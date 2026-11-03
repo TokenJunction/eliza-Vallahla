@@ -24,4 +24,4 @@ jobs:
         with:
           bun-version: 1.4.2
       - name: Test
-        run: bun test packages/valhalla-brain-api/src/score.test.ts
+        run: bun test packages/valhalla-brain-api/src/score.test.ts packages/valhalla-brain-api/src/portal.test.ts && bun packages/valhalla-brain-api/scripts/forbid-portal-sign.ts

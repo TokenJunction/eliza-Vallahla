@@ -1,9 +1,20 @@
 import { DISCLAIMER, PLAN_LIMITS, type PlanName, scoreFromFacts, withinLimit } from "./score.ts";
 import { factsForMint, publicWalletSummary, trendingMints } from "./upstream.ts";
+import { handlePortal } from "./portal.ts";
 
 export interface MemoryStore {
   keys: Map<string, PlanName>;
   usage: Map<string, number>;
+  portal?: {
+    nonces: Map<string, { pubkey: string; message: string; exp: number }>;
+    users: Map<string, { id: string; email: string; plan: "free" | "pro"; wallets: string[]; licenseTail: string; telegram: string; createdAt: number }>;
+    sessions: Map<string, { id: string; userId: string; csrf: string; exp: number; createdAt: number }>;
+    walletIndex: Map<string, string>;
+    emailIndex: Map<string, string>;
+    apiKeys: Map<string, { userId: string; tail: string; hash: string }>;
+    watch: Map<string, string[]>;
+    hits: Map<string, number[]>;
+  };
 }
 
 export interface D1Statement {
@@ -21,6 +32,12 @@ export interface BrainEnv {
   /** Comma or newline list of "sha256:plan". Raw keys are ignored. */
   BRAIN_KEYS?: string;
   LEMONSQUEEZY_SIGNING_SECRET?: string;
+  LEMONSQUEEZY_API_KEY?: string;
+  LEMONSQUEEZY_PORTAL_URL?: string;
+  SESSION_SECRET?: string;
+  GOOGLE_CLIENT_ID?: string;
+  /** Comma-separated Google emails. Never put a real address in the repo. */
+  ADMIN_EMAILS?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -151,6 +168,8 @@ export async function handleRequest(
 ): Promise<Response> {
   if (request.method === "OPTIONS") return json({ ok: true });
   const url = new URL(request.url);
+  const portal = await handlePortal(request, store, env);
+  if (portal) return portal;
   const fetcher = env.fetchImpl ?? fetch;
   if (request.method === "GET" && url.pathname === "/v1/health") {
     return json({ ok: true, service: "valhalla-brain", disclaimer: DISCLAIMER });

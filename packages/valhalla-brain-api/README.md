@@ -38,6 +38,12 @@ VALUES ('<64 hex chars>', 'free', datetime('now'));
 
 You can also set the secret `BRAIN_KEYS` to lines of `hash:free`. A raw key in that secret is ignored.
 
+## Pro portal
+
+The worker serves the portal at `/app`. Sign-in is a Solana login message or Google. The session is an HttpOnly cookie. Set `SESSION_SECRET` before login works. Set `GOOGLE_CLIENT_ID` for Google. Set `ADMIN_EMAILS` to the operator Google emails. Do not commit those values.
+
+The public page is https://valhalla-app.xyz/app. The intended host is https://app.valhalla-app.xyz after a CNAME to this worker. TODO: TJ creates the free Cloudflare project and that DNS record.
+
 ## Deploy for $0
 
 TODO: TJ creates a free Cloudflare account.

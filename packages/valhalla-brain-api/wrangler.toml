@@ -6,6 +6,11 @@ compatibility_date = "2026-11-03"
 # then `wrangler d1 create valhalla-brain` and `wrangler kv namespace create VALHALLA_KV`.
 # Paste the ids below. Do not commit Helius, Birdeye, or API key secrets.
 # Set them with `wrangler secret put HELIUS_API_KEY` and `wrangler secret put BIRDEYE_API_KEY`.
+# Also set SESSION_SECRET, GOOGLE_CLIENT_ID, and ADMIN_EMAILS.
+# ADMIN_EMAILS is a comma-separated list of Google emails. Do not commit a real address.
+# Optional: LEMONSQUEEZY_API_KEY for admin MRR, LEMONSQUEEZY_PORTAL_URL for Manage billing.
+# Point app.valhalla-app.xyz at this worker so the login cookie stays on that host.
+# TODO: TJ creates the free Cloudflare account and the DNS CNAME.
 
 [[d1_databases]]
 binding = "DB"
