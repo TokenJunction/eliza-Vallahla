@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Valhalla — ACCELERATION desk companion</title>
+<meta name="description" content="Valhalla is a phone companion for a trading desk on your computer. Sample demo only. Not financial advice.">
+<meta name="theme-color" content="#050507">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%23050507' width='32' height='32'/%3E%3Crect x='3' y='3' width='26' height='26' fill='none' stroke='%23ffb347' stroke-width='2'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#050507;--panel:#101014;--line:#2a261f;--amber:#ffb347;--text:#f4ecdf;--muted:#c8bfb0;--green:#5dffb0;--red:#ff8b93}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--amber)}
+img,video,canvas{max-width:100%;height:auto}
+.wrap{width:min(1120px,calc(100% - 32px));margin:0 auto}
+header.bar{position:sticky;top:0;z-index:5;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:12px 0;background:rgba(5,5,7,.92);border-bottom:1px solid var(--line)}
+.brand{font-weight:700;letter-spacing:.16em;color:var(--amber);text-decoration:none}
+nav{display:flex;gap:14px;flex-wrap:wrap}
+nav a{color:var(--text);text-decoration:none;font-size:14px}
+.hero{position:relative;min-height:78vh;display:grid;align-items:end;padding:48px 0 36px;overflow:hidden}
+.hero-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.28;background:#120e09}
+.hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,7,.2),var(--bg))}
+.hero-copy{position:relative;z-index:1;max-width:720px}
+h1{font-size:clamp(40px,7vw,76px);line-height:.95;letter-spacing:.04em;margin:0 0 12px}
+.kicker{color:var(--amber);letter-spacing:.22em;font-size:12px;font-weight:700}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.btn,button{min-height:48px;padding:12px 16px;border:1px solid var(--amber);background:#1a140c;color:var(--amber);font:inherit;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+.btn.solid{background:var(--amber);color:#1a1208;font-weight:700}
+.badge{border:1px solid var(--line);color:var(--muted);padding:8px 10px;font-size:13px}
+section{padding:56px 0;border-top:1px solid var(--line)}
+h2{letter-spacing:.08em;margin:0 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);padding:16px}
+.demo-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.tag{color:#1a1208;background:var(--amber);font-size:12px;font-weight:700;letter-spacing:.08em;padding:4px 8px}
+canvas{width:100%;height:180px;background:#08080c;display:block}
+.pos{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.log{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:var(--muted);max-height:140px;overflow:auto}
+.chat{display:flex;flex-direction:column;gap:8px;min-height:220px}
+.bubble{padding:8px 10px;background:#08080c;border:1px solid var(--line);font-size:14px}
+.bubble.you{border-color:#3d3428}
+form{display:flex;gap:8px;flex-wrap:wrap}
+input,textarea{min-height:48px;background:#08080c;color:var(--text);border:1px solid var(--line);padding:10px;font:inherit;width:min(100%,280px)}
+.phone-stage{display:grid;grid-template-columns:280px 1fr;gap:28px;align-items:center}
+.phone{width:260px;height:520px;border:8px solid #2c261c;border-radius:28px;background:#08080c;padding:18px;box-shadow:0 0 0 1px var(--amber);animation:float 4.5s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-8px)}}
+.screen{display:none}
+.screen.on{display:block}
+.price{font-size:32px;margin:8px 0}
+footer{padding:28px 0 48px;color:var(--muted);font-size:14px;border-top:1px solid var(--line)}
+@media(max-width:800px){.phone-stage{grid-template-columns:1fr}.phone{margin:0 auto}}
+@media(prefers-reduced-motion:reduce){.phone{animation:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<header class="bar wrap">
+  <a class="brand" href="#top">VALHALLA</a>
+  <nav>
+    <a href="#demo">Demo</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#api">Brain API</a>
+    <a href="#download">Download</a>
+  </nav>
+</header>
+<main id="top">
+  <section class="hero wrap">
+    <video class="hero-video" autoplay muted loop playsinline preload="none" poster="">
+      <source src="media/hero.mp4" type="video/mp4">
+    </video>
+    <div class="hero-shade"></div>
+    <div class="hero-copy">
+      <p class="kicker">ACCELERATION</p>
+      <h1>The desk stays on the computer.</h1>
+      <p>Valhalla is a phone companion for that desk. It can show status, chat, and a safe restart. It does not hold a wallet key, and it cannot send or withdraw.</p>
+      <div class="row">
+        <a class="btn solid" href="https://github.com/TokenJunction/eliza-valhalla/releases/download/v0.1.1-phone/valhalla-phone.apk">Download the APK</a>
+        <a class="btn" href="#demo">Try the demo</a>
+        <span class="badge">Coming to Google Play</span>
+        <span class="badge">Coming to the App Store</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="wrap">
+      <div class="demo-top">
+        <h2>Live demo</h2>
+        <span class="tag">DEMO</span>
+      </div>
+      <p>Sample data only. The chart and the trades are simulated. They are not your account and they are not a promise of profit.</p>
+      <div class="grid">
+        <article class="card">
+          <h3>P&amp;L</h3>
+          <canvas id="chart" width="640" height="180" aria-label="Demo profit and loss chart"></canvas>
+          <p id="pnl">Demo P&amp;L: 0.00 SOL</p>
+        </article>
+        <article class="card">
+          <h3>Open positions</h3>
+          <div id="positions"></div>
+        </article>
+        <article class="card">
+          <h3>Self-repair</h3>
+          <div id="repairs" class="log"></div>
+          <button type="button" id="stall">Simulate a stall</button>
+        </article>
+        <article class="card">
+          <h3>Valhalla Brain</h3>
+          <div id="chat" class="chat" aria-live="polite"></div>
+          <form id="ask">
+            <label>Ask the demo <input id="q" name="q" autocomplete="off" placeholder="status, positions, repair"></label>
+            <button type="submit">Send</button>
+          </form>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="phone">
+    <div class="wrap phone-stage">
+      <div class="phone" aria-hidden="true">
+        <p class="kicker">PHONE</p>
+        <div class="screen on" data-screen>
+          <h3>Pair</h3>
+          <p>Desk address</p>
+          <p>Scan a QR. Not a wallet key.</p>
+        </div>
+        <div class="screen" data-screen>
+          <h3>Status</h3>
+          <p>Read-only</p>
+          <p>No open positions</p>
+        </div>
+        <div class="screen" data-screen>
+          <h3>Chat</h3>
+          <p>Same agent as the PC.</p>
+          <p>Confirm before a setting changes.</p>
+        </div>
+      </div>
+      <div>
+        <h2>The phone app</h2>
+        <p>Pair, read status, and ask the agent. Recover agent restarts the loop only when no position is open. Ads, when they are on, stay off that control.</p>
+        <video preload="none" playsinline muted width="320" height="180">
+          <source src="media/phone.mp4" type="video/mp4">
+        </video>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>Features</h2>
+      <div class="grid">
+        <article class="card"><h3>Desk on the PC</h3><p>The command center runs on your computer. The phone watches it.</p></article>
+        <article class="card"><h3>Reconnect</h3><p>If the link drops, the phone waits and tries again. The last status stays on screen.</p></article>
+        <article class="card"><h3>Safe restart</h3><p>One tap asks the PC to recover. Open positions are left alone.</p></article>
+        <article class="card"><h3>Same chat</h3><p>Questions go to the agent on the PC. A settings idea waits for your confirm tap.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="security">
+    <div class="wrap">
+      <h2>Security</h2>
+      <div class="grid">
+        <article class="card"><h3>No key on the phone</h3><p>The wallet key stays on the computer. The phone cannot send, withdraw, or take custody.</p></article>
+        <article class="card"><h3>Read-only until you arm it</h3><p>Live trading is armed on the PC, not from a phone button that moves funds.</p></article>
+        <article class="card"><h3>Delete the phone data</h3><p>The error screen can clear the address, the chat, and the log stored on that phone.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <div class="wrap">
+      <h2>Pricing</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>Free</h3>
+          <p class="price">$0</p>
+          <p>The phone APK, pairing, and status. Sideload today.</p>
+          <a class="btn" href="#download">Get the APK</a>
+        </article>
+        <article class="card">
+          <h3>Pro</h3>
+          <p class="price">Store price</p>
+          <p>The Valhalla desk for people who want the full companion. Checkout is the Valhalla store on Lemon Squeezy. The payment button is a placeholder until that product link is connected.</p>
+          <a class="btn solid" href="https://valhalla.lemonsqueezy.com" rel="noopener">Pro on Lemon Squeezy</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="api">
+    <div class="wrap">
+      <h2>Valhalla Brain API</h2>
+      <p>Developers can ask for access to the same agent the desk uses. Access is a request, not an open key. Checkout for API plans can move to Lemon Squeezy later.</p>
+      <form id="api-form">
+        <label>Work email <input id="api-email" type="email" required autocomplete="email"></label>
+        <label>What you want to build <input id="api-note" required maxlength="240"></label>
+        <button type="submit">Request access</button>
+      </form>
+      <video preload="none" playsinline muted width="480" height="270">
+        <source src="media/desk.mp4" type="video/mp4">
+      </video>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <h2>Download</h2>
+      <p>The APK is a sideload file. Android will warn you. That is expected until the Play listing is approved.</p>
+      <div class="row">
+        <a class="btn solid" href="https://github.com/TokenJunction/eliza-valhalla/releases/download/v0.1.1-phone/valhalla-phone.apk">Download valhalla-phone.apk</a>
+        <span class="badge">Coming to Google Play</span>
+        <span class="badge">Coming to the App Store</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <h2>FAQ</h2>
+      <article class="card"><h3>Is the demo my account?</h3><p>No. It is sample data in this browser. It does not connect a wallet.</p></article>
+      <article class="card"><h3>Does the phone hold funds?</h3><p>No. There is no send or withdraw control on the phone.</p></article>
+      <article class="card"><h3>How do I join the waitlist?</h3><p>Use the form below. It opens a GitHub issue so the request is not stored in this page.</p></article>
+    </div>
+  </section>
+
+  <section id="waitlist">
+    <div class="wrap">
+      <h2>Waitlist</h2>
+      <form id="wait">
+        <label>Email <input id="wait-email" type="email" required autocomplete="email"></label>
+        <button type="submit">Join the waitlist</button>
+      </form>
+    </div>
+  </section>
+</main>
+<footer>
+  <div class="wrap">
+    <p>Not financial advice. Valhalla does not promise profit. The demo is simulated. You can lose money if you trade.</p>
+    <p><a href="https://github.com/TokenJunction/eliza-valhalla">Source</a> · <a href="https://tokenjunction.github.io/eliza-valhalla/">tokenjunction.github.io/eliza-valhalla</a></p>
+  </div>
+</footer>
+<script>
+(function () {
+  var equity = [0.27, 0.26, 0.28, 0.25, 0.29, 0.27, 0.3, 0.28];
+  var positions = [
+    { name: "DEMO-A", lane: "paper", pnl: "+1.2%" },
+    { name: "DEMO-B", lane: "paper", pnl: "-0.4%" }
+  ];
+  var repairs = ["DEMO: watch started. No funds moved."];
+  var chart = document.getElementById("chart");
+  var ctx = chart.getContext("2d");
+
+  function draw() {
+    var w = chart.width, h = chart.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = "#ffb347";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    equity.forEach(function (v, i) {
+      var x = (i / (equity.length - 1)) * (w - 16) + 8;
+      var y = h - ((v - 0.2) / 0.2) * (h - 16) - 8;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  function renderPositions() {
+    var box = document.getElementById("positions");
+    box.replaceChildren();
+    positions.forEach(function (p) {
+      var row = document.createElement("div");
+      row.className = "pos";
+      row.textContent = p.name + " · " + p.lane + " · " + p.pnl;
+      box.appendChild(row);
+    });
+  }
+
+  function renderRepairs() {
+    document.getElementById("repairs").textContent = repairs.join("\n");
+  }
+
+  function tick() {
+    var last = equity[equity.length - 1];
+    var next = Math.max(0.22, Math.min(0.34, last + (Math.random() - 0.5) * 0.01));
+    equity.push(Number(next.toFixed(3)));
+    if (equity.length > 24) equity.shift();
+    var pnl = next - equity[0];
+    document.getElementById("pnl").textContent = "Demo P&L: " + (pnl >= 0 ? "+" : "") + pnl.toFixed(3) + " SOL (sample)";
+    draw();
+  }
+
+  document.getElementById("stall").addEventListener("click", function () {
+    repairs.push("DEMO: stall detected. Loop restarted. No positions were open.");
+    if (repairs.length > 6) repairs.shift();
+    renderRepairs();
+  });
+
+  function answer(text) {
+    var q = text.toLowerCase();
+    if (q.indexOf("position") >= 0) return "DEMO: two paper lines are open. Nothing was sent.";
+    if (q.indexOf("p&l") >= 0 || q.indexOf("pnl") >= 0 || q.indexOf("profit") >= 0) return "DEMO: the chart is sample data. It is not a forecast.";
+    if (q.indexOf("repair") >= 0 || q.indexOf("stall") >= 0) return "DEMO: a restart runs only when no position is open.";
+    if (q.indexOf("status") >= 0) return "DEMO: the desk is read-only in this preview.";
+    if (q.indexOf("key") >= 0 || q.indexOf("send") >= 0 || q.indexOf("withdraw") >= 0) return "No. This demo cannot send, withdraw, or hold a key.";
+    return "DEMO: I can talk about status, positions, the sample P&L, or a repair. I do not move funds.";
+  }
+
+  function addBubble(cls, text) {
+    var el = document.createElement("div");
+    el.className = "bubble " + cls;
+    el.textContent = text;
+    var log = document.getElementById("chat");
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  document.getElementById("ask").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var input = document.getElementById("q");
+    var text = input.value.trim();
+    if (!text) return;
+    addBubble("you", "You: " + text);
+    addBubble("", answer(text));
+    input.value = "";
+  });
+
+  function issue(title, body) {
+    var url = new URL("https://github.com/TokenJunction/eliza-valhalla/issues/new");
+    url.searchParams.set("title", title);
+    url.searchParams.set("body", body);
+    window.open(url.toString(), "_blank", "noopener");
+  }
+
+  document.getElementById("wait").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var email = document.getElementById("wait-email").value.trim();
+    issue("Waitlist", "Email: " + email + "\n\nPlease add me to the Valhalla waitlist.");
+  });
+
+  document.getElementById("api-form").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var email = document.getElementById("api-email").value.trim();
+    var note = document.getElementById("api-note").value.trim();
+    issue("Valhalla Brain API access", "Email: " + email + "\n\n" + note);
+  });
+
+  var screens = document.querySelectorAll("[data-screen]");
+  var screenIndex = 0;
+  setInterval(function () {
+    screens[screenIndex].classList.remove("on");
+    screenIndex = (screenIndex + 1) % screens.length;
+    screens[screenIndex].classList.add("on");
+  }, 2800);
+
+  renderPositions();
+  renderRepairs();
+  draw();
+  setInterval(tick, 2000);
+  addBubble("", "DEMO: ask about status, positions, or a repair.");
+})();
+</script>
+</body>
+</html>
