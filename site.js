@@ -1,8 +1,12 @@
 (function () {
   var cfg = window.VALHALLA_SITE || {};
   var price = cfg.PRO_PRICE || "$9.99/mo launch price";
+  var trialDays = Number(cfg.TRIAL_DAYS) > 0 ? Number(cfg.TRIAL_DAYS) : 15;
   document.querySelectorAll("[data-price]").forEach(function (node) {
     node.textContent = price;
+  });
+  document.querySelectorAll("[data-trial]").forEach(function (node) {
+    node.textContent = trialDays + " day free Pro trial";
   });
 
   function checkoutHref(base, source) {

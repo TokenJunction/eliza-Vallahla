@@ -10,6 +10,7 @@ window.VALHALLA_SITE = {
   adsense: false,
   adsenseClient: "",
   SIGNED_IN_EMAIL: "",
+  TRIAL_DAYS: 15,
   PRO_PRICE: "$9.99/mo launch price",
   LEMONSQUEEZY_CHECKOUT_URL: "https://valhalla.lemonsqueezy.com/checkout/buy/4f959b69-81ca-45ca-8c3d-c80347b6b439",
   LEMONSQUEEZY_YEARLY_URL: "",
