@@ -35,6 +35,12 @@ window.VALHALLA_SITE = {
   AUTH_URL: "",
   /* Paste the live Spring store URL before any buy button is enabled. */
   SPRING_STORE_URL: "",
+  /* Merch card. Leave enabled false until shop.url is a live https store. */
+  shop: {
+    url: "",
+    code: "VALHALLA25",
+    enabled: false
+  },
   /* Empty until the analysis API is deployed. Leader mode stays off while this is empty. */
   AGENT_API_URL: "",
   /* Public status only. Leave empty until the keeper is deployed. An empty value must show Status unavailable. */

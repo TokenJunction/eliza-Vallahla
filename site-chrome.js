@@ -10,6 +10,11 @@
       ask.src = "/app/ask.js";
       document.body.appendChild(ask);
     }
+    if (!document.querySelector('script[src="/merch-promo.js"]')) {
+      var merch = document.createElement("script");
+      merch.src = "/merch-promo.js";
+      document.body.appendChild(merch);
+    }
     if (!window.ValhallaConsent && !document.querySelector('script[src="/consent.js"]')) {
       var consent = document.createElement("script");
       consent.src = "/consent.js";
