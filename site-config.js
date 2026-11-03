@@ -18,5 +18,6 @@ window.VALHALLA_SITE = {
   LEMONSQUEEZY_LIFETIME_URL: "",
   CHROME_WEB_STORE_URL: "",
   /* Paste the Brain API click address when the worker hostname is live. Example: https://YOUR-WORKER/v1/offers/click */
-  OFFER_CLICK_URL: ""
+  OFFER_CLICK_URL: "",
+  BRAIN_URL: ""
 };

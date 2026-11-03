@@ -67,10 +67,16 @@
     });
   }
 
+  function accepted(doc) {
+    if (!doc || !window.ValhallaTrust || !window.nacl) return [];
+    var offers = window.ValhallaTrust.verifyOffers(window.nacl, doc);
+    return offers || [];
+  }
+
   fetch(document.body.dataset.offers || "offers.json")
     .then(function (res) { return res.ok ? res.json() : null; })
     .then(function (doc) {
-      var offers = doc && Array.isArray(doc.offers) ? doc.offers : [];
+      var offers = accepted(doc);
       fillFooter(offers);
       fillTools(offers);
     })
