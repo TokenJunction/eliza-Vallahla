@@ -127,6 +127,16 @@ async function draw() {
   say("balances", balances.note);
   say("account", "Plan " + me.plan + ". License " + (me.licenseTail || "none") + ".");
 }
+async function payCrypto(asset) {
+  try {
+    const order = await send("/v1/crypto/order", { plan: "monthly", asset });
+    say("crypto-out", "Recipient ends " + order.recipientTail + ". " + order.refunds + " Open " + order.phantom);
+  } catch (err) {
+    say("crypto-out", err.message);
+  }
+}
+document.getElementById("pay-usdc")?.addEventListener("click", () => { payCrypto("usdc"); });
+document.getElementById("pay-sol")?.addEventListener("click", () => { payCrypto("sol"); });
 document.getElementById("siws")?.addEventListener("click", () => { signInWallet().catch((err) => say("login-note", err.message)); });
 document.getElementById("logout")?.addEventListener("click", () => { send("/v1/auth/logout", {}).then(() => location.reload()); });
 draw().catch(() => {});
@@ -165,7 +175,13 @@ section { margin: 24px 0; }
 <aside id="offers" hidden><h3>Recommended tools</h3><div id="offer-list"></div><p class="note"><a href="https://valhalla-app.xyz/tools/">All tools</a></p></aside>
 <aside id="portal-ad" hidden><p class="note">Advertisement</p><ins class="adsbygoogle" style="display:block;min-height:90px" data-ad-client="ca-pub-6504655762357230" data-ad-format="auto" data-full-width-responsive="true"></ins></aside>
 </section>
-<section id="account"><h2>Account</h2><p id="account"></p><p><a class="btn" id="billing" href="https://app.lemonsqueezy.com/my-orders">Manage billing</a></p></section>
+<section id="account"><h2>Account</h2><p id="account"></p><p><a class="btn" id="billing" href="https://app.lemonsqueezy.com/my-orders">Pay with card</a></p>
+<h3>Pay with crypto</h3>
+<p class="note">Monthly is $9.99, yearly is $149, and lifetime is $199. Those prices come from the signed config. USDC is the default. A SOL quote locks for 10 minutes. Refunds are manual. This page never holds a wallet key.</p>
+<button id="pay-usdc" type="button">Pay monthly with USDC</button>
+<button id="pay-sol" type="button">Pay monthly with SOL</button>
+<p id="crypto-out" class="note"></p>
+</section>
 </main>
 <script src="/app/portal.js"></script>
 </body>

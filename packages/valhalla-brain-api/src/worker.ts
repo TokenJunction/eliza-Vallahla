@@ -1,3 +1,5 @@
+import { pollCryptoOrders } from "./crypto-pay.ts";
+import { handleProTrades, handleSiwsVerify } from "./pro-trades.ts";
 import { handlePortal } from "./portal.ts";
 import {
   DISCLAIMER,
@@ -22,6 +24,8 @@ export interface MemoryStore {
     watch: Map<string, string[]>;
     hits: Map<string, number[]>;
   };
+  proTrades?: Map<string, { remaining: number; used: Set<string> }>;
+  crypto?: { orders: Map<string, unknown>; receipts: unknown[]; seen: Set<string> };
 }
 
 export interface D1Statement {
@@ -45,6 +49,10 @@ export interface BrainEnv {
   GOOGLE_CLIENT_ID?: string;
   /** Comma-separated Google emails. Never put a real address in the repo. */
   ADMIN_EMAILS?: string;
+  /** PKCS8 PEM. Not stored in the repo. Counters are unsigned until this is set. */
+  VALHALLA_MONETIZATION_PEM?: string;
+  /** Public URL of the signed monetization.json. Defaults to the site copy. */
+  MONETIZATION_URL?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -175,6 +183,10 @@ export async function handleRequest(
 ): Promise<Response> {
   if (request.method === "OPTIONS") return json({ ok: true });
   const url = new URL(request.url);
+  const signIn = await handleSiwsVerify(request);
+  if (signIn) return signIn;
+  const trades = await handleProTrades(request, store, env);
+  if (trades) return trades;
   const portal = await handlePortal(request, store, env);
   if (portal) return portal;
   const fetcher = env.fetchImpl ?? fetch;
@@ -245,8 +257,13 @@ export async function handleRequest(
   return json({ error: "Not found", disclaimer: DISCLAIMER }, 404);
 }
 
+const durable: MemoryStore = { keys: new Map(), usage: new Map() };
+
 export default {
   async fetch(request: Request, env: BrainEnv = {}): Promise<Response> {
-    return handleRequest(request, { keys: new Map(), usage: new Map() }, env);
+    return handleRequest(request, durable, env);
+  },
+  async scheduled(_event: unknown, env: BrainEnv = {}): Promise<void> {
+    await pollCryptoOrders(durable, env);
   },
 };

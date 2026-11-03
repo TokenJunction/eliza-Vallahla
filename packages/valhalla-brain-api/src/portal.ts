@@ -1,3 +1,4 @@
+import { openOrder, orderView, readPayConfig, receiptsCsv } from "./crypto-pay.ts";
 import { decodeBase58 } from "./base58.ts";
 import { DISCLAIMER } from "./score.ts";
 import type { BrainEnv, MemoryStore } from "./worker.ts";
@@ -270,7 +271,7 @@ async function offerTotals(data: PortalData, env: BrainEnv): Promise<Array<{ id:
 export async function handlePortal(request: Request, store: MemoryStore, env: BrainEnv): Promise<Response | null> {
   const url = new URL(request.url);
   const path = url.pathname;
-  const portalPath = path === "/app" || path.startsWith("/app/") || path.startsWith("/v1/auth") || path.startsWith("/v1/me") || path.startsWith("/v1/admin") || path === "/v1/offers/click";
+  const portalPath = path === "/app" || path.startsWith("/app/") || path.startsWith("/v1/auth") || path.startsWith("/v1/me") || path.startsWith("/v1/admin") || path.startsWith("/v1/crypto") || path === "/v1/offers/click";
   if (!portalPath) return null;
   const data = portalOf(store);
   const now = Date.now();
@@ -344,6 +345,34 @@ export async function handlePortal(request: Request, store: MemoryStore, env: Br
   if (request.method !== "GET" && !csrfOk(request, current.row)) return json({ error: "Refresh the page and try again", disclaimer: DISCLAIMER }, 403);
   const user = current.user;
   const admin = adminEmails(env).has(user.email.toLowerCase());
+
+  if (request.method === "POST" && path === "/v1/crypto/order") {
+    if (!user.email.includes("@")) return json({ error: "Sign in with Google before paying with crypto", disclaimer: DISCLAIMER }, 400);
+    const config = await readPayConfig(env);
+    if (!config) return json({ error: "Crypto checkout is off until the signed config verifies", disclaimer: DISCLAIMER }, 503);
+    const body = (await request.json().catch(() => ({}))) as { plan?: string; asset?: string };
+    const plan = body.plan === "yearly" || body.plan === "lifetime" ? body.plan : "monthly";
+    const asset = body.asset === "sol" ? "sol" : "usdc";
+    let solPriceUsd = 0;
+    if (asset === "sol") {
+      const fetcher = env.fetchImpl ?? fetch;
+      try {
+        const quote = await fetcher("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+        const priced = (await quote.json()) as { solana?: { usd?: number } };
+        solPriceUsd = Number(priced.solana?.usd || 0);
+      } catch {
+        solPriceUsd = 0;
+      }
+      if (!solPriceUsd) return json({ error: "SOL price is not available. Pay with USDC.", disclaimer: DISCLAIMER }, 503);
+    }
+    const order = await openOrder(store, { userId: user.id, email: user.email, plan, asset, config, solPriceUsd, now });
+    if (!order) return json({ error: "Crypto checkout is off", disclaimer: DISCLAIMER }, 503);
+    return json({ ok: true, ...orderView(order) });
+  }
+  if (request.method === "GET" && path === "/v1/admin/crypto-receipts.csv") {
+    if (!admin) return json({ error: "Not an admin", disclaimer: DISCLAIMER }, 403);
+    return new Response(receiptsCsv(store), { headers: { "content-type": "text/csv; charset=utf-8", "cache-control": "no-store" } });
+  }
 
   if (request.method === "POST" && path === "/v1/auth/link/google") {
     if (!env.GOOGLE_CLIENT_ID) return json({ error: "Google sign-in is not configured", disclaimer: DISCLAIMER }, 503);
