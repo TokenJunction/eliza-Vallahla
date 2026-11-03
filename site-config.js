@@ -16,5 +16,7 @@ window.VALHALLA_SITE = {
   LEMONSQUEEZY_CHECKOUT_URL: "https://valhalla.lemonsqueezy.com/checkout/buy/4f959b69-81ca-45ca-8c3d-c80347b6b439",
   LEMONSQUEEZY_YEARLY_URL: "",
   LEMONSQUEEZY_LIFETIME_URL: "",
-  CHROME_WEB_STORE_URL: ""
+  CHROME_WEB_STORE_URL: "",
+  /* Paste the Brain API click address when the worker hostname is live. Example: https://YOUR-WORKER/v1/offers/click */
+  OFFER_CLICK_URL: ""
 };
