@@ -35,12 +35,8 @@
     link.href = store || "extension/";
   });
   document.querySelectorAll("[data-pro]").forEach(function (link) {
-    var href = checkoutHref(cfg.LEMONSQUEEZY_CHECKOUT_URL, "website");
-    if (href) {
-      link.href = href;
-      link.classList.add("lemonsqueezy-button");
-    }
-    link.addEventListener("click", proClick);
+    link.href = "app/";
+    link.classList.remove("lemonsqueezy-button");
   });
   function showPlan(name, raw) {
     var href = checkoutHref(raw, "website");

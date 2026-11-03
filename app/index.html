@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Valhalla Pro</title>
+<style>
+body { margin: 0; font: 16px/1.45 system-ui, sans-serif; background: #07080b; color: #e7eef8; }
+main { max-width: 880px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { color: #e8b65a; letter-spacing: .08em; }
+button, a.btn { background: #e8b65a; color: #07080b; border: 0; min-height: 40px; padding: 0 16px; font-weight: 700; text-decoration: none; display: inline-block; line-height: 40px; }
+.note { color: #93a4ba; }
+.lock { filter: grayscale(1); opacity: .72; border: 1px solid #3a3428; padding: 12px; }
+section { margin: 24px 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>VALHALLA</h1>
+<p class="note">Read-only portal. Sign-in proves you hold the wallet. It does not send or withdraw. Not financial advice. The login cookie is set by this host. For the public site, use https://valhalla-app.xyz/app until app.valhalla-app.xyz points here.</p>
+<section id="login">
+<h2>Log in</h2>
+<button id="siws" type="button">Sign in with Phantom, Solflare, or Backpack</button>
+<div id="google"></div>
+<p id="login-note" class="note">The login message expires quickly. Valhalla never asks for a seed phrase.</p>
+</section>
+<section id="app" hidden>
+<p id="who"></p>
+<nav><a href="#dashboard">Dashboard</a> <a href="#account">Account</a> <button id="logout" type="button">Sign out</button></nav>
+<section id="dashboard"><h2>Dashboard</h2><p id="balances"></p><h3>Trader Report Card</h3><div id="report"></div></section>
+<section id="account"><h2>Account</h2><p id="account"></p><p><a class="btn" id="billing" href="https://app.lemonsqueezy.com/my-orders">Manage billing</a></p></section>
+</main>
+<script src="/app/portal.js"></script>
+</body>
+</html>
