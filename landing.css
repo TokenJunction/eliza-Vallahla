@@ -1,0 +1,28 @@
+html:has(body.landing),
+body.landing { height: auto; overflow: auto; }
+body.landing { background: #050507; color: #f2ead8; }
+.land { width: min(1040px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 64px; }
+.land-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0 28px; }
+.land-nav .brand { color: #ffb347; letter-spacing: .18em; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+.hero-copy h1 { font-size: clamp(36px, 6vw, 64px); line-height: .95; letter-spacing: .04em; margin: 8px 0 12px; }
+.hero-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 28px; align-items: center; }
+.sub { color: #cfc6b6; font-size: 16px; max-width: 46ch; }
+.cta-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.preview { position: relative; border: 1px solid #1c1a16; background: #0a0a0e; }
+.preview img { width: 100%; height: auto; display: block; filter: blur(1.5px); }
+.preview span { position: absolute; left: 10px; top: 10px; border: 1px solid #ffb347; color: #ffb347; padding: 2px 8px; letter-spacing: .14em; font-size: 11px; background: rgba(5,5,7,.8); }
+.blocks, .steps, .prices { display: grid; gap: 12px; margin-top: 14px; }
+.blocks, .prices { grid-template-columns: 1fr 1fr; }
+.steps { grid-template-columns: 1fr 1fr 1fr; }
+.features { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+.land section { padding: 36px 0; border-top: 1px solid #1c1a16; }
+.land article, .price { border: 1px solid #1c1a16; background: #0a0a0e; padding: 14px; }
+.land h2 { letter-spacing: .12em; font-size: 22px; margin-bottom: 8px; }
+.kicker { color: #ff9a1f; letter-spacing: .2em; font-size: 11px; }
+.land a { color: #ffb347; }
+.land form { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.land input { background: #050507; color: #f2ead8; border: 1px solid #1c1a16; padding: 10px; min-width: 220px; font: inherit; }
+.foot-links { color: #7a7468; font-size: 13px; }
+@media (max-width: 800px) {
+  .hero-grid, .blocks, .steps, .features, .prices { grid-template-columns: 1fr; }
+}
