@@ -30,6 +30,11 @@ async function signInWallet() {
 async function signInGoogle(credential) { await send("/v1/auth/google", { credential }); location.hash = "#dashboard"; await draw(); }
 function lock(on, html) { return on ? '<div class="lock"><span>Locked</span>' + html + '<button type="button" id="upgrade">Upgrade</button></div>' : html; }
 async function draw() {
+  const probe = await fetch(api + "/v1/auth/config", { credentials: "same-origin" }).catch(() => null);
+  if (!probe || !probe.ok) {
+    say("login-note", "Sign-in runs on the Brain API worker. Until app.valhalla-app.xyz points at that worker, this page cannot start a session.");
+    return;
+  }
   const me = await fetch("/v1/me", { credentials: "same-origin" }).then((res) => res.ok ? res.json() : null).catch(() => null);
   document.getElementById("login").hidden = Boolean(me);
   document.getElementById("app").hidden = !me;
