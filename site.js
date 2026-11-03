@@ -8,6 +8,19 @@
   document.querySelectorAll("[data-trial]").forEach(function (node) {
     node.textContent = trialDays + " day free Pro trial";
   });
+  fetch("version.json", { cache: "no-store" }).then(function (res) {
+    return res.ok ? res.json() : null;
+  }).then(function (doc) {
+    if (!doc || !doc.version) return;
+    var key = "valhalla-site-version";
+    var seen = localStorage.getItem(key);
+    if (seen && seen !== doc.version) {
+      localStorage.setItem(key, doc.version);
+      location.reload();
+      return;
+    }
+    localStorage.setItem(key, doc.version);
+  }).catch(function () {});
 
   function checkoutHref(base, source) {
     var trimmed = (base || "").trim();
