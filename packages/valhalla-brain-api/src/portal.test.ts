@@ -55,6 +55,37 @@ describe("Valhalla portal", () => {
     const admin = await handleRequest(new Request("https://brain.local/v1/admin/overview", { headers }), store, env);
     expect(admin.status).toBe(403);
   });
+
+  it("counts an offer click with no account data", async () => {
+    const store = empty();
+    const post = () =>
+      handleRequest(
+        new Request("https://brain.local/v1/offers/click", {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "https://valhalla-app.xyz" },
+          body: JSON.stringify({ id: "ledger", placement: "tools", email: "hidden@example.com" }),
+        }),
+        store,
+        env
+      );
+    const first = await post();
+    expect(first.status).toBe(200);
+    expect(first.headers.get("access-control-allow-origin")).toBe("*");
+    expect((await post()).status).toBe(200);
+    expect(store.portal?.offerClicks.get("ledger:tools")).toBe(2);
+    const clicks = [...(store.portal?.offerClicks.entries() ?? [])];
+    expect(JSON.stringify(clicks)).not.toContain("example.com");
+    const bad = await handleRequest(
+      new Request("https://brain.local/v1/offers/click", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "Ledger", placement: "tools" }),
+      }),
+      store,
+      env
+    );
+    expect(bad.status).toBe(400);
+  });
 });
 
 async function signIn(store: MemoryStore): Promise<{ pubkey: string; login: Response }> {

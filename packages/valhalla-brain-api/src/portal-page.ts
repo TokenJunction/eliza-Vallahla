@@ -51,6 +51,64 @@ async function draw() {
   say("who", (me.email || "Wallet") + " · " + me.plan);
   const report = await send("/v1/me/report");
   document.getElementById("report").innerHTML = lock(!pro, report.locked ? report.preview : report.note);
+  const offers = document.getElementById("offers");
+  if (offers) {
+    offers.hidden = pro || location.hash === "#account";
+    if (!pro && !offers.dataset.loaded) {
+      offers.dataset.loaded = "1";
+      const label = "Affiliate link · we may earn a commission";
+      fetch("https://valhalla-app.xyz/offers.json").then((res) => res.ok ? res.json() : null).then((doc) => {
+        const rows = doc && Array.isArray(doc.offers) ? doc.offers : [];
+        const live = rows.filter((row) => typeof row.url === "string" && row.url.indexOf("https://") === 0 && (row.placements || []).indexOf("portal") >= 0);
+        const chart = rows.filter((row) => typeof row.url === "string" && row.url.indexOf("https://") === 0 && (row.placements || []).indexOf("report-card") >= 0)[0];
+        const note = document.createElement("p");
+        note.className = "note";
+        if (chart) {
+          const link = document.createElement("a");
+          link.href = chart.url;
+          link.target = "_blank";
+          link.rel = "sponsored noopener noreferrer";
+          link.textContent = "Chart better. " + chart.partner + ".";
+          link.addEventListener("click", () => { fetch("/v1/offers/click", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: chart.id, placement: "report-card" }) }).catch(() => {}); });
+          note.appendChild(link);
+          note.appendChild(document.createTextNode(" " + label + ". Not trading advice."));
+        } else {
+          note.textContent = "Chart better. Not trading advice.";
+        }
+        document.getElementById("report").appendChild(note);
+        const list = document.getElementById("offer-list");
+        if (!list) return;
+        if (!live.length) {
+          const empty = document.createElement("p");
+          empty.className = "note";
+          empty.textContent = "Partner links are not connected yet. Not trading advice.";
+          list.appendChild(empty);
+          return;
+        }
+        live.forEach((row) => {
+          const link = document.createElement("a");
+          link.href = row.url;
+          link.target = "_blank";
+          link.rel = "sponsored noopener noreferrer";
+          link.textContent = row.partner + ": " + row.title;
+          link.addEventListener("click", () => { fetch("/v1/offers/click", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: row.id, placement: "portal" }) }).catch(() => {}); });
+          const line = document.createElement("p");
+          line.appendChild(link);
+          list.appendChild(line);
+        });
+        const fine = document.createElement("p");
+        fine.className = "note";
+        fine.textContent = label + ". Not trading advice.";
+        list.appendChild(fine);
+      }).catch(() => {
+        const note = document.createElement("p");
+        note.className = "note";
+        note.textContent = "Chart better. Not trading advice.";
+        const report = document.getElementById("report");
+        if (report) report.appendChild(note);
+      });
+    }
+  }
   const ad = document.getElementById("portal-ad");
   if (ad) {
     ad.hidden = pro || location.hash === "#account";
@@ -104,6 +162,7 @@ section { margin: 24px 0; }
 <p id="who"></p>
 <nav><a href="#dashboard">Dashboard</a> <a href="#account">Account</a> <button id="logout" type="button">Sign out</button></nav>
 <section id="dashboard"><h2>Dashboard</h2><p id="balances"></p><h3>Trader Report Card</h3><div id="report"></div>
+<aside id="offers" hidden><h3>Recommended tools</h3><div id="offer-list"></div><p class="note"><a href="https://valhalla-app.xyz/tools/">All tools</a></p></aside>
 <aside id="portal-ad" hidden><p class="note">Advertisement</p><ins class="adsbygoogle" style="display:block;min-height:90px" data-ad-client="ca-pub-6504655762357230" data-ad-format="auto" data-full-width-responsive="true"></ins></aside>
 </section>
 <section id="account"><h2>Account</h2><p id="account"></p><p><a class="btn" id="billing" href="https://app.lemonsqueezy.com/my-orders">Manage billing</a></p></section>

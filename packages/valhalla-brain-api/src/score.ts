@@ -65,6 +65,18 @@ export function scoreFromFacts(facts: ScoreFacts): ScoreResult {
   };
 }
 
+/** A low score can mention a hardware wallet. The partner URL stays in offers.json. */
+export function offerHint(
+  score: number,
+): { category: string; title: string; disclosure: string } | null {
+  if (score > 40) return null;
+  return {
+    category: "hardware-wallet",
+    title: "Protect your coins: hardware wallet",
+    disclosure: "Affiliate link · we may earn a commission",
+  };
+}
+
 export const PLAN_LIMITS = { free: 100, dev: 5_000, pro: 100_000 } as const;
 export type PlanName = keyof typeof PLAN_LIMITS;
 

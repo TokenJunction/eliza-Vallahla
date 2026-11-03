@@ -42,6 +42,8 @@ export interface PortalData {
   apiKeys: Map<string, { userId: string; tail: string; hash: string }>;
   watch: Map<string, string[]>;
   hits: Map<string, number[]>;
+  offerClicks: Map<string, number>;
+  clickHits: Map<string, number[]>;
 }
 
 function portalOf(store: MemoryStore): PortalData {
@@ -55,6 +57,8 @@ function portalOf(store: MemoryStore): PortalData {
       apiKeys: new Map(),
       watch: new Map(),
       hits: new Map(),
+      offerClicks: new Map(),
+      clickHits: new Map(),
     };
   }
   return store.portal;
@@ -195,14 +199,83 @@ function csrfOk(request: Request, row: SessionRow): boolean {
   return request.headers.get("x-csrf") === row.csrf;
 }
 
+function clickLimited(data: PortalData, ip: string, now: number): boolean {
+  const recent = (data.clickHits.get(ip) ?? []).filter((at) => now - at < 60_000);
+  if (recent.length >= 30) {
+    data.clickHits.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  data.clickHits.set(ip, recent);
+  return false;
+}
+
+async function countOfferClick(request: Request, data: PortalData, env: BrainEnv): Promise<Response> {
+  if (!data.offerClicks) data.offerClicks = new Map();
+  if (!data.clickHits) data.clickHits = new Map();
+  if (request.method !== "POST") return json({ error: "POST only", disclaimer: DISCLAIMER }, 405);
+  const ip = request.headers.get("cf-connecting-ip") || "local";
+  if (clickLimited(data, ip, Date.now())) return json({ error: "Too many clicks", disclaimer: DISCLAIMER }, 429);
+  const raw = await request.text();
+  if (raw.length > 400) return json({ error: "Too large", disclaimer: DISCLAIMER }, 400);
+  let body: { id?: string; placement?: string };
+  try {
+    body = JSON.parse(raw) as { id?: string; placement?: string };
+  } catch {
+    return json({ error: "Bad JSON", disclaimer: DISCLAIMER }, 400);
+  }
+  const id = String(body.id ?? "");
+  const placement = String(body.placement ?? "");
+  if (!/^[a-z0-9-]{1,40}$/.test(id) || !/^[a-z0-9-]{1,40}$/.test(placement)) {
+    return json({ error: "Offer id required", disclaimer: DISCLAIMER }, 400);
+  }
+  const key = `${id}:${placement}`;
+  data.offerClicks.set(key, (data.offerClicks.get(key) ?? 0) + 1);
+  if (env.DB) {
+    await env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS offer_clicks (offer_id TEXT NOT NULL, placement TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY (offer_id, placement))"
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO offer_clicks (offer_id, placement, count) VALUES (?, ?, 1) ON CONFLICT(offer_id, placement) DO UPDATE SET count = count + 1"
+    )
+      .bind(id, placement)
+      .run();
+  }
+  const response = json({ ok: true });
+  response.headers.set("access-control-allow-origin", "*");
+  return response;
+}
+
+async function offerTotals(data: PortalData, env: BrainEnv): Promise<Array<{ id: string; placement: string; count: number }>> {
+  if (env.DB) {
+    try {
+      const rows = await env.DB.prepare("SELECT offer_id, placement, count FROM offer_clicks").all<{
+        offer_id: string;
+        placement: string;
+        count: number;
+      }>();
+      if (rows.results.length) {
+        return rows.results.map((row) => ({ id: row.offer_id, placement: row.placement, count: row.count }));
+      }
+    } catch {
+      // The table appears on the first click.
+    }
+  }
+  return [...(data.offerClicks?.entries() ?? [])].map(([key, count]) => {
+    const [id, placement] = key.split(":");
+    return { id: id ?? "", placement: placement ?? "", count };
+  });
+}
+
 export async function handlePortal(request: Request, store: MemoryStore, env: BrainEnv): Promise<Response | null> {
   const url = new URL(request.url);
   const path = url.pathname;
-  const portalPath = path === "/app" || path.startsWith("/app/") || path.startsWith("/v1/auth") || path.startsWith("/v1/me") || path.startsWith("/v1/admin");
+  const portalPath = path === "/app" || path.startsWith("/app/") || path.startsWith("/v1/auth") || path.startsWith("/v1/me") || path.startsWith("/v1/admin") || path === "/v1/offers/click";
   if (!portalPath) return null;
   const data = portalOf(store);
   const now = Date.now();
-  const csp = "default-src 'self'; script-src 'self' https://accounts.google.com; frame-src https://accounts.google.com; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; object-src 'none'";
+  const csp = "default-src 'self'; script-src 'self' https://accounts.google.com; frame-src https://accounts.google.com; connect-src 'self' https://valhalla-app.xyz; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://valhalla-app.xyz; base-uri 'none'; object-src 'none'";
+  if (path === "/v1/offers/click") return countOfferClick(request, data, env);
   if (request.method === "GET" && (path === "/app" || path === "/app/")) {
     return new Response(PORTAL_HTML, { headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": csp, "cache-control": "no-store" } });
   }
@@ -302,9 +375,14 @@ export async function handlePortal(request: Request, store: MemoryStore, env: Br
   }
   if (request.method === "GET" && path === "/v1/me/report") {
     if (user.plan !== "pro") {
-      return json({ locked: true, preview: "Sample report. Win rate is hidden. This is not your account and it is not a promise of profit.", disclaimer: DISCLAIMER });
+      return json({
+        locked: true,
+        preview: "Sample report. Win rate is hidden. This is not your account and it is not a promise of profit.",
+        offer: { category: "charts", title: "Chart better", disclosure: "Affiliate link · we may earn a commission" },
+        disclaimer: DISCLAIMER,
+      });
     }
-    return json({ locked: false, winRate: null, avgHold: null, mistakes: [], note: "Not enough closed trades for a report yet. Tips appear after you record trades. This is education, not a promise of profit.", disclaimer: DISCLAIMER });
+    return json({ locked: false, winRate: null, avgHold: null, mistakes: [], offer: null, note: "Not enough closed trades for a report yet. Tips appear after you record trades. This is education, not a promise of profit.", disclaimer: DISCLAIMER });
   }
   if (request.method === "POST" && path === "/v1/me/license") {
     const body = (await request.json().catch(() => ({}))) as { key?: string };
@@ -361,7 +439,8 @@ export async function handlePortal(request: Request, store: MemoryStore, env: Br
       users: users.map((item) => ({ email: item.email, plan: item.plan, wallets: item.wallets.length })),
       pro: users.filter((item) => item.plan === "pro").length,
       mrr: env.LEMONSQUEEZY_API_KEY ? "Connect the Lemon Squeezy API in the worker secret to load MRR." : "MRR is empty until LEMONSQUEEZY_API_KEY is set.",
-      ads: "Ad and affiliate totals are not connected.",
+      ads: "Ad network totals stay in AdMob and AdSense. Affiliate clicks are the offers list.",
+      offers: await offerTotals(data, env),
       disclaimer: DISCLAIMER,
     });
   }

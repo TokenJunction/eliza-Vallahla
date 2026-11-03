@@ -1,6 +1,13 @@
-import { DISCLAIMER, PLAN_LIMITS, type PlanName, scoreFromFacts, withinLimit } from "./score.ts";
-import { factsForMint, publicWalletSummary, trendingMints } from "./upstream.ts";
 import { handlePortal } from "./portal.ts";
+import {
+  DISCLAIMER,
+  offerHint,
+  PLAN_LIMITS,
+  type PlanName,
+  scoreFromFacts,
+  withinLimit,
+} from "./score.ts";
+import { factsForMint, publicWalletSummary, trendingMints } from "./upstream.ts";
 
 export interface MemoryStore {
   keys: Map<string, PlanName>;
@@ -204,7 +211,8 @@ export async function handleRequest(
     const mint = decodeURIComponent(url.pathname.slice("/v1/score/".length));
     if (!mintOk(mint)) return json({ error: "Mint must be a public address", disclaimer: DISCLAIMER }, 400);
     const upstream = await factsForMint(mint, env, fetcher);
-    return json({ mint, ...scoreFromFacts(upstream.facts), upstream: upstream.upstream });
+    const scored = scoreFromFacts(upstream.facts);
+    return json({ mint, ...scored, offer: offerHint(scored.score), upstream: upstream.upstream });
   }
   if (request.method === "POST" && url.pathname === "/v1/score/batch") {
     const body = (await request.json().catch(() => ({}))) as { mints?: string[] };
@@ -213,7 +221,8 @@ export async function handleRequest(
     for (const mint of mints) {
       if (!mintOk(mint)) continue;
       const upstream = await factsForMint(mint, env, fetcher);
-      results.push({ mint, ...scoreFromFacts(upstream.facts), upstream: upstream.upstream });
+      const scored = scoreFromFacts(upstream.facts);
+      results.push({ mint, ...scored, offer: offerHint(scored.score), upstream: upstream.upstream });
     }
     return json({ results, disclaimer: DISCLAIMER });
   }
