@@ -22,3 +22,10 @@ jobs:
           path: .
       - id: deploy
         uses: actions/deploy-pages@v4
+      - name: Custom domain and HTTPS
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method PUT "/repos/${{ github.repository }}/pages" -f cname=valhalla-app.xyz
+          gh api --method PUT "/repos/${{ github.repository }}/pages" -f cname=valhalla-app.xyz -F https_enforced=true || echo "Enforce HTTPS after GitHub issues the certificate."
