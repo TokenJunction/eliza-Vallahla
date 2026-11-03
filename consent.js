@@ -71,7 +71,7 @@
       + '<p>Strictly necessary cookies stay on. Analytics and advertising stay off until you allow them.</p>'
       + '<div id="consentCustom" hidden>'
       + '<label><input type="checkbox" checked disabled> Strictly necessary (always on)</label><br>'
-      + '<label><input id="consentFunctional" type="checkbox"> Functional / preferences</label><br>'
+      + '<label><input id="consentFunctional" type="checkbox"> Functional: Remember me on this device (masked email, sign-in method, wallet name, last 4, avatar initial, plan)</label><br>'
       + '<label><input id="consentAnalytics" type="checkbox"> Analytics</label><br>'
       + '<label><input id="consentAds" type="checkbox"> Advertising / affiliate</label>'
       + '</div>'

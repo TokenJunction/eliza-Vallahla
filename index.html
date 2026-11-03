@@ -17,6 +17,7 @@
     <a class="brand" href="/"><img src="assets/mark.svg" alt="Valhalla™ mech logo" width="32" height="32"> VALHALLA™</a>
     <a class="btn solid" href="app/">Get started</a>
   </header>
+  <div data-ticker hidden class="ticker" aria-label="Live prices. Not financial advice."></div>
   <section class="hero-grid">
     <div class="hero-copy">
       <p class="kicker">VALHALLA™</p>
@@ -29,7 +30,8 @@
     </div>
     <a class="preview" href="app/" aria-label="Preview of the desk. Get started to sign up.">
       <span>PREVIEW</span>
-      <img src="assets/promo/desk-preview.png" alt="Blurred preview of the Valhalla desk. Labeled Preview. Demo data only." width="640" height="400">
+      <img src="assets/promo/desk-frame.png" srcset="assets/promo/desk-frame-640.png 640w, assets/promo/desk-frame.png 1280w" sizes="(max-width: 800px) 100vw, 480px" alt="Preview of the Valhalla desk in a browser frame. Demo data only." width="1280" height="800">
+      <p class="note">Demo data</p>
     </a>
   </section>
   <section>
@@ -105,6 +107,7 @@
   </footer>
 </div>
 <script src="site-config.js"></script>
+<script src="ticker.js"></script>
 <script src="site-chrome.js"></script>
 <script>
   document.getElementById("emailCapture").addEventListener("submit", function (event) {

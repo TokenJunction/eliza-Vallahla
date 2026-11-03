@@ -9,7 +9,11 @@ body.landing { background: #050507; color: #f2ead8; }
 .sub { color: #cfc6b6; font-size: 16px; max-width: 46ch; }
 .cta-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 .preview { position: relative; border: 1px solid #1c1a16; background: #0a0a0e; }
-.preview img { width: 100%; height: auto; display: block; filter: blur(1.5px); }
+.preview img { width: 100%; height: auto; display: block; }
+.ticker { overflow: hidden; border: 1px solid #1c1a16; background: #07080c; color: #cfc6b6; font-size: 12px; margin-bottom: 16px; }
+.ticker-track { display: inline-block; white-space: nowrap; animation: ticker 28s linear infinite; padding: 6px 0; }
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
 .preview span { position: absolute; left: 10px; top: 10px; border: 1px solid #ffb347; color: #ffb347; padding: 2px 8px; letter-spacing: .14em; font-size: 11px; background: rgba(5,5,7,.8); }
 .blocks, .steps, .prices { display: grid; gap: 12px; margin-top: 14px; }
 .blocks, .prices { grid-template-columns: 1fr 1fr; }

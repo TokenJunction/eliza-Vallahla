@@ -126,20 +126,27 @@
   async function paperTick() {
     if (!running || paused) return;
     var price = 0;
-    try {
-      var response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
-      var body = await response.json();
-      price = Number(body.solana && body.solana.usd) || 0;
-    } catch (err) {
-      price = 0;
+    var source = "the live ticker";
+    var feed = window.ValhallaTicker && window.ValhallaTicker.last && window.ValhallaTicker.last.sol;
+    if (feed && Number(feed.usd)) price = Number(feed.usd);
+    else {
+      try {
+        var response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true");
+        var body = await response.json();
+        price = Number(body.solana && body.solana.usd) || 0;
+        source = "CoinGecko";
+      } catch (err) {
+        price = 0;
+      }
     }
     var bot = fields();
     var move = lastPrice && price ? ((price - lastPrice) / lastPrice) : 0;
     lastPrice = price || lastPrice;
     var skipped = Math.abs(move) < Number(bot.stopLoss) / 1000;
-    if (skipped) log("SIMULATED skip. Live SOL price " + (price ? "$" + price.toFixed(2) : "unavailable") + ". No order was sent.");
-    else log("SIMULATED mark only. Live SOL price " + (price ? "$" + price.toFixed(2) : "unavailable") + ". Size cap " + bot.maxSol + " SOL. No order was sent.");
-    showPnl("SIMULATED result: flat. Live-money trading is off. Not a promise of profit.");
+    var priceText = price ? "$" + price.toFixed(2) + " via " + source : "quiet";
+    if (skipped) log("SIMULATED skip. Live SOL price " + priceText + ". Not financial advice. No order was sent.");
+    else log("SIMULATED mark only. Live SOL price " + priceText + ". Size cap " + bot.maxSol + " SOL. Not financial advice. No order was sent.");
+    showPnl("SIMULATED result: flat. Live-money trading is off. Not financial advice.");
   }
 
   function startPaper() {
@@ -147,6 +154,22 @@
     paused = false;
     light("running");
     log("Paper run started. Live prices only. No order will be sent.");
+    var positions = document.getElementById("paperPositions");
+    if (positions) positions.textContent = "SAMPLE · flat · SIMULATED · not a live position";
+    var chart = document.getElementById("paperChart");
+    if (chart) {
+      var ctx = chart.getContext("2d");
+      ctx.strokeStyle = "#ffb347";
+      ctx.beginPath();
+      ctx.moveTo(0, 30);
+      ctx.lineTo(40, 28);
+      ctx.lineTo(80, 32);
+      ctx.lineTo(120, 26);
+      ctx.lineTo(160, 30);
+      ctx.lineTo(200, 24);
+      ctx.lineTo(280, 27);
+      ctx.stroke();
+    }
     paintStart();
     paperTick();
     timer = window.setInterval(paperTick, 20000);

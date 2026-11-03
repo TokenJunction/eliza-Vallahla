@@ -62,7 +62,7 @@
       });
     }
     if (!base()) {
-      paintEmpty("Trusted devices load when the sign-in Worker is live.");
+      paintEmpty("Trusted devices appear after you sign in.");
       return;
     }
     var token = sessionStorage.getItem("valhalla-auth-token") || "";
@@ -95,7 +95,7 @@
         });
       }
     }).catch(function () {
-      paintEmpty("The sign-in Worker did not answer.");
+      paintEmpty("Trusted devices are temporarily unavailable. Please try again shortly. (V-AUTH)");
     });
   }
 

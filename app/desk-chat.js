@@ -159,7 +159,7 @@
       return;
     }
     var answer = await remote(text).catch(function () { return "Assistant offline"; });
-    if (!answer) say("The language model is offline until the chat Worker is deployed. Tools above still run on this desk. SIMULATED. Not financial advice.");
+    if (!answer) say("The assistant is temporarily unavailable. Please try again shortly. (V-CHAT)");
   }
 
   function boot() {

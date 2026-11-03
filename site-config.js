@@ -58,5 +58,7 @@ window.VALHALLA_SITE = {
   /* Live-money trading stays off until TokenJunction turns this on. */
   LIVE_TRADING: false,
   /* Empty until the chat Worker is deployed. */
-  CHAT_URL: ""
+  CHAT_URL: "",
+  /* Cached public price Worker. Empty until it is deployed. The ticker hides if this is empty. */
+  TICKER_URL: ""
 };

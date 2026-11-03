@@ -9,6 +9,19 @@
 <link rel="stylesheet" href="desk.css">
 </head>
 <body data-page="app">
+<div id="mechaBoot" role="status" aria-label="Valhalla is starting">
+  <svg viewBox="0 0 64 64" width="72" height="72" aria-hidden="true"><rect x="22" y="8" width="20" height="14" rx="3" fill="#ffb347"/><rect x="16" y="24" width="32" height="22" rx="4" fill="#1a140c" stroke="#ffb347"/><circle cx="26" cy="34" r="3" fill="#00ff88"/><circle cx="38" cy="34" r="3" fill="#00ff88"/><rect x="12" y="28" width="6" height="14" fill="#ffb347"/><rect x="46" y="28" width="6" height="14" fill="#ffb347"/></svg>
+  <p>Systems online…</p>
+</div>
+<section id="mechaError" class="gate" hidden>
+  <div class="card" role="alert">
+    <svg viewBox="0 0 64 64" width="72" height="72" aria-hidden="true"><rect x="22" y="8" width="20" height="14" rx="3" fill="#ffb347"/><rect x="16" y="24" width="32" height="22" rx="4" fill="#1a140c" stroke="#ffb347"/><circle cx="26" cy="34" r="3" fill="#ff3b4a"/><circle cx="38" cy="34" r="3" fill="#ff3b4a"/><rect x="40" y="46" width="14" height="4" transform="rotate(40 40 46)" fill="#cfc6b6"/></svg>
+    <h1>VALHALLA™</h1>
+    <p id="mechaErrorText">Something went wrong. Please try again shortly.</p>
+    <p id="mechaErrorCode" class="note"></p>
+    <button id="mechaRetry" type="button">Retry</button>
+  </div>
+</section>
 <section id="gateHuman" class="gate">
   <div class="card">
     <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
@@ -17,7 +30,7 @@
     <p>Confirm you are a person. This does not connect a wallet and it does not ask for a payment.</p>
     <div id="turnstile"></div>
     <p id="humanNote" class="note"></p>
-    <button id="humanPlaceholder" type="button" hidden>Site key is not set. Continue to sign-in.</button>
+    <button id="humanPlaceholder" type="button" hidden>Continue</button>
   </div>
 </section>
 <section id="gateTerms" class="gate" hidden>
@@ -39,7 +52,13 @@
   <div class="card">
     <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
     <h1>VALHALLA™</h1>
+    <div id="welcomeBack" hidden>
+      <p id="welcomeName">Welcome back</p>
+      <button id="welcomeContinue" type="button">Continue</button>
+      <p><a href="#" id="forgetDevice">Not you? Forget this device</a></p>
+    </div>
     <p>Create an account or log in. Google uses openid, email, and profile only. It does not ask for Gmail or Drive.</p>
+    <label><input id="rememberMe" type="checkbox"> Remember me on this device</label>
     <p>
       <button id="showCreate" type="button">Create account</button>
       <button id="showLogin" type="button">Log in</button>
@@ -65,8 +84,8 @@
     <button id="googleBtn" type="button">Sign in with Google</button>
     <div id="googleSlot"></div>
     <button id="openPaper" type="button">Open the paper desk</button>
-    <p id="accountNote" class="note"></p>
-    <p class="note">Every login emails a 6-digit code. The server must be deployed before a code is sent. No code was sent while AUTH_URL is empty.</p>
+    <p id="accountNote" class="note" role="status"></p>
+    <p class="note">We email a 6-digit code to confirm it is you.</p>
   </div>
 </section>
 <section id="gateCode" class="gate" hidden>
@@ -90,6 +109,7 @@
     <p>Connect a wallet and sign in. The signature is a message only. Valhalla™ does not store a private key and there is no custodial wallet.</p>
     <div id="loginButtons" class="login-stack"></div>
     <button id="useDifferent" type="button">Use a different wallet</button>
+    <button id="skipWallet" type="button">Continue without a wallet</button>
     <button id="useOnFile" type="button" hidden>Use my wallet on file</button>
     <p id="walletNote" class="note"></p>
   </div>
@@ -110,6 +130,13 @@
     </button>
     <div class="clock" id="clock">00:00:00</div>
   </header>
+  <div data-ticker hidden class="ticker" aria-label="Live prices. Not financial advice."></div>
+    <p id="connectBanner" class="note" hidden><svg viewBox="0 0 64 64" width="36" height="36" aria-hidden="true"><rect x="22" y="8" width="20" height="14" rx="3" fill="#ffb347"/><rect x="16" y="24" width="32" height="22" rx="4" fill="#1a140c" stroke="#ffb347"/><circle cx="26" cy="34" r="3" fill="#7a7468"/><circle cx="38" cy="34" r="3" fill="#7a7468"/></svg> Connect wallet to load your data <button id="connectFromDesk" type="button">Connect wallet</button></p>
+    <aside id="debugPanel" hidden>
+      <p class="kicker">DEBUG</p>
+      <p id="debugLock">This view is not available.</p>
+      <pre id="debugLog"></pre>
+    </aside>
     <aside id="adTop" class="adslot" hidden></aside>
     <div class="grid">
     <article class="panel yours">
@@ -185,6 +212,9 @@
         <p><a href="#agent-howto">How to link your Valhalla agent</a></p>
         <div class="term" id="botLog"></div>
         <p id="paperPnl" class="note">SIMULATED result: flat. Live-money trading is off.</p>
+        <p class="note">Demo data</p>
+        <canvas id="paperChart" width="280" height="48"></canvas>
+        <div id="paperPositions" class="note"></div>
         <form id="safetyForm">
           <label>Token mint for a safety check <input id="safetyMint" autocomplete="off" spellcheck="false"></label>
           <button type="submit">Check token</button>
@@ -302,6 +332,8 @@
 </section>
 <script src="/consent.js"></script>
 <script src="/site-config.js"></script>
+<script src="/errors.js"></script>
+<script src="/ticker.js"></script>
 <script src="/merch-promo.js"></script>
 <script src="/status.js"></script>
 <script src="/nacl.min.js"></script>
@@ -331,6 +363,7 @@
 <script src="upgrade.js"></script>
 <script src="security.js"></script>
 <script src="hive.js"></script>
+<script src="debug.js"></script>
 <script src="/app/ask.js"></script>
 </body>
 </html>

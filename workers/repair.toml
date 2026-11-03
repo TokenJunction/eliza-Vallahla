@@ -1,0 +1,14 @@
+# Hourly self-repair. Do not deploy this over the auth Worker.
+# Secrets, never committed: ADMIN_WALLETS, SENTRY_DSN, INCIDENT_EMAIL_URL.
+# Health URLs are optional vars. Leave them empty until each service exists.
+# SENTRY_DSN is optional. Use it only if you want Sentry's free tier.
+name = "valhalla-repair"
+main = "repair.js"
+compatibility_date = "2026-11-03"
+
+[triggers]
+crons = ["17 * * * *"]
+
+# [[kv_namespaces]]
+# binding = "REPAIR_KV"
+# id = "paste-the-kv-id"
