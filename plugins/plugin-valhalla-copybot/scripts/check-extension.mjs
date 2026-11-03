@@ -16,7 +16,24 @@ function fail(message) {
 
 execFileSync(
   "zip",
-  ["-r", packed, "manifest.json", "popup.html", "popup.js", "background.js", "house-ads.json", "icons", "house"],
+  [
+    "-r",
+    packed,
+    "manifest.json",
+    "popup.html",
+    "valhalla-command.css",
+    "popup.js",
+    "background.js",
+    "connect-bridge.js",
+    "connect-core.js",
+    "trust.js",
+    "vendor",
+    "house-ads.json",
+    "monetization.json",
+    "offers.json",
+    "icons",
+    "house",
+  ],
   { cwd: extensionDir }
 );
 const listing = execFileSync("unzip", ["-Z1", packed], { encoding: "utf8" });
@@ -33,10 +50,15 @@ if (manifest.manifest_version !== 3) fail("manifest is not MV3");
 const permissions = manifest.permissions || [];
 if (permissions.length !== 1 || permissions[0] !== "storage") fail("permissions must be storage only");
 if (manifest.host_permissions?.length) fail("required host_permissions are set");
-if (manifest.content_scripts?.length) fail("content scripts are set");
+const scripts = manifest.content_scripts || [];
+if (scripts.length !== 1 || scripts[0].js.join(",") !== "connect-bridge.js") fail("content script must be the connect bridge only");
 const optional = manifest.optional_host_permissions || [];
-const allowedOptional = new Set(["http://127.0.0.1/*", "http://localhost/*"]);
-if (optional.some((host) => !allowedOptional.has(host))) fail("optional host is not the local desk");
+const allowedOptional = new Set([
+  "http://127.0.0.1/*",
+  "http://localhost/*",
+  "https://api.mainnet-beta.solana.com/*",
+]);
+if (optional.some((host) => !allowedOptional.has(host))) fail("optional host is not the local desk or the public RPC");
 const broad = /<all_urls>|\/\/\*\/\*|https:\/\/\*|http:\/\/\*/;
 if (broad.test(JSON.stringify(manifest))) fail("a broad host pattern is set");
 if (manifest.optional_host_permissions && !optional.length) fail("optional host list is empty");
