@@ -28,7 +28,7 @@
   document.querySelectorAll("[data-chrome]").forEach(function (link) {
     var store = (cfg.CHROME_WEB_STORE_URL || "").trim();
     link.textContent = "Add to Chrome";
-    link.href = store || "chrome/";
+    link.href = store || "extension/";
   });
   document.querySelectorAll("[data-pro]").forEach(function (link) {
     var href = checkoutHref(cfg.LEMONSQUEEZY_CHECKOUT_URL, "website");
