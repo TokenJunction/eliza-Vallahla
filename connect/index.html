@@ -3,25 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in to Valhalla</title>
-<meta name="description" content="Read-only Solana sign-in for Valhalla. No transaction and no fee.">
+<title>Sign in to Valhalla™</title>
+<meta name="description" content="Read-only Solana sign-in for Valhalla. No transaction and no payment.">
 <link rel="canonical" href="https://valhalla-app.xyz/connect/">
+<meta name="twitter:site" content="@ValhallaOS">
 <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
-<main class="wrap" style="max-width:440px;padding:32px 0 64px">
-  <p class="kicker">SIGN IN</p>
-  <h1>Sign in to Valhalla</h1>
-  <p>Read-only. Valhalla asks the wallet to connect, then to sign a login message. There is no fee and no transaction. Valhalla never asks for a seed phrase.</p>
-  <p id="status" role="status">Looking for the wallet.</p>
-  <button id="go" type="button">Continue</button>
-  <p id="missing" hidden>The wallet was not detected in this tab.</p>
-  <a id="download" href="https://phantom.app/download" hidden>Install the wallet</a>
-  <p><a href="../">Back to Valhalla</a></p>
+<header class="bar wrap">
+  <a class="brand" href="/"><img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="32" height="32"> VALHALLA™</a>
+</header>
+<main class="wrap" style="padding:32px 0 64px">
+  <p class="kicker">ACCELERATION</p>
+  <h1>Sign in to Valhalla™</h1>
+  <p>This tab can see your wallet. Pick a detected wallet. Your wallet asks you to connect, then to sign in. There is no payment on this page. Valhalla™ never asks for a seed phrase.</p>
 </main>
-<script src="../site-config.js"></script>
-<script src="nacl.min.js"></script>
-<script src="connect-core.js"></script>
-<script src="connect-page.js"></script>
+<footer><div class="wrap"></div></footer>
+<script src="/site-config.js"></script>
+<script src="/nacl.min.js"></script>
+<script src="/connect-core.js"></script>
+<script src="/site-wallet.js"></script>
+<script src="/site-chrome.js"></script>
 </body>
 </html>

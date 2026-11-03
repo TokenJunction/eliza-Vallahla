@@ -15,7 +15,8 @@
 <meta property="og:image" content="https://valhalla-app.xyz/assets/og.jpg">
 <meta property="og:url" content="https://valhalla-app.xyz/">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Valhalla">
+<meta name="twitter:site" content="@ValhallaOS">
+<meta name="twitter:title" content="Valhalla™">
 <meta name="twitter:description" content="Desk on your computer. Phone watches. No wallet key.">
 <meta name="twitter:image" content="https://valhalla-app.xyz/assets/og.jpg">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
@@ -27,7 +28,7 @@
 </head>
 <body>
 <header class="bar wrap">
-  <a class="brand" href="#top"><img src="assets/mark.svg" alt="" width="32" height="32"> VALHALLA</a>
+  <a class="brand" href="#top"><img src="assets/mark.svg" alt="Valhalla™ mech logo" width="32" height="32"> VALHALLA™</a>
   <nav aria-label="Page">
     <a href="#how">How</a>
     <a href="#film">Demo</a>
@@ -40,6 +41,20 @@
   </nav>
 </header>
 <main id="top">
+  <section class="wrap" aria-label="Command center">
+    <p class="kicker">ACCELERATION</p>
+    <h2>Web3 sign-in: connect Phantom or Solflare, no seed phrase</h2>
+    <p class="banner">DEMO DATA, illustrative only</p>
+    <div class="desk">
+      <article class="panel"><div class="ph"><span>00</span><span>WALLET · P&amp;L</span></div><div class="pb"><p>Sample book -0.011 SOL</p><p>SAMPLE …a1c4 · -0.018 SOL</p><p>SAMPLE …b7e2 · +0.011 SOL</p><p>SAMPLE …c390 · -0.004 SOL</p></div></article>
+      <article class="panel"><div class="ph"><span>01</span><span>FUNNEL · 450</span></div><div class="pb"><p class="rowline"><span>elite</span><span>48</span></p><p class="rowline"><span>good</span><span>126</span></p><p class="rowline"><span>watch</span><span>198</span></p><p class="rowline"><span>paused</span><span>78</span></p></div></article>
+      <article class="panel"><div class="ph"><span>05</span><span>RISK</span></div><div class="pb"><p>Brain sample score 64. Not a live coin.</p><p>Exits: take-profit, stop, copied-wallet-sell exit, 2h max hold.</p></div></article>
+      <article class="panel"><div class="ph"><span>02</span><span>STAGES</span></div><div class="pb"><p class="rowline"><span>Scout</span><span>120 kills</span></p><p class="rowline"><span>Filter</span><span>86 kills</span></p><p class="rowline"><span>Analyst</span><span>54 kills</span></p><p class="rowline"><span>Copier</span><span>17 kills</span></p><p class="rowline"><span>Risk</span><span>41 kills</span></p></div></article>
+      <article class="panel"><div class="ph"><span>04</span><span>SKIPPED</span></div><div class="pb"><p class="rowline"><span>liquidity floor</span><span>64</span></p><p class="rowline"><span>breaker pause after 3 losses</span><span>9</span></p><p class="rowline"><span>24h volume floor</span><span>41</span></p><p class="rowline"><span>already pumped &gt;80%</span><span>28</span></p><p class="rowline"><span>max positions</span><span>6</span></p><p class="rowline"><span>no pair</span><span>33</span></p></div></article>
+      <article class="panel"><div class="ph"><span>03</span><span>TERMINAL</span></div><div class="pb"><p>DEMO DATA, illustrative only</p><p>scout scanned the sample book</p><p>filter stopped a thin pool</p><p>risk held a new buy</p></div></article>
+    </div>
+    <p class="note">Not financial advice. Past or sample results don't predict future results.</p>
+  </section>
   <section class="hero">
     <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="assets/poster.jpg" aria-hidden="true">
       <source src="media/hero.mp4" type="video/mp4">
@@ -227,14 +242,18 @@
 <footer>
   <div class="wrap">
     <p>Valhalla is a product of TokenJunction LLC.</p>
-    <p>© 2026 TokenJunction LLC · <a href="mailto:hello@valhalla-app.xyz">hello@valhalla-app.xyz</a></p>
+    <p>© 2026 TokenJunction LLC · <a href="mailto:hello@valhalla-app.xyz">hello@valhalla-app.xyz</a> · <a href="contact/">Contact Us</a></p>
+    <p class="legal-tm">Valhalla™ and the Valhalla mech logo are trademarks of TokenJunction LLC.</p>
     <p id="offer-footer"></p>
     <p><a href="tools/">Recommended tools</a> · <a href="disclosure/">Affiliate disclosure</a> · <a href="privacy/">Privacy</a> · <a href="terms.md">Terms</a> · <a href="disclaimer.md">Disclaimer</a> · <a href="https://github.com/TokenJunction/eliza-valhalla">GitHub</a></p>
   </div>
 </footer>
 <script src="site-config.js"></script>
 <script src="nacl.min.js"></script>
+<script src="connect-core.js"></script>
 <script src="trust.js"></script>
+<script src="site-wallet.js"></script>
+<script src="site-chrome.js"></script>
 <script src="site-offers.js"></script>
 <script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
 <script src="site.js" defer></script>

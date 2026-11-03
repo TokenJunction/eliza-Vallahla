@@ -3,6 +3,15 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.ValhallaConnect = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  // Wallet extensions inject into https pages, not chrome-extension pages.
+  // Point CONNECT_PAGE_URL at CONNECT_PAGE_URL_LATER when that certificate is live.
+  const CONNECT_PAGE_URL = "https://tokenjunction.github.io/eliza-valhalla/connect/";
+  const CONNECT_PAGE_URL_LATER = "https://valhalla-app.xyz/connect/";
+  const CONNECT_ORIGINS = [
+    "https://tokenjunction.github.io",
+    "https://valhalla-app.xyz",
+    "https://www.valhalla-app.xyz",
+  ];
   const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
   function decodeBase58(value) {
@@ -123,7 +132,31 @@
     };
   }
 
+  function connectPage(which, extensionId) {
+    const url = new URL(CONNECT_PAGE_URL);
+    if (which) url.searchParams.set("wallet", which);
+    if (extensionId) url.searchParams.set("ext", extensionId);
+    return url.toString();
+  }
+
+  function allowedOrigin(origin) {
+    return CONNECT_ORIGINS.includes(String(origin || ""));
+  }
+
+  function handoff(proof, signatureB64) {
+    return {
+      source: "valhalla-connect",
+      type: "siws",
+      pubkey: proof.address,
+      signature: signatureB64,
+      message: proof.message,
+    };
+  }
+
   return {
+    CONNECT_PAGE_URL,
+    CONNECT_PAGE_URL_LATER,
+    CONNECT_ORIGINS,
     decodeBase58,
     isPubkey,
     buildSiwsMessage,
@@ -132,5 +165,8 @@
     adapterFromInjected,
     pickNamed,
     signInWithAdapter,
+    connectPage,
+    allowedOrigin,
+    handoff,
   };
 });

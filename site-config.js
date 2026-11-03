@@ -19,5 +19,8 @@ window.VALHALLA_SITE = {
   CHROME_WEB_STORE_URL: "",
   /* Paste the Brain API click address when the worker hostname is live. Example: https://YOUR-WORKER/v1/offers/click */
   OFFER_CLICK_URL: "",
-  BRAIN_URL: ""
+  BRAIN_URL: "",
+  handle: "@ValhallaOS",
+  xUrl: "https://x.com/intent/user?user_id=2092719999886475265",
+  dmUrl: "https://x.com/messages/compose?recipient_id=2092719999886475265"
 };

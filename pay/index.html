@@ -16,8 +16,8 @@
   <p id="prices">Prices load from the signed config.</p>
   <p>Monthly is 30 days. Yearly is 365 days. Lifetime does not expire. A SOL price locks for 10 minutes. USDC is the default.</p>
   <p><a class="btn" href="../app/">Pay with card</a></p>
-  <p><a class="btn" href="../app/#crypto">Pay with crypto</a></p>
-  <p id="receive"></p>
+  <p><button type="button" id="buyCrypto">Buy Pro with crypto</button></p>
+  <div id="cryptoBox" hidden></div>
   <p>Refunds are manual. Email hello@valhalla-app.xyz with the transaction signature. Paying the wrong amount does not turn Pro on. That payment is flagged for a person to review.</p>
   <p>On-chain payments are public. We store the transaction signature with the license. This is not financial advice.</p>
   <p><a href="../">Back to Valhalla</a> · <a href="../privacy/">Privacy</a> · <a href="../disclosure/">Disclosure</a></p>
@@ -34,11 +34,54 @@ fetch("../monetization.json").then(function (res) { return res.json(); }).then(f
     return;
   }
   if (prices) prices.textContent = "Monthly $" + signed.priceMonthlyUsd + ". Yearly $" + signed.priceYearlyUsd + ". Lifetime $" + signed.priceLifetimeUsd + ".";
-  if (receive) receive.textContent = "Crypto payments go to an address ending in " + String(signed.cryptoReceiveAddress).slice(-4) + ".";
+  var buy = document.getElementById("buyCrypto");
+  if (!buy) return;
+  buy.addEventListener("click", function () {
+    var box = document.getElementById("cryptoBox");
+    box.hidden = false;
+    box.textContent = "";
+    var lead = document.createElement("p");
+    lead.textContent = "Choose a plan. The pay link appears only after you confirm.";
+    box.appendChild(lead);
+    var selected = null;
+    var confirm = document.createElement("button");
+    confirm.type = "button";
+    confirm.disabled = true;
+    confirm.textContent = "Confirm plan";
+    [["Monthly", signed.priceMonthlyUsd], ["Yearly", signed.priceYearlyUsd], ["Lifetime", signed.priceLifetimeUsd]].forEach(function (plan) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = plan[0] + " $" + Number(plan[1]).toFixed(2);
+      button.addEventListener("click", function () {
+        selected = plan;
+        confirm.disabled = false;
+        confirm.textContent = "Confirm " + plan[0] + " $" + Number(plan[1]).toFixed(2);
+      });
+      box.appendChild(button);
+    });
+    confirm.addEventListener("click", function () {
+      if (!selected) return;
+      var address = String(signed.cryptoReceiveAddress || "");
+      var line = document.createElement("p");
+      line.textContent = selected[0] + " $" + Number(selected[1]).toFixed(2) + ". Pay only this address: " + address;
+      var link = document.createElement("a");
+      link.href = "solana:" + address + "?amount=" + encodeURIComponent(String(selected[1])) + "&spl-token=" + encodeURIComponent(String(signed.usdcMint || "")) + "&label=Valhalla%20Pro&message=" + encodeURIComponent(selected[0]);
+      link.textContent = "Open your wallet to pay " + selected[0];
+      box.appendChild(line);
+      box.appendChild(link);
+    });
+    box.appendChild(confirm);
+  });
 }).catch(function () {
   var prices = document.getElementById("prices");
   if (prices) prices.textContent = "Crypto checkout is off until the signed config verifies.";
 });
 </script>
+
+<script src="/site-config.js"></script>
+<script src="/nacl.min.js"></script>
+<script src="/connect-core.js"></script>
+<script src="/site-wallet.js"></script>
+<script src="/site-chrome.js"></script>
 </body>
 </html>

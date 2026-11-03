@@ -20,4 +20,5 @@
 <path d="M434 401 L435 439 L443 440 L443 531 L435 532 L435 566 L433 566 L433 532 L425 531 L425 440 L433 439 L433 402 L434 401 Z" fill="url(#gold)" filter="url(#glow)"/>
 <path d="M406 457 L409 457 L408 491 L416 493 L416 575 L408 577 L408 609 L406 609 L407 577 L399 575 L398 572 L398 493 L406 492 L406 458 L406 457 Z" fill="url(#gold)" filter="url(#glow)"/>
 <path d="M479 506 L478 518 L467 542 L492 582 L472 611 L498 649 L477 679 L495 706 L508 843 L405 633 L452 581 L451 536 L478 507 L479 506 Z" fill="url(#gold)" filter="url(#glow)"/>
+<text x="700" y="250" fill="#E8B65A" font-size="92" font-family="sans-serif">™</text>
 </svg>
