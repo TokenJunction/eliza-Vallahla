@@ -281,6 +281,40 @@ export async function openOrder(
   return order;
 }
 
+const ORDER_SQL = `CREATE TABLE IF NOT EXISTS crypto_orders (
+  id TEXT PRIMARY KEY, user_id TEXT, email_hash TEXT, plan TEXT, asset TEXT,
+  amount_base TEXT, mint TEXT, reference TEXT, recipient TEXT,
+  created_at INTEGER, expires_at INTEGER, status TEXT, reason TEXT
+)`;
+const RECEIPT_SQL = `CREATE TABLE IF NOT EXISTS crypto_receipts (
+  signature TEXT PRIMARY KEY, order_id TEXT, email_hash TEXT, plan TEXT,
+  amount_base TEXT, mint TEXT, paid_at INTEGER
+)`;
+
+export async function persistCrypto(env: BrainEnv, store: MemoryStore): Promise<void> {
+  if (!env.DB) return;
+  const box = stateOf(store);
+  await env.DB.prepare(ORDER_SQL).run();
+  await env.DB.prepare(RECEIPT_SQL).run();
+  for (const order of box.orders.values()) {
+    await env.DB.prepare(
+      `INSERT INTO crypto_orders (id, user_id, email_hash, plan, asset, amount_base, mint, reference, recipient, created_at, expires_at, status, reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET status = excluded.status, reason = excluded.reason`
+    )
+      .bind(order.id, order.userId, order.emailHash, order.plan, order.asset, order.amountBase, order.mint, order.reference, order.recipient, order.createdAt, order.expiresAt, order.status, order.reason || "")
+      .run();
+  }
+  for (const row of box.receipts) {
+    await env.DB.prepare(
+      `INSERT INTO crypto_receipts (signature, order_id, email_hash, plan, amount_base, mint, paid_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(signature) DO NOTHING`
+    )
+      .bind(row.signature, row.orderId, row.emailHash, row.plan, row.amountBase, row.mint, row.paidAt)
+      .run();
+  }
+}
+
 export function rpcUrl(env: BrainEnv): string {
   const key = env.HELIUS_API_KEY?.trim();
   if (key) return `https://mainnet.helius-rpc.com/?api-key=${encodeURIComponent(key)}`;
@@ -442,5 +476,6 @@ export async function pollCryptoOrders(store: MemoryStore, env: BrainEnv, now = 
       }
     }
   }
+  await persistCrypto(env, store);
   return paid;
 }

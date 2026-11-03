@@ -1,4 +1,4 @@
-import { openOrder, orderView, readPayConfig, receiptsCsv } from "./crypto-pay.ts";
+import { openOrder, orderView, persistCrypto, readPayConfig, receiptsCsv } from "./crypto-pay.ts";
 import { decodeBase58 } from "./base58.ts";
 import { DISCLAIMER } from "./score.ts";
 import type { BrainEnv, MemoryStore } from "./worker.ts";
@@ -367,6 +367,7 @@ export async function handlePortal(request: Request, store: MemoryStore, env: Br
     }
     const order = await openOrder(store, { userId: user.id, email: user.email, plan, asset, config, solPriceUsd, now });
     if (!order) return json({ error: "Crypto checkout is off", disclaimer: DISCLAIMER }, 503);
+    await persistCrypto(env, store);
     return json({ ok: true, ...orderView(order) });
   }
   if (request.method === "GET" && path === "/v1/admin/crypto-receipts.csv") {
