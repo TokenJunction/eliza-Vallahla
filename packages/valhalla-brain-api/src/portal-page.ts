@@ -149,7 +149,9 @@ export const PORTAL_HTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Valhalla Pro</title>
 <style>
-body { margin: 0; font: 16px/1.45 system-ui, sans-serif; background: #07080b; color: #e7eef8; }
+body { margin: 0; font: 16px/1.45 ui-sans-serif, system-ui, sans-serif; background: radial-gradient(circle at 0 0, rgba(255,179,71,.18), transparent 36%), #07080b; color: #f4ecdf; }
+section { background: rgba(16,16,20,.72); border: 1px solid rgba(255,179,71,.22); border-radius: 16px; padding: 12px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 main { max-width: 880px; margin: 0 auto; padding: 32px 16px 64px; }
 h1 { color: #e8b65a; letter-spacing: .08em; }
 button, a.btn { background: #e8b65a; color: #07080b; border: 0; min-height: 40px; padding: 0 16px; font-weight: 700; text-decoration: none; display: inline-block; line-height: 40px; }
