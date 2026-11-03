@@ -1,129 +1,93 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta name="google-adsense-account" content="ca-pub-6504655762357230">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Valhalla™ — the desk in your browser</title>
-<meta name="description" content="Valhalla™ is the website desk. The Chrome extension is next. Telegram and Windows are coming soon. Android is in testing. Not financial advice.">
-<meta name="theme-color" content="#07080B">
-<link rel="canonical" href="https://valhalla-app.xyz/">
-<meta property="og:title" content="Valhalla™">
-<meta property="og:description" content="The desk runs in the browser. Keys stay on your device. Not financial advice.">
-<meta property="og:image" content="https://valhalla-app.xyz/assets/og.jpg">
-<meta name="twitter:card" content="summary_large_image">
+<title>VALHALLA™ · command center</title>
+<meta name="description" content="Valhalla™ is the website desk. Sample panels are demo data. Not financial advice.">
 <meta name="twitter:site" content="@ValhallaOS">
-<meta name="twitter:title" content="Valhalla™">
+<link rel="canonical" href="https://valhalla-app.xyz/">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="valhalla-command.css">
 </head>
-<body data-marketing="1">
-<header class="bar wrap" data-nav="locked">
-  <a class="brand" href="#top"><img src="assets/mark.svg" alt="Valhalla™ mech logo" width="32" height="32"> VALHALLA™</a>
-  <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="siteNav">Menu</button>
-  <nav id="siteNav" aria-label="Page">
-    <a href="#features">Features</a>
-    <a href="#pricing">Pricing</a>
-    <a href="shop/">Shop</a>
-    <a href="#faq">FAQ</a>
-  </nav>
-  <a class="xicon" href="https://x.com/intent/user?user_id=2092719999886475265" aria-label="Follow Valhalla on X"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14.7 10.3 22 2h-2.2l-6.3 7.2L8.2 2H2l7.7 10.9L2 22h2.2l7-8 5.6 8H22l-7.3-11.7Z"/></svg></a>
-  <a class="btn solid" href="app/">Launch App</a>
-</header>
-<main id="top">
-  <section class="hero desk-hero">
-    <div class="wrap hero-grid">
-      <div>
-        <p class="kicker">VALHALLA™</p>
-        <h1>The desk is the website.</h1>
-        <p>Sign in, see your wallet, and run the bot controls in the browser. The Chrome extension is the second way in.</p>
-        <div class="row">
-          <a class="btn solid" href="app/">Launch App</a>
-          <a class="btn" href="#film">Watch it run</a>
-        </div>
-      </div>
-      <div class="desk-mock" aria-hidden="true">
-        <div class="mock-bar"><b>ACCELERATION</b><span>DEMO DATA</span><i></i></div>
-        <div class="mock-grid">
-          <div><b>00 YOUR WALLET</b><strong>0.42 SOL</strong></div>
-          <div><b>00b AGENT WALLET</b><em>No agent wallet linked</em></div>
-          <div><b>01 FUNNEL</b><span>elite · good · watch · paused</span></div>
-          <div><b>02 BOT</b><span>Stopped</span></div>
-        </div>
-      </div>
+<body>
+<div class="hud">
+  <header class="topbar" data-nav="locked">
+    <img class="logo-mech" src="assets/mark.svg" alt="Valhalla™ mech logo" width="40" height="40">
+    <div class="brand"><h1>VALHALLA</h1><div class="sub">command center · website desk</div></div>
+    <div class="badges">
+      <span class="badge live">● DEMO</span>
+      <span class="badge mode">SAMPLE</span>
     </div>
-    <div class="wrap" data-status-slot></div>
-  </section>
-
-  <section id="features" class="wrap blocks">
-    <article><p class="kicker">01</p><h2>Sign in</h2><p>A human check, then email or Google, then a wallet message. No seed phrase.</p></article>
-    <article><p class="kicker">02</p><h2>Your desk</h2><p>Your wallet and the agent wallet stay in separate panels. History is read from the chain.</p></article>
-    <article><p class="kicker">03</p><h2>Bot control</h2><p>Set the limits, review them, then Start or Stop. The key stays on your computer.</p></article>
-    <article><p class="kicker">04</p><h2>Forge Lab</h2><p>Paper tests on live prices. SIMULATED fills only. No real orders.</p></article>
-    <article><p class="kicker">05</p><h2>Ask Valhalla</h2><p>A small assistant for how the product works. Not financial advice.</p></article>
-    <article id="downloads"><p class="kicker">06</p><h2>Downloads</h2>
-      <div class="row">
-        <a class="btn solid" href="extension/">Add to Chrome</a>
-        <span class="btn soon" aria-disabled="true">Download for Android</span>
-        <span class="btn soon" aria-disabled="true">Telegram · Coming soon</span>
-        <span class="btn soon" aria-disabled="true">Windows · Coming soon</span>
+    <div class="tape"><div class="tape-inner"><span class="up">SAMPLE-A +0.4%</span> · <span class="dn">SAMPLE-B −0.2%</span> · <span class="up">SAMPLE-C +0.1%</span> · <span class="dn">SAMPLE-D −0.5%</span> · DEMO DATA · not a live market · </div></div>
+    <a class="btn solid" href="app/">Launch App</a>
+  </header>
+  <main class="main">
+    <section class="panel">
+      <div class="ph"><span class="num">05</span><span class="ttl">SYSTEM</span><span class="hint">demo</span></div>
+      <div class="pb rules">
+        <p class="demo-flag">DEMO DATA, illustrative only</p>
+        <p><b>EXITS</b></p>
+        <p>+ take-profit · − stop</p>
+        <p>copied-wallet-sell exit</p>
+        <p>2h max hold</p>
+        <p><b>OPS</b></p>
+        <p>Website desk is first. Chrome extension is second.</p>
+        <p>Telegram is coming soon. Android is in testing. Windows is coming soon.</p>
+        <p>Not financial advice. Sample results do not predict future results.</p>
       </div>
-      <p class="note"><span class="pill">In testing</span> Android app is in testing, coming soon.</p>
-      <p class="mono">Android app ID<br>ai.tokenjunction.valhalla</p>
-      <p class="note">Windows is paused. When a build returns, the publisher may show as unknown until it is signed.</p>
-    </article>
-  </section>
-
-  <section id="film" class="wrap">
-    <p class="kicker">DEMO</p>
-    <h2>Watch it run</h2>
-    <p class="note">Sample film only. Not your account.</p>
-    <video poster="assets/poster.jpg" controls preload="metadata" playsinline>
-      <source src="media/valhalla-demo.mp4" type="video/mp4">
-    </video>
-  </section>
-
-  <section id="pricing" class="wrap">
-    <p class="kicker">PRICING</p>
-    <h2>Free and Pro</h2>
-    <div class="price-row">
-      <article class="card"><h3>Free</h3><p>The website desk, with ads. Not a promise of profit.</p></article>
-      <article class="card"><h3>Pro</h3><p>$9.99 a month at the launch price. A 15 day trial is included. Ads come off. Not a promise of profit.</p><a class="btn" href="app/">Launch App</a></article>
-    </div>
-  </section>
-
-  <section class="wrap">
-    <p class="kicker">MERCH</p>
-    <h2>Hats, a hoodie, tees, a sticker</h2>
-    <p>The shop is not open yet.</p>
-    <a class="btn" href="shop/">See the shop</a>
-  </section>
-
-  <section id="faq" class="wrap">
-    <p class="kicker">FAQ</p>
-    <h2>Before you start</h2>
-    <article class="card"><h3>What is first?</h3><p>The website desk. The Chrome extension is second. Telegram is coming soon. Android is in testing.</p></article>
-    <article class="card"><h3>Will this make money?</h3><p>No promise. Crypto is risky. This page is not financial advice.</p></article>
-  </section>
-</main>
-<footer>
-  <div class="wrap">
-    <p>Crypto is risky, not financial advice.</p>
-    <p><a href="#film">Demo</a> · <a href="tools/">Tools</a> · <a href="api/">API</a> · <a href="contact/">Contact</a> · <a href="status/">Status</a> · <a href="faq/">FAQ</a> · <a href="whitepaper/">White paper</a> · <a href="terms/">Terms</a> · <a href="privacy/">Privacy</a> · <a href="extension/">Chrome extension</a></p>
-    <p class="legal-tm">Valhalla™ and the Valhalla mech logo are trademarks of TokenJunction LLC.</p>
-  </div>
-</footer>
+    </section>
+    <section class="panel">
+      <div class="ph"><span class="num">00</span><span class="ttl">EQUITY</span><span class="hint">sample book</span></div>
+      <div class="pb">
+        <div class="equity-num down">−0.011</div>
+        <div class="pnl dn">SOL · mixed sample · not a profit claim</div>
+        <svg class="chart" viewBox="0 0 240 54" aria-hidden="true"><polyline fill="none" stroke="#ff3b4a" stroke-width="1.5" points="0,20 30,22 60,18 90,28 120,24 150,36 180,30 210,40 240,34"/></svg>
+        <p class="meta">Sample fills: …a1c4 −0.018 · …b7e2 +0.011 · …c390 −0.004. No live wallet is shown here.</p>
+      </div>
+    </section>
+    <section class="panel" style="grid-column:3;grid-row:1 / span 2">
+      <div class="ph"><span class="num">01</span><span class="ttl">FUNNEL</span><span class="hint">450 sample wallets</span></div>
+      <div class="pb">
+        <canvas id="net" width="360" height="220"></canvas>
+        <p class="legend"><i style="background:#00ff88"></i>elite 48 <i style="background:#ff9a1f"></i>good 126 <i style="background:#7a7468"></i>watch 198 <i style="background:#ff3b4a"></i>paused 78</p>
+        <p class="meta">Scout 120 · Filter 86 · Analyst 54 · Copier 17 · Risk 41 kills. Sample counts only.</p>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="ph"><span class="num">02</span><span class="ttl">POSITIONS</span><span class="hint">0/5</span></div>
+      <div class="pb"><p class="note">No open sample positions.</p><img src="assets/mark.svg" alt="" width="72" height="72" style="margin-top:12px"></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><span class="num">03</span><span class="ttl">COPY LOG</span></div>
+      <div class="pb term">
+        <div><span class="prompt">&gt;</span> <span class="info">scout</span> sample poll · 450 wallets</div>
+        <div><span class="prompt">&gt;</span> <span class="bad">filter</span> skipped · liquidity floor</div>
+        <div><span class="prompt">&gt;</span> <span class="ok">analyst</span> sample score 64 · not a live coin</div>
+        <div><span class="dim">DEMO DATA. No transaction signature is shown.</span></div>
+      </div>
+    </section>
+  </main>
+  <footer class="foot">
+    <span>DEMO DATA · not financial advice · Crypto is risky</span>
+    <span><a href="extension/">Chrome</a> · <a href="shop/">Shop</a> · <a href="faq/">FAQ</a> · <a href="whitepaper/">White paper</a> · <a href="terms/">Terms</a> · <a href="contact/">Contact</a> · <a href="privacy/">Privacy</a></span>
+    <span>Valhalla™ · TokenJunction LLC</span>
+  </footer>
+</div>
 <script src="site-config.js"></script>
-<script src="status.js"></script>
 <script src="site-chrome.js"></script>
 <script>
-  var toggle = document.querySelector(".menu-toggle");
-  var nav = document.getElementById("siteNav");
-  toggle.addEventListener("click", function () {
-    var open = nav.classList.toggle("open");
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
-  });
+  var canvas = document.getElementById("net");
+  var ctx = canvas.getContext("2d");
+  var colors = ["#00ff88", "#ff9a1f", "#7a7468", "#ff3b4a"];
+  ctx.fillStyle = "#060608";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  var seed = 17;
+  function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+  for (var i = 0; i < 160; i += 1) {
+    ctx.fillStyle = colors[i % 4];
+    ctx.fillRect(12 + rnd() * (canvas.width - 24), 8 + rnd() * (canvas.height - 20), 3, 3);
+  }
 </script>
 </body>
 </html>
