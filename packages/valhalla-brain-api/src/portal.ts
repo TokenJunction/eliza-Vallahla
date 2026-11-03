@@ -272,6 +272,30 @@ export async function handlePortal(request: Request, store: MemoryStore, env: Br
   const user = current.user;
   const admin = adminEmails(env).has(user.email.toLowerCase());
 
+  if (request.method === "POST" && path === "/v1/auth/link/google") {
+    if (!env.GOOGLE_CLIENT_ID) return json({ error: "Google sign-in is not configured", disclaimer: DISCLAIMER }, 503);
+    const body = (await request.json().catch(() => ({}))) as { credential?: string };
+    const email = await googleEmail(String(body.credential ?? ""), env);
+    if (!email) return json({ error: "Google sign-in was not accepted", disclaimer: DISCLAIMER }, 401);
+    const owner = data.emailIndex.get(email);
+    if (owner && owner !== user.id) return json({ error: "That Google account is already linked", disclaimer: DISCLAIMER }, 409);
+    user.email = email;
+    data.emailIndex.set(email, user.id);
+    return json(view(user, adminEmails(env).has(email)));
+  }
+  if (request.method === "POST" && path === "/v1/auth/link/siws") {
+    const body = (await request.json().catch(() => ({}))) as { pubkey?: string; signature?: string; nonce?: string };
+    const nonce = data.nonces.get(String(body.nonce ?? ""));
+    if (!nonce || nonce.exp < now || nonce.pubkey !== body.pubkey) return json({ error: "Login expired", disclaimer: DISCLAIMER }, 401);
+    const valid = await verifyEd25519(nonce.pubkey, nonce.message, String(body.signature ?? "")).catch(() => false);
+    if (!valid) return json({ error: "Login was not accepted", disclaimer: DISCLAIMER }, 401);
+    data.nonces.delete(String(body.nonce));
+    const owner = data.walletIndex.get(nonce.pubkey);
+    if (owner && owner !== user.id) return json({ error: "That wallet is already linked", disclaimer: DISCLAIMER }, 409);
+    if (!user.wallets.includes(nonce.pubkey)) user.wallets.push(nonce.pubkey);
+    data.walletIndex.set(nonce.pubkey, user.id);
+    return json(view(user, admin));
+  }
   if (request.method === "GET" && path === "/v1/me") return json(view(user, admin));
   if (request.method === "GET" && path === "/v1/me/balances") {
     return json({ sol: null, positions: [], live: true, publicDataOnly: true, note: "Live SOL appears when a wallet is linked and an RPC key is set. No sample balance is shown as yours.", disclaimer: DISCLAIMER });

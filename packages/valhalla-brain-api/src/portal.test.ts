@@ -28,6 +28,17 @@ describe("Valhalla portal", () => {
       env
     );
     expect(denied.status).toBe(403);
+    const link = await handleRequest(
+      new Request("https://brain.local/v1/auth/link/google", {
+        method: "POST",
+        headers: { cookie: cookieHeader(login), "x-csrf": csrf(login), "content-type": "application/json" },
+        body: JSON.stringify({ credential: "token" }),
+      }),
+      store,
+      { ...env, fetchImpl: async () => new Response(JSON.stringify({ aud: "google-client", email: "person@example.com", exp: String(Math.floor(Date.now() / 1000) + 60) }), { status: 200 }) }
+    );
+    expect(link.status).toBe(200);
+    expect((await link.json()).email).toBe("person@example.com");
   });
 
   it("accepts Google, blocks other admins, and locks the free report", async () => {
