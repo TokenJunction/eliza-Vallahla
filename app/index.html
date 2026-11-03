@@ -23,15 +23,31 @@
   <div class="card">
     <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
     <h1>VALHALLA™</h1>
-    <p>Sign in with your email. This account does not hold a wallet key or a seed phrase.</p>
-    <button id="googleBtn" type="button">Continue with Google</button>
+    <p>Sign in with Google or your email. This step uses openid, email, and profile only. It does not ask for Gmail or Drive. It does not hold a wallet key or a seed phrase.</p>
+    <label><input id="termsOk" type="checkbox"> I agree to the <a href="/terms/">Terms of Use</a>. I am 18 or older.</label>
+    <p id="termsNote" class="note"></p>
+    <button id="googleBtn" type="button">Sign in with Google</button>
     <div id="googleSlot"></div>
-    <form id="magicForm">
+    <form id="emailForm">
       <label>Email <input id="magicEmail" type="email" autocomplete="email" required></label>
-      <button type="submit">Email me a sign-in link</button>
+      <button type="submit">Email me a 6-digit code</button>
     </form>
     <p id="accountNote" class="note"></p>
-    <p class="note">Google setup: in Google Cloud, create an OAuth web client. Set the authorized JavaScript origin to https://valhalla-app.xyz. Paste the client ID into GOOGLE_CLIENT_ID in site-config.js. Email link setup: deploy a Worker that emails a one-time link, then set MAGIC_LINK_URL. Until then, this form does not sign you in.</p>
+    <p class="note">Google setup: create an OAuth web client. Authorized JavaScript origin: https://valhalla-app.xyz. Scopes stay at openid, email, and profile. Paste the client ID into GOOGLE_CLIENT_ID. The same value goes in the Worker. The sign-in Worker must be deployed and AUTH_URL set before a token is accepted. No code is sent until that Worker can mail it.</p>
+  </div>
+</section>
+<section id="gateCode" class="gate" hidden>
+  <div class="card">
+    <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
+    <h1>VALHALLA™</h1>
+    <p class="kicker">EMAIL CODE</p>
+    <p id="codeLead">Enter the 6-digit code from your email. It expires in 10 minutes.</p>
+    <form id="codeForm">
+      <label>Code <input id="emailCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></label>
+      <button type="submit">Verify code</button>
+    </form>
+    <p id="codeNote" class="note"></p>
+    <p class="note">The message comes from noreply@valhalla-app.xyz. It includes the time, the approximate place, and the browser. If it was not you, secure your account. Five tries, then the code stops.</p>
   </div>
 </section>
 <section id="gateWallet" class="gate" hidden>
@@ -48,6 +64,7 @@
   <header class="topbar">
     <img class="logo-mech" src="/assets/mech.jpg" alt="Valhalla™ mech logo">
     <div class="word"><strong>ACCELERATION</strong><span>VALHALLA™ · COMMAND CENTER</span></div>
+    <span class="badge" id="leaderBadge" hidden>MECHA LEADER</span>
     <span class="badge" id="modeBadge">DEMO</span>
     <div class="tape" id="tape">DEMO DATA, illustrative only · sample tape · not a live market</div>
     <div class="chip" id="walletChip"></div>
@@ -57,25 +74,32 @@
     </button>
     <div class="clock" id="clock">00:00:00</div>
   </header>
-  <div class="grid">
-    <article class="panel">
-      <div class="ph"><b>00</b><span>WALLET</span></div>
-      <div class="pb eq">
-        <div>
-          <div class="sub">YOUR BALANCE · PUBLIC RPC</div>
-          <div class="big" id="solLine">—</div>
-          <div id="tokenLines"></div>
-          <div class="sub">DEMO P&amp;L · NOT YOUR RESULTS</div>
-          <div class="down" id="demoPnl">-0.011 SOL sample</div>
-          <p class="note">SAMPLE …a1c4 -0.018 · SAMPLE …b7e2 +0.011 · SAMPLE …c390 -0.004</p>
-          <p class="note">Not financial advice. Past or sample results don't predict future results.</p>
-          <form id="pasteForm" hidden>
-            <label>Paste a Solana address to watch <input id="pasteKey" autocomplete="off" spellcheck="false"></label>
-            <button type="submit">Watch address</button>
-          </form>
-        </div>
-        <img class="hero-mech" src="/assets/mech.jpg" alt="Valhalla™ mech">
+    <aside id="adTop" class="adslot" hidden></aside>
+    <div class="grid">
+    <article class="panel yours">
+      <div class="ph"><b>00</b><span>YOUR WALLET</span><span id="yourFresh">stale</span></div>
+      <div class="pb">
+        <div class="big" id="solLine">—</div>
+        <div id="tokenLines"></div>
+        <p class="note" id="yourUpdated">Last updated —</p>
+        <form id="pasteForm" hidden>
+          <label>Paste a public address to watch <input id="pasteKey" autocomplete="off" spellcheck="false"></label>
+          <button type="submit">Watch address</button>
+        </form>
       </div>
+    </article>
+    <article class="panel agent-wallet">
+      <div class="ph"><b>00b</b><span>AGENT WALLET</span><span id="agentFresh">stale</span></div>
+      <div class="pb">
+        <p id="agentEmpty">No agent wallet linked</p>
+        <div class="big" id="agentSol" hidden>—</div>
+        <div id="agentTokens"></div>
+        <p class="note" id="agentUpdated"></p>
+      </div>
+    </article>
+    <article class="panel">
+      <div class="ph"><b>00c</b><span>COMBINED TOTAL</span></div>
+      <div class="pb"><p id="combined">Combined total —</p><p class="note">Read-only. No transactions.</p></div>
     </article>
     <article class="panel">
       <div class="ph"><b>01</b><span>FUNNEL</span><span id="funnelHint">450 wallets</span></div>
@@ -125,19 +149,40 @@
       </div>
     </article>
     <article class="panel">
-      <div class="ph"><b>03</b><span>COPY LOG</span></div>
-      <div class="pb term" id="term">
-        <div>DEMO DATA, illustrative only</div>
-        <div>&gt; scout scanned the sample book</div>
-        <div>&gt; filter stopped a thin pool</div>
-        <div>&gt; risk held a new buy</div>
-      </div>
+      <div class="ph"><b>03</b><span>TRADE HISTORY</span></div>
+      <div class="pb" id="history">History loads from the chain for your wallet only.</div>
+    </article>
+    <article class="panel">
+      <div class="ph"><b>07</b><span>PATTERN</span></div>
+      <div class="pb" id="pattern">Your trading pattern (from on-chain history)</div>
     </article>
     <article class="panel">
       <div class="ph"><b>04</b><span>SKIPPED</span></div>
       <div class="pb" id="skips"></div>
     </article>
   </div>
+    <aside id="adSide" class="adslot" hidden></aside>
+    <section id="lab">
+      <div class="ph"><b>08</b><span>LAB</span><span>SIMULATED</span></div>
+      <div class="pb">
+        <p>SIMULATED paper trades on sample prices. No orders. No keys. These numbers are not on the public site.</p>
+        <button id="labExport" type="button">Export simulated journal</button>
+        <div class="term" id="labFeed"></div>
+        <p id="labStats" class="note"></p>
+        <p id="leaderFeed" class="note">Leader offsite paper run is offline until the API is live.</p>
+        <h2>Hive</h2>
+        <p id="hiveFlag">The Hive is off until a leader turns it on.</p>
+        <button id="hiveJoin" type="button" disabled>Join the Hive</button>
+        <label>CPU and GPU limit <input id="hiveThrottle" type="range" min="25" max="50" value="25" disabled></label>
+        <p id="hiveState" hidden><span class="pill">Hive active</span> <button id="hiveStop" type="button">Stop</button></p>
+        <p id="hivePoints" class="note">Contribution points: 0. Not transferable. No cash value.</p>
+        <p class="note">Rewards are points only for now.</p>
+      </div>
+    </section>
+    <aside id="leaderPanel" hidden>
+      <div class="ph"><b>09</b><span>ADMIN</span></div>
+      <div class="pb"><p>Leader tools load only after the server confirms the role.</p><button id="hiveFlagBtn" type="button" disabled>Hive feature flag</button><p class="note">The Hive flag stays off until the API confirms a leader. Rewards payouts stay off.</p></div>
+    </aside>
   <aside id="settings" class="settings" hidden>
     <div class="panel">
       <div class="ph"><b>06</b><span>SETTINGS</span><button id="closeSettings" type="button">Close</button></div>
@@ -154,11 +199,23 @@
         <label>Other API key <input id="keyOther" type="password" autocomplete="off"></label>
         <button id="saveKeys" type="button">Save on this device</button>
         <button id="deleteKeys" type="button">Delete keys</button>
+        <h2>Data</h2>
+        <label>Agent wallet public address <input id="agentWallet" autocomplete="off" spellcheck="false"></label>
+        <button id="saveAgentWallet" type="button">Save agent wallet</button>
+        <button id="histRefresh" type="button">Refresh history</button>
+        <button id="histRebuild" type="button">Rebuild from chain</button>
+        <button id="histClear" type="button">Clear cached history</button>
         <h2>Connected accounts</h2>
         <p id="setGoogle">Google: not connected.</p>
         <button id="connectX" type="button" disabled>Connect X · Coming soon</button>
         <button id="shareX" type="button" hidden>Share on X</button>
-        <p class="note">Gmail and other account links: Coming soon. They need Google OAuth verification.</p>
+        <p class="note">Sign-in does not request Gmail or Drive access.</p>
+        <h2>Security</h2>
+        <label><input id="alwaysAsk" type="checkbox"> Always ask for an email code</label>
+        <p class="note">A new device or a new network always asks. A leader account always asks. A remembered device lasts 30 days unless you turn this on or revoke it.</p>
+        <div id="deviceList" class="note">Trusted devices load after you sign in.</div>
+        <h3>Recent sign-ins</h3>
+        <div id="signinList" class="note"></div>
         <h2>Display</h2>
         <label>Theme
           <select id="themePick">
@@ -167,6 +224,15 @@
           </select>
         </label>
         <label><input id="compactPick" type="checkbox"> Compact mode</label>
+        <h2>Hive</h2>
+        <p id="hiveFlagSettings">The Hive is off until a leader turns it on. Joining is a separate choice from these terms.</p>
+        <p class="note">Rewards are points only for now.</p>
+        <button id="payoutLink" type="button" disabled>Link a payout address</button>
+        <p class="note">A payout address would be a public key confirmed with a sign-in message. Nothing is sent. The rewards treasury is not this site. Payouts stay off.</p>
+        <h2>Privacy</h2>
+        <button id="deleteData" type="button">Delete my data</button>
+        <p id="deleteNote" class="note"></p>
+        <p><a href="/privacy/">Privacy</a> · <a href="#" data-cookie-settings>Cookie settings</a></p>
       </div>
     </div>
   </aside>
@@ -176,12 +242,18 @@
     <span id="footWho"></span>
   </footer>
 </section>
+<script src="/consent.js"></script>
 <script src="/site-config.js"></script>
+<script src="/status.js"></script>
 <script src="/nacl.min.js"></script>
 <script src="/connect-core.js"></script>
 <script src="/site-wallet.js"></script>
 <script src="gate.js"></script>
 <script src="bot.js"></script>
+<script src="ledger.js"></script>
 <script src="settings.js"></script>
+<script src="security.js"></script>
+<script src="hive.js"></script>
+<script src="/app/ask.js"></script>
 </body>
 </html>

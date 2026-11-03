@@ -31,6 +31,17 @@ window.VALHALLA_SITE = {
   GOOGLE_CLIENT_ID: "GOOGLE_CLIENT_ID_NOT_SET",
   /* Optional email sign-in Worker. POST {email}. Leave empty until that Worker exists. */
   MAGIC_LINK_URL: "",
+  /* Sign-in Worker. Empty until it is deployed. A Google token is not accepted in the browser alone. */
+  AUTH_URL: "",
   /* Paste the live Spring store URL before any buy button is enabled. */
-  SPRING_STORE_URL: ""
+  SPRING_STORE_URL: "",
+  /* Empty until the analysis API is deployed. Leader mode stays off while this is empty. */
+  AGENT_API_URL: "",
+  /* Public status only. Leave empty until the keeper is deployed. An empty value must show Status unavailable. */
+  STATUS_URL: "",
+  /* Leader turns the Hive on from the API. The site stays off while this is false. */
+  HIVE_ENABLED: false,
+  HIVE_URL: "",
+  /* Payouts stay off. Points have no cash value and no public rate. */
+  REWARDS_PAYOUT_ENABLED: false
 };

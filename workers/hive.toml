@@ -1,0 +1,16 @@
+# Hive coordinator. Not deployed until a leader wants it live.
+# Secrets, never committed: ADMIN_WALLETS, TURNSTILE_SECRET, REWARDS_TREASURY.
+# REWARDS_TREASURY is a dedicated rewards wallet. It is not a personal wallet.
+# Leave the payout flag unset. Unset means payouts stay off.
+name = "valhalla-hive"
+main = "hive.js"
+compatibility_date = "2026-11-03"
+
+[durable_objects]
+bindings = [
+  { name = "HIVE", class_name = "HiveRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["HiveRoom"]

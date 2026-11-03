@@ -12,6 +12,8 @@ button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 .card h1 { margin: 0 0 8px; color: var(--amber2); letter-spacing: .16em; font-size: 22px; }
 .note { color: var(--muted); }
 .login-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+#emailCode { letter-spacing: .4em; font-size: 22px; width: 100%; background: #100e0a; color: #f2ead8; border: 1px solid #ffb347; padding: 8px; }
+.device-row { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #1c1a16; padding: 6px 0; }
 .login-stack button, #googleBtn { display: flex; align-items: center; gap: 10px; width: 100%; background: #100e0a; color: var(--amber2); border: 1px solid rgba(255,154,31,.45); padding: 8px 12px; text-align: left; }
 .hud { display: grid; grid-template-rows: 56px 1fr 28px; height: 100vh; padding: 10px 12px 6px; gap: 8px; }
 .topbar { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); background: linear-gradient(180deg, #0f0e0b, #0a0908); padding: 6px 12px; position: relative; overflow: hidden; }
@@ -29,6 +31,10 @@ button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 .clock { color: var(--amber2); font-variant-numeric: tabular-nums; }
 .grid { display: grid; grid-template-columns: 1.05fr 1.35fr .9fr; grid-template-rows: 1.05fr .95fr; gap: 8px; min-height: 0; }
 .panel { background: var(--panel); border: 1px solid var(--line); min-height: 0; display: flex; flex-direction: column; position: relative; }
+.panel.yours { border-color: #00ff88; }
+.panel.agent-wallet { border-color: #7ad7ff; }
+.adslot { margin: 8px 0; padding: 8px; border: 1px dashed #ffb347; color: #ffb347; font-size: 12px; }
+#lab { border: 1px solid #ffb347; margin-top: 8px; }
 .panel::after { content: ""; position: absolute; top: 0; right: 0; width: 16px; height: 16px; border-top: 1px solid var(--amber); border-right: 1px solid var(--amber); opacity: .5; }
 .ph { display: flex; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #16140f; letter-spacing: .14em; font-size: 11px; }
 .ph b { color: var(--amber); }

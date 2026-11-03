@@ -1,0 +1,14 @@
+# Cheap lab keeper. Deploy only when you want this Worker live.
+# Required binding: a KV namespace named LAB_KV.
+# Secrets, never committed: ADMIN_WALLETS, INCIDENT_EMAIL_URL, any LLM key.
+# Cron is every 10 minutes. The paper run stops itself at the daily cap.
+name = "valhalla-lab-keeper"
+main = "lab-keeper.js"
+compatibility_date = "2026-11-03"
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+# [[kv_namespaces]]
+# binding = "LAB_KV"
+# id = "paste-the-kv-id"

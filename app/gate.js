@@ -7,7 +7,7 @@
   var TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
   function show(id) {
-    ["gateHuman", "gateAccount", "gateWallet", "desk"].forEach(function (name) {
+    ["gateHuman", "gateAccount", "gateCode", "gateWallet", "desk"].forEach(function (name) {
       var node = document.getElementById(name);
       if (node) node.hidden = name !== id;
     });
@@ -80,14 +80,106 @@
     document.head.appendChild(script);
   }
 
+  function termsOk() {
+    var box = document.getElementById("termsOk");
+    var note = document.getElementById("termsNote");
+    if (box && box.checked) {
+      if (note) note.textContent = "";
+      return true;
+    }
+    if (note) note.textContent = "Accept the Terms of Use before you sign in.";
+    return false;
+  }
+
+  function authBase() {
+    return String(cfg.AUTH_URL || "").replace(/\/$/, "");
+  }
+
+  function alwaysAsk() {
+    try { return JSON.parse(localStorage.getItem("valhalla-security") || "{}").alwaysAsk === true; }
+    catch (err) { return false; }
+  }
+
+  function authNote(error) {
+    if (error === "auth-not-configured") return "The sign-in Worker is not configured. No one was signed in.";
+    if (error === "email-not-configured") return "The email service is not configured. No code was sent.";
+    if (error === "rate") return "Too many codes were requested. Wait and try again. No extra code was sent.";
+    if (error === "locked") return "That code was tried 5 times. Ask for a new code.";
+    if (error === "expired" || error === "code" || error === "missing") return "That code was not accepted.";
+    if (error === "google") return "Google did not confirm this sign-in. The token was not stored.";
+    return "The sign-in Worker did not accept this step.";
+  }
+
+  function showCode(email, next) {
+    sessionStorage.setItem("valhalla-pending-email", email);
+    sessionStorage.setItem("valhalla-code-next", next);
+    var lead = document.getElementById("codeLead");
+    var local = email.indexOf("@");
+    var masked = local > 0 ? email.slice(0, 1) + "***" + email.slice(local) : "your email";
+    if (lead) lead.textContent = "Enter the 6-digit code sent to " + masked + ". It expires in 10 minutes.";
+    show("gateCode");
+  }
+
+  function acceptAccount(body, next) {
+    var prior = readAccount() || {};
+    writeAccount({
+      email: body.email || prior.email || "",
+      name: body.name || prior.name || "",
+      picture: body.picture || prior.picture || "",
+      wallet: prior.wallet || "",
+      agentUrl: prior.agentUrl || "",
+      bot: prior.bot || null,
+      riskAccepted: prior.riskAccepted === true,
+      termsAccepted: true
+    });
+    sessionStorage.setItem("valhalla-auth", "1");
+    if (body.session) sessionStorage.setItem("valhalla-auth-token", body.session);
+    if (body.needCode) showCode(body.email, "wallet");
+    else {
+      sessionStorage.setItem("valhalla-code-ok", "1");
+      if (next === "desk") openDesk();
+      else {
+        show("gateWallet");
+        mountWallet();
+      }
+    }
+  }
+
+  function postAuth(path, payload) {
+    return fetch(authBase() + path, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer " + (sessionStorage.getItem("valhalla-auth-token") || "")
+      },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      return res.json().catch(function () { return { ok: false }; }).then(function (body) {
+        body.status = res.status;
+        return body;
+      });
+    });
+  }
+
   function mountAccount() {
     var google = document.getElementById("googleBtn");
     var note = document.getElementById("accountNote");
+    var box = document.getElementById("termsOk");
+    var saved = readAccount();
+    if (box && saved && saved.termsAccepted) box.checked = true;
     if (!keyReady(cfg.GOOGLE_CLIENT_ID)) {
       google.onclick = function () {
-        note.textContent = "Google client ID is not set. Create an OAuth web client. Authorized JavaScript origin: https://valhalla-app.xyz. Paste the client ID into GOOGLE_CLIENT_ID.";
+        if (!termsOk()) return;
+        note.textContent = "Google client ID is not set. Create an OAuth web client for https://valhalla-app.xyz. Use openid, email, and profile only. Paste the client ID into GOOGLE_CLIENT_ID. No sign-in happened.";
       };
-    } else {
+    } else if (!authBase()) {
+      google.onclick = function () {
+        if (!termsOk()) return;
+        note.textContent = "AUTH_URL is empty. Deploy the sign-in Worker, then paste its address into AUTH_URL. The Google token is not accepted in the browser. No sign-in happened.";
+      };
+    } else if (!google.dataset.gis) {
+      google.dataset.gis = "1";
       google.hidden = true;
       var script = document.createElement("script");
       script.src = "https://accounts.google.com/gsi/client";
@@ -96,33 +188,79 @@
         window.google.accounts.id.initialize({
           client_id: cfg.GOOGLE_CLIENT_ID,
           callback: function (resp) {
-            var part = String(resp.credential || "").split(".")[1] || "";
-            var pad = part.replace(/-/g, "+").replace(/_/g, "/");
-            while (pad.length % 4) pad += "=";
-            var json = JSON.parse(atob(pad));
-            var prior = readAccount() || {};
-            writeAccount({ email: json.email || "", name: json.name || "", picture: json.picture || "", wallet: prior.wallet || "", agentUrl: prior.agentUrl || "", bot: prior.bot || null, riskAccepted: prior.riskAccepted === true });
-            show("gateWallet");
-            mountWallet();
-          }
+            if (!termsOk()) return;
+            note.textContent = "Checking the Google token with the sign-in Worker.";
+            postAuth("/auth/google", { credential: resp.credential, alwaysAsk: alwaysAsk() }).then(function (body) {
+              if (!body.ok) {
+                note.textContent = authNote(body.error);
+                return;
+              }
+              acceptAccount(body, "wallet");
+            }).catch(function () {
+              note.textContent = "The sign-in Worker did not answer. No sign-in happened.";
+            });
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: true,
+          context: "signin"
         });
-        window.google.accounts.id.renderButton(document.getElementById("googleSlot"), { theme: "filled_black", size: "large", text: "continue_with", shape: "rectangular", width: 360 });
+        window.google.accounts.id.renderButton(document.getElementById("googleSlot"), {
+          theme: "filled_black",
+          size: "large",
+          text: "signin_with",
+          shape: "rectangular",
+          width: 360
+        });
+        window.google.accounts.id.prompt();
       };
       document.head.appendChild(script);
     }
-    var form = document.getElementById("magicForm");
+    var form = document.getElementById("emailForm");
     if (form && !form.dataset.bound) {
       form.dataset.bound = "1";
       form.addEventListener("submit", function (event) {
         event.preventDefault();
-        var email = document.getElementById("magicEmail").value.trim();
-        if (!cfg.MAGIC_LINK_URL) {
-          note.textContent = "Email sign-in is not live. Deploy a Worker that emails a one-time link, then set MAGIC_LINK_URL. No message was sent.";
+        if (!termsOk()) return;
+        var email = document.getElementById("magicEmail").value.trim().toLowerCase();
+        if (!authBase()) {
+          note.textContent = "AUTH_URL is empty. No code was sent.";
           return;
         }
-        fetch(cfg.MAGIC_LINK_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email }) })
-          .then(function (res) { note.textContent = res.ok ? "Check your email for the sign-in link." : "The email link was not sent."; })
-          .catch(function () { note.textContent = "The email link service did not answer."; });
+        note.textContent = "Asking the sign-in Worker to send a code.";
+        postAuth("/auth/email/start", { email: email, alwaysAsk: alwaysAsk() }).then(function (body) {
+          if (!body.ok) {
+            note.textContent = authNote(body.error);
+            return;
+          }
+          var prior = readAccount() || {};
+          prior.email = email;
+          prior.termsAccepted = true;
+          writeAccount(prior);
+          note.textContent = "The code was sent. It expires in 10 minutes.";
+          showCode(email, "wallet");
+        }).catch(function () {
+          note.textContent = "The sign-in Worker did not answer. No code was sent.";
+        });
+      });
+    }
+    var codeForm = document.getElementById("codeForm");
+    if (codeForm && !codeForm.dataset.bound) {
+      codeForm.dataset.bound = "1";
+      codeForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var codeNote = document.getElementById("codeNote");
+        var email = sessionStorage.getItem("valhalla-pending-email") || (readAccount() || {}).email || "";
+        postAuth("/auth/email/verify", { email: email, code: document.getElementById("emailCode").value.trim() }).then(function (body) {
+          if (!body.ok) {
+            if (codeNote) codeNote.textContent = authNote(body.error);
+            return;
+          }
+          sessionStorage.setItem("valhalla-code-ok", "1");
+          acceptAccount(body, sessionStorage.getItem("valhalla-code-next") || "wallet");
+        }).catch(function () {
+          if (codeNote) codeNote.textContent = "The sign-in Worker did not answer. The code was not accepted.";
+        });
       });
     }
   }
@@ -333,20 +471,67 @@
       return;
     }
     var account = readAccount() || {};
+    if (!account.termsAccepted) {
+      if (note) note.textContent = "Accept the Terms of Use before you sign in.";
+      show("gateAccount");
+      mountAccount();
+      return;
+    }
+    if (sessionStorage.getItem("valhalla-auth") !== "1" || sessionStorage.getItem("valhalla-code-ok") !== "1") {
+      if (note) note.textContent = "Finish the email step before the wallet can open the desk.";
+      show("gateAccount");
+      mountAccount();
+      return;
+    }
     account.wallet = packed.pubkey;
     writeAccount(account);
     saveSession({ kind: "wallet", pubkey: packed.pubkey, email: account.email || "" });
     sessionStorage.setItem("valhalla-wallet-ok", "1");
-    if (fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS) && account.email) openDesk();
+    if (!(fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS) && account.email)) return;
+    if (!authBase()) {
+      if (note) note.textContent = "The sign-in Worker is not set, so the desk stays closed.";
+      return;
+    }
+    postAuth("/auth/leader", { pubkey: packed.pubkey, message: packed.message, signature: packed.signature }).then(function (body) {
+      if (!body.ok) {
+        if (note) note.textContent = "The sign-in Worker did not confirm this wallet. The desk stays closed.";
+        return;
+      }
+      if (body.role === "leader") {
+        var badge = document.getElementById("leaderBadge");
+        if (badge) badge.hidden = false;
+      }
+      if (body.needCode) {
+        if (note) note.textContent = "Leader accounts always need the email code.";
+        sessionStorage.removeItem("valhalla-code-ok");
+        postAuth("/auth/email/start", { email: account.email }).then(function (sent) {
+          if (!sent.ok) {
+            if (note) note.textContent = authNote(sent.error);
+            return;
+          }
+          showCode(account.email, "desk");
+        }).catch(function () {
+          if (note) note.textContent = "The sign-in Worker did not send the leader code.";
+        });
+        return;
+      }
+      openDesk();
+    }).catch(function () {
+      if (note) note.textContent = "The sign-in Worker did not answer. The desk stays closed.";
+    });
   });
 
   var human = fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS);
   var account = readAccount();
   var signed = sessionStorage.getItem("valhalla-wallet-ok") === "1";
-  if (human && account && account.email && signed) openDesk();
-  else if (human && account && account.email) {
+  var authed = sessionStorage.getItem("valhalla-auth") === "1" && sessionStorage.getItem("valhalla-code-ok") === "1";
+  if (human && account && account.email && authed && signed) openDesk();
+  else if (human && account && account.email && authed) {
     show("gateWallet");
     mountWallet();
+  } else if (human && sessionStorage.getItem("valhalla-pending-email") && sessionStorage.getItem("valhalla-code-ok") !== "1") {
+    show("gateCode");
+    mountAccount();
   } else if (human) {
     show("gateAccount");
     mountAccount();

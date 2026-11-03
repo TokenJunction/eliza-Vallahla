@@ -3,6 +3,7 @@
   var LABEL = "Affiliate link · we may earn a commission";
 
   function track(id, placement) {
+    if (!window.ValhallaConsent || !window.ValhallaConsent.allows("advertising")) return;
     var cfg = window.VALHALLA_SITE || {};
     var endpoint = cfg.OFFER_CLICK_URL || "";
     if (!endpoint || !/^[a-z0-9-]{1,40}$/.test(id)) return;

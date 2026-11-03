@@ -1,27 +1,15 @@
 # Valhalla terms of use
 
-TokenJunction LLC publishes Valhalla. TokenJunction LLC is a private company. It is the parent company and the owner of the product. Valhalla is its product.
+Template, not legal advice; have counsel review.
 
-## What you get
+TokenJunction LLC publishes Valhalla. The website desk is the main product. The Chrome extension is second. Telegram is coming soon. Android is in testing. Windows is coming soon.
 
-The desk runs on your computer. The phone watches that desk. The phone does not hold a wallet key. The product has no send, withdraw, or custody control.
+You must be 18 or older. You accept these terms with the checkbox at sign-in.
 
-## Not advice
+The product does not hold your keys. It does not send or withdraw. This is not financial advice. Crypto can lose money. There is no promise of profit.
 
-This is not financial, legal, or tax advice. Crypto can lose money. TokenJunction LLC does not promise profit.
+The Hive is off by default. The website Join the Hive choice and the Chrome extension idle-helper choice are separate. They are not bundled only into these terms. The helper can use CPU, and GPU when the browser already allows it, for a paper test on public data. You can stop it in one click. It does not mine and it does not share your connection.
 
-## Your duties
+Contribution points are not cash, not a coin, and not transferable. Rewards are points only for now. No payment, rate, or bonus is promised. A future payout path is designed and disabled.
 
-You must be 18 or older. You arm any live trade on your computer. You keep your own keys. Do not send a seed phrase or a private key to support. TokenJunction LLC will not ask for one, and it will not message you first in a private chat.
-
-## Pro
-
-On this website, TokenJunction LLC sells Valhalla Pro through the store named Valhalla on Lemon Squeezy. On the phone, Pro uses Google Play Billing or Apple In-App Purchase, product `valhalla_pro_monthly`. The phone plan is not a Lemon Squeezy checkout.
-
-## The software
-
-The software is provided as it is. TokenJunction LLC is not liable for trading losses.
-
-## Contact
-
-TokenJunction LLC is the publisher. The site is https://valhalla-app.xyz. Support is hello@valhalla-app.xyz. This public page does not include a street address or a tax id.
+Support is hello@valhalla-app.xyz. This page has no street address.

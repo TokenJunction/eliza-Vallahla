@@ -1,5 +1,20 @@
 (function () {
   function boot() {
+    if (!document.querySelector('script[src="/status.js"]')) {
+      var statusScript = document.createElement("script");
+      statusScript.src = "/status.js";
+      document.head.appendChild(statusScript);
+    }
+    if (!document.querySelector('script[src="/app/ask.js"]')) {
+      var ask = document.createElement("script");
+      ask.src = "/app/ask.js";
+      document.body.appendChild(ask);
+    }
+    if (!window.ValhallaConsent && !document.querySelector('script[src="/consent.js"]')) {
+      var consent = document.createElement("script");
+      consent.src = "/consent.js";
+      document.head.appendChild(consent);
+    }
     var cfg = window.VALHALLA_SITE || {};
     var xUrl = cfg.xUrl || "https://x.com/intent/user?user_id=2092719999886475265";
     var mark = '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14.7 10.3 22 2h-2.2l-6.3 7.2L8.2 2H2l7.7 10.9L2 22h2.2l7-8 5.6 8H22l-7.3-11.7Z"/></svg>';
@@ -22,20 +37,21 @@
       else brand.insertAdjacentHTML("beforeend", " VALHALLA™");
     }
     var nav = header.querySelector("nav") || header;
-    if (!header.querySelector(".xlink")) {
+    var locked = header.dataset.nav === "locked";
+    if (!locked && !header.querySelector(".xlink")) {
       var link = document.createElement("a");
       link.className = "xlink";
       link.href = xUrl;
       link.innerHTML = mark + " Follow Valhalla on X";
       nav.appendChild(link);
     }
-    if (!header.querySelector('a[href="/shop/"]')) {
+    if (!locked && !header.querySelector('a[href="/shop/"]')) {
       var shop = document.createElement("a");
       shop.href = "/shop/";
       shop.textContent = "Shop";
       nav.appendChild(shop);
     }
-    if (!header.querySelector('a[href="/contact/"]')) {
+    if (!locked && !header.querySelector('a[href="/contact/"]')) {
       var contact = document.createElement("a");
       contact.href = "/contact/";
       contact.textContent = "Contact";
@@ -60,6 +76,11 @@
       var footX = document.createElement("p");
       footX.innerHTML = '<a class="xlink" href="' + xUrl + '">' + mark + " Follow Valhalla on X</a>";
       host.appendChild(footX);
+    }
+    if (!foot.querySelector("[data-cookie-settings]")) {
+      var privacy = document.createElement("p");
+      privacy.innerHTML = '<a href="/privacy/">Privacy</a> · <a href="/cookies/">Cookies</a> · <a href="#" data-cookie-settings>Cookie settings</a> · <a href="/privacy/#do-not-sell">Do Not Sell or Share My Personal Information</a> · <a href="/faq/">FAQ</a>';
+      host.appendChild(privacy);
     }
     if (!foot.querySelector(".legal-tm")) {
       var legal = document.createElement("p");

@@ -2,7 +2,7 @@
   {
     "q": "What is Valhalla?",
     "keys": ["what", "valhalla", "product"],
-    "a": "Valhalla is a desk on your computer and a phone app that watches it. TokenJunction LLC publishes it. It is not financial advice."
+    "a": "Valhalla™ is the website desk at /app first, then the Chrome extension. Telegram is coming soon. The Android app is in testing. TokenJunction LLC publishes it. It is not financial advice."
   },
   {
     "q": "Can the app move my funds?",
@@ -27,11 +27,16 @@
   {
     "q": "Where do I download it?",
     "keys": ["download", "apk", "android", "windows", "install"],
-    "a": "The Android APK is on the GitHub release. The Windows installer is on the GitHub release when that build is published. The site is valhalla-app.xyz."
+    "a": "Open the website desk at valhalla-app.xyz/app. The Chrome extension is the second install. Telegram is coming soon. Android is in testing and is not a public download yet. Windows is coming soon."
   },
   {
     "q": "What if the computer is off?",
     "keys": ["off", "offline", "pc"],
-    "a": "The phone still opens. It shows the last saved status, or the pairing screen."
+    "a": "The website desk still opens in the browser. The Chrome extension needs the computer on. Android is in testing and is not a public download yet."
+  },
+  {
+    "q": "What is the Hive?",
+    "keys": ["hive", "compute", "worker", "extension"],
+    "a": "The Hive is an optional paper-test helper. It is off until a leader turns the feature on, and it stays off for you until you choose Join the Hive. The Chrome extension has a second, separate idle-helper switch. It does not mine and it does not share your internet connection. Points are not cash and not a coin. Rewards are points only for now."
   }
 ]

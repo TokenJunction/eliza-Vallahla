@@ -74,6 +74,14 @@
     }));
     window.dispatchEvent(new Event("valhalla-keys"));
   });
+  var wipe = document.getElementById("deleteData");
+  if (wipe) wipe.addEventListener("click", function () {
+    localStorage.clear();
+    sessionStorage.clear();
+    document.cookie = "valhalla_consent=; Path=/; Max-Age=0";
+    var note = document.getElementById("deleteNote");
+    if (note) note.textContent = "Local data on this browser was cleared. To ask TokenJunction LLC to delete data held on a server, email hello@valhalla-app.xyz. This site does not keep a private key.";
+  });
   document.getElementById("deleteKeys").addEventListener("click", function () {
     localStorage.removeItem(KEYS);
     fill();

@@ -2,246 +2,128 @@
 <html lang="en">
 <head>
 <meta name="google-adsense-account" content="ca-pub-6504655762357230">
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6504655762357230" crossorigin="anonymous"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Valhalla — the desk that stays on your computer</title>
-<meta name="description" content="Valhalla watches a trading desk on your PC. The phone never holds a wallet key. The app cannot send or withdraw. Not financial advice.">
+<title>Valhalla™ — the desk in your browser</title>
+<meta name="description" content="Valhalla™ is the website desk. The Chrome extension is next. Telegram and Windows are coming soon. Android is in testing. Not financial advice.">
 <meta name="theme-color" content="#07080B">
 <link rel="canonical" href="https://valhalla-app.xyz/">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Valhalla">
-<meta property="og:description" content="Desk on your computer. Phone watches. No wallet key. Not financial advice.">
+<meta property="og:title" content="Valhalla™">
+<meta property="og:description" content="The desk runs in the browser. Keys stay on your device. Not financial advice.">
 <meta property="og:image" content="https://valhalla-app.xyz/assets/og.jpg">
-<meta property="og:url" content="https://valhalla-app.xyz/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@ValhallaOS">
 <meta name="twitter:title" content="Valhalla™">
-<meta name="twitter:description" content="Desk on your computer. Phone watches. No wallet key.">
-<meta name="twitter:image" content="https://valhalla-app.xyz/assets/og.jpg">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="icon" href="assets/favicon-16.png" sizes="16x16" type="image/png">
 <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body data-marketing="1">
-<header class="bar wrap">
+<header class="bar wrap" data-nav="locked">
   <a class="brand" href="#top"><img src="assets/mark.svg" alt="Valhalla™ mech logo" width="32" height="32"> VALHALLA™</a>
-  <nav aria-label="Page">
-    <a href="#how">How</a>
-    <a href="#film">Demo</a>
-    <a href="#tour">Tour</a>
-    <a href="#pricing">Pro</a>
-    <a href="tools/">Tools</a>
-    <a href="api/">API</a>
-    <a href="app/">Launch App</a>
+  <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="siteNav">Menu</button>
+  <nav id="siteNav" aria-label="Page">
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="shop/">Shop</a>
     <a href="#faq">FAQ</a>
   </nav>
+  <a class="xicon" href="https://x.com/intent/user?user_id=2092719999886475265" aria-label="Follow Valhalla on X"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14.7 10.3 22 2h-2.2l-6.3 7.2L8.2 2H2l7.7 10.9L2 22h2.2l7-8 5.6 8H22l-7.3-11.7Z"/></svg></a>
+  <a class="btn solid" href="app/">Launch App</a>
 </header>
 <main id="top">
-  <section class="hero">
-    <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="assets/poster.jpg" aria-hidden="true">
-      <source src="media/hero.mp4" type="video/mp4">
+  <section class="hero desk-hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="kicker">VALHALLA™</p>
+        <h1>The desk is the website.</h1>
+        <p>Sign in, see your wallet, and run the bot controls in the browser. The Chrome extension is the second way in.</p>
+        <div class="row">
+          <a class="btn solid" href="app/">Launch App</a>
+          <a class="btn" href="#film">Watch it run</a>
+        </div>
+      </div>
+      <div class="desk-mock" aria-hidden="true">
+        <div class="mock-bar"><b>ACCELERATION</b><span>DEMO DATA</span><i></i></div>
+        <div class="mock-grid">
+          <div><b>00 YOUR WALLET</b><strong>0.42 SOL</strong></div>
+          <div><b>00b AGENT WALLET</b><em>No agent wallet linked</em></div>
+          <div><b>01 FUNNEL</b><span>elite · good · watch · paused</span></div>
+          <div><b>02 BOT</b><span>Stopped</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="wrap" data-status-slot></div>
+  </section>
+
+  <section id="features" class="wrap blocks">
+    <article><p class="kicker">01</p><h2>Sign in</h2><p>A human check, then email or Google, then a wallet message. No seed phrase.</p></article>
+    <article><p class="kicker">02</p><h2>Your desk</h2><p>Your wallet and the agent wallet stay in separate panels. History is read from the chain.</p></article>
+    <article><p class="kicker">03</p><h2>Bot control</h2><p>Set the limits, review them, then Start or Stop. The key stays on your computer.</p></article>
+    <article><p class="kicker">04</p><h2>Forge Lab</h2><p>Paper tests on live prices. SIMULATED fills only. No real orders.</p></article>
+    <article><p class="kicker">05</p><h2>Ask Valhalla</h2><p>A small assistant for how the product works. Not financial advice.</p></article>
+    <article id="downloads"><p class="kicker">06</p><h2>Downloads</h2>
+      <div class="row">
+        <a class="btn solid" href="extension/">Add to Chrome</a>
+        <span class="btn soon" aria-disabled="true">Download for Android</span>
+        <span class="btn soon" aria-disabled="true">Telegram · Coming soon</span>
+        <span class="btn soon" aria-disabled="true">Windows · Coming soon</span>
+      </div>
+      <p class="note"><span class="pill">In testing</span> Android app is in testing, coming soon.</p>
+      <p class="mono">Android app ID<br>ai.tokenjunction.valhalla</p>
+      <p class="note">Windows is paused. When a build returns, the publisher may show as unknown until it is signed.</p>
+    </article>
+  </section>
+
+  <section id="film" class="wrap">
+    <p class="kicker">DEMO</p>
+    <h2>Watch it run</h2>
+    <p class="note">Sample film only. Not your account.</p>
+    <video poster="assets/poster.jpg" controls preload="metadata" playsinline>
+      <source src="media/valhalla-demo.mp4" type="video/mp4">
     </video>
-    <div class="hero-shade" aria-hidden="true"></div>
-    <div class="wrap hero-copy">
-      <p class="kicker">TOKENJUNCTION LLC</p>
-      <h1>See the desk. Keep the keys.</h1>
-      <p>Valhalla is the phone and the Windows desk for a copy bot that stays on your computer. It works with Phantom and Solflare. Connect is read-only. The app cannot send or withdraw funds.</p>
-      <div class="row">
-        <a class="btn solid" href="https://github.com/TokenJunction/eliza-valhalla/releases/latest/download/valhalla-phone.apk">Download for Android</a>
-        <a class="btn" href="https://github.com/TokenJunction/eliza-valhalla/releases/latest/download/Valhalla-Setup-x64.exe">Download for Windows</a>
-        <a class="btn solid" href="app/">Launch App</a>
-        <a class="btn" data-pro href="app/">Go Pro <span data-price>$9.99/mo launch price</span></a>
-        <a class="btn" data-chrome href="extension/">Add to Chrome</a>
-      </div>
-      <p class="note">Windows may say the publisher is unknown. Choose More info, then Run anyway. The file is not signed yet. Crypto is risky. This is not financial advice.</p>
+  </section>
+
+  <section id="pricing" class="wrap">
+    <p class="kicker">PRICING</p>
+    <h2>Free and Pro</h2>
+    <div class="price-row">
+      <article class="card"><h3>Free</h3><p>The website desk, with ads. Not a promise of profit.</p></article>
+      <article class="card"><h3>Pro</h3><p>$9.99 a month at the launch price. A 15 day trial is included. Ads come off. Not a promise of profit.</p><a class="btn" href="app/">Launch App</a></article>
     </div>
   </section>
 
-  <section id="how">
-    <div class="wrap">
-      <p class="kicker">HOW IT WORKS</p>
-      <h2>Three steps. No seed phrase.</h2>
-      <div class="grid">
-        <article class="card"><h3>1. Desk on the PC</h3><p>Install Valhalla on the computer. It stays read-only until you arm live there.</p></article>
-        <article class="card"><h3>2. Pair the phone</h3><p>Use a code or a QR. The phone watches status. It does not hold a key.</p></article>
-        <article class="card"><h3>3. Read, then decide</h3><p>Positions, P&amp;L, and alerts stay in view. A stop stays on. Nothing is sent from the phone.</p></article>
-      </div>
-    </div>
+  <section class="wrap">
+    <p class="kicker">MERCH</p>
+    <h2>Hats, a hoodie, tees, a sticker</h2>
+    <p>The shop is not open yet.</p>
+    <a class="btn" href="shop/">See the shop</a>
   </section>
 
-  <section id="film">
-    <div class="wrap">
-      <p class="kicker">SEE IT IN ACTION</p>
-      <h2>A narrated demo. Sample data only.</h2>
-      <div class="film">
-        <video id="demo-film" poster="assets/poster.jpg" preload="metadata" playsinline>
-          <source src="media/valhalla-demo.mp4" type="video/mp4">
-          <track kind="captions" src="media/captions.vtt" srclang="en" label="English" default>
-        </video>
-        <button type="button" id="play-film" class="play">Play with sound</button>
-      </div>
-      <p class="note">Captions are burned in. The vertical cut is <a href="media/valhalla-demo-story.mp4">the 9:16 film</a>.</p>
-    </div>
-  </section>
-
-  <section id="tour">
-    <div class="wrap">
-      <p class="kicker">GUI PREVIEW</p>
-      <h2>Click through the sample desk</h2>
-      <p class="note">Every number below is demo data. It is not your account.</p>
-      <div class="row" role="tablist" aria-label="Sample screens">
-        <button type="button" data-tour="dashboard" aria-selected="true">Dashboard</button>
-        <button type="button" data-tour="chart">Trade feed</button>
-        <button type="button" data-tour="alerts">Alerts</button>
-        <button type="button" data-tour="risk">Settings and risk</button>
-        <button type="button" data-tour="pro">Pro</button>
-      </div>
-      <div class="tour">
-        <div class="bezel">
-          <iframe id="phone-frame" title="Phone preview, demo data" src="demo/stage.html?layout=phone"></iframe>
-        </div>
-        <div class="window">
-          <iframe id="desk-frame" title="Windows preview, demo data" src="demo/stage.html"></iframe>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="safety">
-    <div class="wrap">
-      <p class="kicker">SECURITY</p>
-      <h2>Non-custodial. The app never moves funds.</h2>
-      <div class="grid">
-        <article class="card"><h3>No custody</h3><p>Valhalla does not hold your coins. Keys stay on your device.</p></article>
-        <article class="card"><h3>No send or withdraw</h3><p>There is no control that moves SOL or tokens. Move funds in your own wallet app.</p></article>
-        <article class="card"><h3>Read-only first</h3><p>Live trading stays off until you arm it on the computer and confirm it there.</p></article>
-      </div>
-    </div>
-  </section>
-
-  <section id="pricing">
-    <div class="wrap">
-      <p class="kicker">PRICING</p>
-      <h2>Free to try. Pro is a plan, not a promise.</h2>
-      <div class="grid">
-        <article class="card">
-          <h3>Free</h3>
-          <p class="price">$0</p>
-          <p>Sideload the phone app. Pair it. Read status.</p>
-          <a class="btn" href="#download">Download</a>
-        </article>
-        <article class="card">
-          <h3>Pro</h3>
-          <p class="price" data-price>$9.99/mo launch price</p>
-          <p>Every new user gets 100 free Pro trades. Then TokenJunction LLC sells Pro on Lemon Squeezy. The launch price includes a <span data-trial>15 day free Pro trial</span>. Pro does not promise profit.</p>
-          <a class="btn solid" data-pro href="app/">Go Pro</a>
-          <a class="btn" href="pay/">Pay with crypto</a>
-          <a class="btn" data-plan="yearly" hidden>Yearly</a>
-          <a class="btn" data-plan="lifetime" hidden>Lifetime</a>
-          <p id="plan-soon" class="note">Yearly and Lifetime are coming soon.</p>
-          <p id="pro-note" class="note" role="status"></p>
-        </article>
-      </div>
-      <table>
-        <thead><tr><th>Feature</th><th>Free</th><th>Pro</th></tr></thead>
-        <tbody>
-          <tr><td>Wallets</td><td>1</td><td>Unlimited</td></tr>
-          <tr><td>Live balances and P&amp;L</td><td>Yes</td><td>Yes</td></tr>
-          <tr><td>Alerts</td><td>Basic, delayed</td><td>Instant</td></tr>
-          <tr><td>Watchlist</td><td>3 coins</td><td>Unlimited</td></tr>
-          <tr><td>Brain scores</td><td>1 a day, plus a <span data-trial>15 day free Pro trial</span></td><td>Unlimited</td></tr>
-          <tr><td>Ads</td><td>Banner and an optional rewarded ad</td><td>None</td></tr>
-          <tr><td>Free Pro trades</td><td>100, then the free plan</td><td>Included</td></tr>
-          <tr><td>Price</td><td>$0</td><td>$9.99/mo launch price</td></tr>
-        </tbody>
-      </table>
-      <p class="note">Pro does not promise profit. A <span data-trial>15 day free Pro trial</span> is included. Free is ad-supported. No ad covers wallet connect or settings. No full-screen ad runs when the app opens.</p>
-    </div>
-  </section>
-
-  <section id="brain">
-    <div class="wrap">
-      <p class="kicker">VALHALLA BRAIN</p>
-      <h2>Request access to the API</h2>
-      <p>No wallet connect. Do not send a key or a seed phrase. This form only takes an email and a note.</p>
-      <form id="brain-form">
-        <label>Email <input id="brain-email" type="email" required autocomplete="email"></label>
-        <label>What do you want it for? <input id="brain-note" maxlength="240" required></label>
-        <button class="solid" type="submit">Request access</button>
-      </form>
-      <p id="form-status" class="note" role="status"></p>
-      <p class="note">If no form service is set, this opens a mail to hello@valhalla-app.xyz.</p>
-    </div>
-  </section>
-
-  <section id="talk">
-    <div class="wrap">
-      <p class="kicker">TALK TO VALHALLA</p>
-      <h2>An assistant for app questions</h2>
-      <p>This uses the browser speech tools on your device. There is no server and no key. It answers from a short FAQ. It gives no financial advice.</p>
-      <button type="button" id="talk-ask">Talk to Valhalla</button>
-      <form id="talk-form" class="row">
-        <label>Or type <input id="talk-text" maxlength="200" placeholder="Can the app move funds?"></label>
-        <button type="submit">Ask</button>
-      </form>
-      <p id="talk-out" class="note" role="status"></p>
-    </div>
-  </section>
-
-  <section id="faq">
-    <div class="wrap">
-      <p class="kicker">FAQ</p>
-      <h2>Before you install</h2>
-      <article class="card"><h3>Will this make money?</h3><p>No promise. Crypto is risky. You can lose money. This page is not financial advice.</p></article>
-      <article class="card"><h3>Where is the app?</h3><p>The Android APK is on the GitHub release. Google Play is not open yet.</p></article>
-      <article class="card"><h3>How long is the free trial?</h3><p>Pro includes a <span data-trial>15 day free Pro trial</span>. The length is TRIAL_DAYS in the product config. It is not a promise of profit.</p></article>
-      <article class="card"><h3>What if the PC is off?</h3><p>The phone still opens. It shows the last status it saved, or the pairing screen.</p></article>
-    </div>
-  </section>
-
-  <section id="risk">
-    <div class="wrap">
-      <p class="kicker">RISK</p>
-      <h2>Not financial advice</h2>
-      <p>Crypto trading is risky. You can lose money. Valhalla does not promise profit. Sample numbers and the demo film are not your account.</p>
-    </div>
-  </section>
-
-  <section id="download">
-    <div class="wrap">
-      <p class="kicker">DOWNLOAD</p>
-      <h2>Windows, Android, and Chrome.</h2>
-      <div class="row">
-        <a class="btn solid" href="https://github.com/TokenJunction/eliza-valhalla/releases/latest/download/Valhalla-Setup-x64.exe">Download for Windows</a>
-        <a class="btn solid" href="https://github.com/TokenJunction/eliza-valhalla/releases/latest/download/valhalla-phone.apk">Download for Android</a>
-        <a class="btn" href="https://github.com/TokenJunction/eliza-valhalla/releases/latest/download/Valhalla-Chrome-Extension.zip">Chrome extension zip</a>
-        <a class="btn" data-chrome href="extension/">Add to Chrome</a>
-      </div>
-      <p class="note">On a computer, unzip the Chrome file. Open chrome://extensions. Turn on Developer mode. Choose Load unpacked. Chrome on Android cannot install extensions.</p>
-    </div>
+  <section id="faq" class="wrap">
+    <p class="kicker">FAQ</p>
+    <h2>Before you start</h2>
+    <article class="card"><h3>What is first?</h3><p>The website desk. The Chrome extension is second. Telegram is coming soon. Android is in testing.</p></article>
+    <article class="card"><h3>Will this make money?</h3><p>No promise. Crypto is risky. This page is not financial advice.</p></article>
   </section>
 </main>
 <footer>
   <div class="wrap">
-    <p>Valhalla is a product of TokenJunction LLC.</p>
-    <p>© 2026 TokenJunction LLC · <a href="mailto:hello@valhalla-app.xyz">hello@valhalla-app.xyz</a> · <a href="contact/">Contact Us</a></p>
+    <p>Crypto is risky, not financial advice.</p>
+    <p><a href="#film">Demo</a> · <a href="tools/">Tools</a> · <a href="api/">API</a> · <a href="contact/">Contact</a> · <a href="status/">Status</a> · <a href="faq/">FAQ</a> · <a href="whitepaper/">White paper</a> · <a href="terms/">Terms</a> · <a href="privacy/">Privacy</a> · <a href="extension/">Chrome extension</a></p>
     <p class="legal-tm">Valhalla™ and the Valhalla mech logo are trademarks of TokenJunction LLC.</p>
-    <p id="offer-footer"></p>
-    <p><a href="tools/">Recommended tools</a> · <a href="disclosure/">Affiliate disclosure</a> · <a href="privacy/">Privacy</a> · <a href="terms.md">Terms</a> · <a href="disclaimer.md">Disclaimer</a> · <a href="https://github.com/TokenJunction/eliza-valhalla">GitHub</a></p>
   </div>
 </footer>
 <script src="site-config.js"></script>
-<script src="nacl.min.js"></script>
-<script src="connect-core.js"></script>
-<script src="trust.js"></script>
-<script src="site-wallet.js"></script>
+<script src="status.js"></script>
 <script src="site-chrome.js"></script>
-<script src="site-offers.js"></script>
-<script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
-<script src="site.js" defer></script>
+<script>
+  var toggle = document.querySelector(".menu-toggle");
+  var nav = document.getElementById("siteNav");
+  toggle.addEventListener("click", function () {
+    var open = nav.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+</script>
 </body>
 </html>
