@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pay for Valhalla Pro</title>
+<meta name="description" content="Pay for Valhalla Pro with a card or with crypto. Refunds are manual.">
+<link rel="canonical" href="https://valhalla-app.xyz/pay/">
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<main class="wrap" style="padding:32px 0 64px">
+  <p class="kicker">CHECKOUT</p>
+  <h1>Pay for Pro</h1>
+  <p>Card checkout uses Lemon Squeezy. Crypto checkout is a transfer you approve in Phantom or Solflare. Valhalla does not hold a wallet key.</p>
+  <p id="prices">Prices load from the signed config.</p>
+  <p>Monthly is 30 days. Yearly is 365 days. Lifetime does not expire. A SOL price locks for 10 minutes. USDC is the default.</p>
+  <p><a class="btn" href="../app/">Pay with card</a></p>
+  <p><a class="btn" href="../app/#crypto">Pay with crypto</a></p>
+  <p id="receive"></p>
+  <p>Refunds are manual. Email hello@valhalla-app.xyz with the transaction signature. Paying the wrong amount does not turn Pro on. That payment is flagged for a person to review.</p>
+  <p>On-chain payments are public. We store the transaction signature with the license. This is not financial advice.</p>
+  <p><a href="../">Back to Valhalla</a> · <a href="../privacy/">Privacy</a> · <a href="../disclosure/">Disclosure</a></p>
+</main>
+<script src="../nacl.min.js"></script>
+<script src="../trust.js"></script>
+<script>
+fetch("../monetization.json").then(function (res) { return res.json(); }).then(function (doc) {
+  var signed = window.ValhallaTrust && window.nacl && window.ValhallaTrust.verifyMonetization(window.nacl, doc);
+  var prices = document.getElementById("prices");
+  var receive = document.getElementById("receive");
+  if (!signed) {
+    if (prices) prices.textContent = "Crypto checkout is off until the signed config verifies.";
+    return;
+  }
+  if (prices) prices.textContent = "Monthly $" + signed.priceMonthlyUsd + ". Yearly $" + signed.priceYearlyUsd + ". Lifetime $" + signed.priceLifetimeUsd + ".";
+  if (receive) receive.textContent = "Crypto payments go to an address ending in " + String(signed.cryptoReceiveAddress).slice(-4) + ".";
+}).catch(function () {
+  var prices = document.getElementById("prices");
+  if (prices) prices.textContent = "Crypto checkout is off until the signed config verifies.";
+});
+</script>
+</body>
+</html>
