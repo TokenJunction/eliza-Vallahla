@@ -29,6 +29,12 @@
       link.innerHTML = mark + " Follow Valhalla on X";
       nav.appendChild(link);
     }
+    if (!header.querySelector('a[href="/shop/"]')) {
+      var shop = document.createElement("a");
+      shop.href = "/shop/";
+      shop.textContent = "Shop";
+      nav.appendChild(shop);
+    }
     if (!header.querySelector('a[href="/contact/"]')) {
       var contact = document.createElement("a");
       contact.href = "/contact/";

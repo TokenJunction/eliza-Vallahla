@@ -28,5 +28,7 @@ window.VALHALLA_SITE = {
   /* Worker route. The secret TURNSTILE_SECRET stays in Cloudflare, never in this file. */
   TURNSTILE_VERIFY_URL: "https://valhalla-app.xyz/api/verify",
   /* Google OAuth web client. Authorized JavaScript origin: https://valhalla-app.xyz */
-  GOOGLE_CLIENT_ID: "GOOGLE_CLIENT_ID_NOT_SET"
+  GOOGLE_CLIENT_ID: "GOOGLE_CLIENT_ID_NOT_SET",
+  /* Paste the live Spring store URL before any buy button is enabled. */
+  SPRING_STORE_URL: ""
 };
