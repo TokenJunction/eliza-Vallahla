@@ -1,3 +1,10 @@
+fetch("/version.json", { cache: "no-store" }).then(function (res) { return res.ok ? res.json() : null; }).then(function (doc) {
+  if (!doc || !doc.version) return;
+  var key = "valhalla-portal-version";
+  var seen = localStorage.getItem(key);
+  if (seen && seen !== doc.version) { localStorage.setItem(key, doc.version); location.reload(); return; }
+  localStorage.setItem(key, doc.version);
+}).catch(function () {});
 const api = "";
 function say(id, text) { const node = document.getElementById(id); if (node) node.textContent = text; }
 function csrf() { const hit = document.cookie.split("; ").find((row) => row.startsWith("valhalla_csrf=")); return hit ? decodeURIComponent(hit.split("=")[1]) : ""; }
