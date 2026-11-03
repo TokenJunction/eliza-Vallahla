@@ -27,8 +27,8 @@ window.VALHALLA_SITE = {
   TURNSTILE_SITE_KEY: "0x4AAAAAAFygFBUewoXH7oRO",
   /* Live Worker valhalla-turnstile-verify. POST {token} returns {success, ok}. */
   TURNSTILE_VERIFY_URL: "https://valhalla-turnstile-verify.valhalla-app.workers.dev/api/verify",
-  /* Google OAuth web client. Authorized JavaScript origin: https://valhalla-app.xyz */
-  GOOGLE_CLIENT_ID: "GOOGLE_CLIENT_ID_NOT_SET",
+  /* Public Google OAuth web client. Origins: https://valhalla-app.xyz and https://www.valhalla-app.xyz. Scopes: openid, email, profile. */
+  GOOGLE_CLIENT_ID: "1085862906383-cmiqc9bu96uqigm73nb3jkp5vfjf9b7l.apps.googleusercontent.com",
   /* Optional email sign-in Worker. POST {email}. Leave empty until that Worker exists. */
   MAGIC_LINK_URL: "",
   /* Sign-in Worker. Empty until it is deployed. A Google token is not accepted in the browser alone. */
