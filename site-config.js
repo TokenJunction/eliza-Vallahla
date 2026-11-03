@@ -43,5 +43,14 @@ window.VALHALLA_SITE = {
   HIVE_ENABLED: false,
   HIVE_URL: "",
   /* Payouts stay off. Points have no cash value and no public rate. */
-  REWARDS_PAYOUT_ENABLED: false
+  REWARDS_PAYOUT_ENABLED: false,
+  /* Terms clickwrap. A new value asks again. */
+  TERMS_VERSION: "2026-11-03",
+  /* Empty until a Coinbase Commerce or NOWPayments checkout URL exists. */
+  COINBASE_COMMERCE_URL: "",
+  NOWPAYMENTS_URL: "",
+  /* Live-money trading stays off until TokenJunction turns this on. */
+  LIVE_TRADING: false,
+  /* Empty until the chat Worker is deployed. */
+  CHAT_URL: ""
 };

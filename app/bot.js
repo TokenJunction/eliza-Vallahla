@@ -52,16 +52,40 @@
     document.getElementById("botLoss").value = bot.dailyLoss || "0.5";
   }
 
+  var running = false;
+  var paused = false;
+  var timer = 0;
+  var lastPrice = 0;
+
+  function liveTrading() {
+    return (window.VALHALLA_SITE || {}).LIVE_TRADING === true;
+  }
+
   function paintStart() {
     var account = readAccount();
     var start = document.getElementById("botStart");
     var note = document.getElementById("botLinkNote");
-    var linked = String(account.agentUrl || "").indexOf("http") === 0;
     var accepted = account.riskAccepted === true || document.getElementById("botRiskAck").checked;
-    start.disabled = !linked || !accepted;
-    note.hidden = linked;
+    start.disabled = !accepted || running;
+    if (note) {
+      note.hidden = false;
+      note.textContent = liveTrading()
+        ? "Live-money trading is on. Start still needs your own agent. This website does not hold the key."
+        : "Paper mode. Start uses live prices and sends no order. Live-money trading is off.";
+    }
+    ["botPause", "botResume"].forEach(function (id) {
+      var node = document.getElementById(id);
+      if (!node || liveTrading()) return;
+      node.disabled = false;
+      node.title = id === "botPause" ? "Pause the paper run" : "Resume the paper run";
+    });
     if (account.agentUrl) document.getElementById("botAgent").value = account.agentUrl;
     if (account.riskAccepted) document.getElementById("botRiskAck").checked = true;
+  }
+
+  function showPnl(text) {
+    var node = document.getElementById("paperPnl");
+    if (node) node.textContent = text;
   }
 
   async function callAgent(path) {
@@ -99,6 +123,44 @@
     log(account.agentUrl ? "Agent link saved on this device." : "Agent link cleared.");
   });
 
+  async function paperTick() {
+    if (!running || paused) return;
+    var price = 0;
+    try {
+      var response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+      var body = await response.json();
+      price = Number(body.solana && body.solana.usd) || 0;
+    } catch (err) {
+      price = 0;
+    }
+    var bot = fields();
+    var move = lastPrice && price ? ((price - lastPrice) / lastPrice) : 0;
+    lastPrice = price || lastPrice;
+    var skipped = Math.abs(move) < Number(bot.stopLoss) / 1000;
+    if (skipped) log("SIMULATED skip. Live SOL price " + (price ? "$" + price.toFixed(2) : "unavailable") + ". No order was sent.");
+    else log("SIMULATED mark only. Live SOL price " + (price ? "$" + price.toFixed(2) : "unavailable") + ". Size cap " + bot.maxSol + " SOL. No order was sent.");
+    showPnl("SIMULATED result: flat. Live-money trading is off. Not a promise of profit.");
+  }
+
+  function startPaper() {
+    running = true;
+    paused = false;
+    light("running");
+    log("Paper run started. Live prices only. No order will be sent.");
+    paintStart();
+    paperTick();
+    timer = window.setInterval(paperTick, 20000);
+  }
+
+  function stopPaper(reason) {
+    running = false;
+    paused = false;
+    window.clearInterval(timer);
+    light("stopped");
+    log(reason || "Paper run stopped. No order was sent.");
+    paintStart();
+  }
+
   document.getElementById("botStart").addEventListener("click", function () {
     var account = readAccount();
     if (!account.riskAccepted && !document.getElementById("botRiskAck").checked) {
@@ -108,16 +170,24 @@
     account.bot = fields();
     account.riskAccepted = true;
     writeAccount(account);
-    callAgent("/api/start").then(function () {
-      light("running");
-      log("Start sent to your agent. The key stayed on that computer.");
-    }).catch(function () {
-      light("error");
-      log("Start failed. Your agent did not answer.");
-    });
+    if (liveTrading()) {
+      callAgent("/api/start").then(function () {
+        light("running");
+        log("Start sent to your agent. The key stayed on that computer.");
+      }).catch(function () {
+        light("error");
+        log("Start failed. Your agent did not answer. No order was sent.");
+      });
+      return;
+    }
+    startPaper();
   });
 
   document.getElementById("botStop").addEventListener("click", function () {
+    if (!liveTrading()) {
+      stopPaper("Paper run stopped.");
+      return;
+    }
     callAgent("/api/stop").then(function () {
       light("stopped");
       log("Stop sent to your agent.");
@@ -127,11 +197,33 @@
     });
   });
 
+  var pauseBtn = document.getElementById("botPause");
+  if (pauseBtn) pauseBtn.addEventListener("click", function () {
+    if (!running || liveTrading()) return;
+    paused = true;
+    log("Paper run paused. No order was sent.");
+  });
+  var resumeBtn = document.getElementById("botResume");
+  if (resumeBtn) resumeBtn.addEventListener("click", function () {
+    if (!running || liveTrading()) return;
+    paused = false;
+    log("Paper run resumed. Still simulated.");
+  });
+
   var saved = readAccount();
   apply(saved.bot);
   paintStart();
   light("stopped");
+  window.ValhallaPaper = {
+    running: function () { return running; },
+    paused: function () { return paused; },
+    start: startPaper,
+    stop: stopPaper,
+    fields: fields,
+    log: log
+  };
   window.setInterval(function () {
+    if (!liveTrading()) return;
     var account = readAccount();
     if (!account.agentUrl) return;
     callAgent("/api/state").then(function (body) {

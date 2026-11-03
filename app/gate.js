@@ -7,7 +7,7 @@
   var TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
   function show(id) {
-    ["gateHuman", "gateAccount", "gateCode", "gateWallet", "desk"].forEach(function (name) {
+    ["gateHuman", "gateTerms", "gateAccount", "gateCode", "gateWallet", "desk"].forEach(function (name) {
       var node = document.getElementById(name);
       if (node) node.hidden = name !== id;
     });
@@ -37,8 +37,43 @@
 
   function markHuman() {
     sessionStorage.setItem(HUMAN_KEY, JSON.stringify({ ok: true, at: Date.now() }));
-    show("gateAccount");
-    mountAccount();
+    var version = String(cfg.TERMS_VERSION || "2026-11-03");
+    if (sessionStorage.getItem("valhalla-terms-session") === version) {
+      show("gateAccount");
+      mountAccount();
+      return;
+    }
+    show("gateTerms");
+    mountTerms();
+  }
+
+  function mountTerms() {
+    var box = document.getElementById("termsAgree");
+    var save = document.getElementById("termsSave");
+    var end = document.getElementById("termsEnd");
+    var scroller = document.getElementById("termsScroll");
+    if (!box || !save || !end || !scroller || scroller.dataset.bound) return;
+    scroller.dataset.bound = "1";
+    box.disabled = true;
+    save.disabled = true;
+    var seen = false;
+    var watcher = new IntersectionObserver(function (entries) {
+      if (entries.some(function (entry) { return entry.isIntersecting; })) {
+        seen = true;
+        box.disabled = false;
+        save.disabled = false;
+      }
+    }, { root: scroller, threshold: 0.9 });
+    watcher.observe(end);
+    save.addEventListener("click", function () {
+      if (!seen || !box.checked) return;
+      var version = String(cfg.TERMS_VERSION || "2026-11-03");
+      var receipt = { version: version, at: new Date().toISOString(), method: "scroll-to-end clickwrap" };
+      localStorage.setItem("valhalla-terms-receipt", JSON.stringify(receipt));
+      sessionStorage.setItem("valhalla-terms-session", version);
+      show("gateAccount");
+      mountAccount();
+    });
   }
 
   function keyReady(value) {
@@ -81,13 +116,12 @@
   }
 
   function termsOk() {
-    var box = document.getElementById("termsOk");
-    var note = document.getElementById("termsNote");
-    if (box && box.checked) {
-      if (note) note.textContent = "";
-      return true;
-    }
-    if (note) note.textContent = "Accept the Terms of Use before you sign in.";
+    var version = String(cfg.TERMS_VERSION || "2026-11-03");
+    if (sessionStorage.getItem("valhalla-terms-session") === version) return true;
+    var box = document.getElementById("termsAgree");
+    if (box && box.checked && !box.disabled) return true;
+    var note = document.getElementById("accountNote");
+    if (note) note.textContent = "Accept the terms before you sign in.";
     return false;
   }
 
@@ -173,11 +207,6 @@
         if (!termsOk()) return;
         note.textContent = "Google client ID is not set. Create an OAuth web client for https://valhalla-app.xyz. Use openid, email, and profile only. Paste the client ID into GOOGLE_CLIENT_ID. No sign-in happened.";
       };
-    } else if (!authBase()) {
-      google.onclick = function () {
-        if (!termsOk()) return;
-        note.textContent = "AUTH_URL is empty. Deploy the sign-in Worker, then paste its address into AUTH_URL. The Google token is not accepted in the browser. No sign-in happened.";
-      };
     } else if (!google.dataset.gis) {
       google.dataset.gis = "1";
       google.hidden = true;
@@ -189,6 +218,10 @@
           client_id: cfg.GOOGLE_CLIENT_ID,
           callback: function (resp) {
             if (!termsOk()) return;
+            if (!authBase()) {
+              note.textContent = "AUTH_URL is empty. The Google token was not accepted. Deploy the sign-in Worker, then paste its address into AUTH_URL.";
+              return;
+            }
             note.textContent = "Checking the Google token with the sign-in Worker.";
             postAuth("/auth/google", { credential: resp.credential, alwaysAsk: alwaysAsk() }).then(function (body) {
               if (!body.ok) {
@@ -215,6 +248,58 @@
         window.google.accounts.id.prompt();
       };
       document.head.appendChild(script);
+    }
+    var showCreate = document.getElementById("showCreate");
+    var showLogin = document.getElementById("showLogin");
+    if (showCreate && !showCreate.dataset.bound) {
+      showCreate.dataset.bound = "1";
+      showCreate.addEventListener("click", function () {
+        document.getElementById("createForm").hidden = false;
+        document.getElementById("emailForm").hidden = true;
+      });
+    }
+    if (showLogin && !showLogin.dataset.bound) {
+      showLogin.dataset.bound = "1";
+      showLogin.addEventListener("click", function () {
+        document.getElementById("createForm").hidden = true;
+        document.getElementById("emailForm").hidden = false;
+      });
+    }
+    var createForm = document.getElementById("createForm");
+    if (createForm && !createForm.dataset.bound) {
+      createForm.dataset.bound = "1";
+      createForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        if (!termsOk()) return;
+        var account = readAccount() || {};
+        account.name = document.getElementById("createName").value.trim();
+        account.email = document.getElementById("createEmail").value.trim().toLowerCase();
+        account.walletPref = document.getElementById("createWallet").value;
+        account.termsAccepted = true;
+        account.plan = "free";
+        writeAccount(account);
+        if (!authBase()) {
+          note.textContent = "Saved on this device. No code was sent because AUTH_URL is empty. Use the paper desk.";
+          return;
+        }
+        postAuth("/auth/email/start", { email: account.email, alwaysAsk: true }).then(function (body) {
+          if (!body.ok) note.textContent = authNote(body.error);
+          else showCode(account.email, "wallet");
+        });
+      });
+    }
+    var paperBtn = document.getElementById("openPaper");
+    if (paperBtn && !paperBtn.dataset.bound) {
+      paperBtn.dataset.bound = "1";
+      paperBtn.addEventListener("click", function () {
+        if (!termsOk()) return;
+        saveSession({ kind: "paper", name: "Paper desk" });
+        var account = readAccount() || {};
+        account.plan = account.plan || "free";
+        account.paper = true;
+        writeAccount(account);
+        openDesk();
+      });
     }
     var form = document.getElementById("emailForm");
     if (form && !form.dataset.bound) {
@@ -400,6 +485,10 @@
       }
       paste.hidden = false;
       document.getElementById("modeBadge").textContent = "READ ONLY";
+    } else if (session.kind === "paper") {
+      who.textContent = "Paper desk";
+      var mode = document.getElementById("modeBadge");
+      if (mode) mode.textContent = "PAPER";
     } else if (session.pubkey) {
       who.textContent = "…" + session.pubkey.slice(-4);
       if (window.ValhallaSite) {
@@ -411,6 +500,7 @@
     }
     tick();
     window.setInterval(tick, 1000);
+    window.dispatchEvent(new Event("valhalla-desk"));
   }
 
   function tick() {

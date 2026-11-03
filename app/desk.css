@@ -58,6 +58,12 @@ button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 #botForm label, #magicForm label { display: block; margin: 6px 0; color: var(--muted); font-size: 12px; }
 #botForm input, #botForm select, #botForm textarea, #magicEmail, #botAgent { width: 100%; margin-top: 4px; background: #050507; color: var(--text); border: 1px solid var(--line); padding: 8px; }
 #gear { background: transparent; color: var(--amber2); border: 1px solid var(--line); min-width: 44px; padding: 8px; }
+#deskChat { position: fixed; right: 12px; bottom: 36px; width: min(360px, calc(100% - 24px)); max-height: 70vh; z-index: 30; background: #0a0a0e; border: 1px solid #1c1a16; display: flex; flex-direction: column; }
+#deskChat[hidden] { display: none !important; }
+#chatLog { height: 220px; overflow: auto; }
+#chatForm { display: flex; gap: 6px; padding: 8px; }
+#chatText { flex: 1; background: #050507; color: #f2ead8; border: 1px solid #1c1a16; }
+.approve { border: 1px solid #ffb347; padding: 8px; margin: 6px 0; }
 .settings { position: fixed; inset: 0; background: rgba(5,5,7,.72); z-index: 40; display: flex; justify-content: flex-end; }
 .settings[hidden] { display: none; }
 .settings .panel { width: min(420px, 100%); height: 100%; background: #0a0a0e; overflow: auto; }

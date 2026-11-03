@@ -20,21 +20,53 @@
     <button id="humanPlaceholder" type="button" hidden>Site key is not set. Continue to sign-in.</button>
   </div>
 </section>
+<section id="gateTerms" class="gate" hidden>
+  <div class="card">
+    <p class="kicker">TERMS AND RISK</p>
+    <h1>VALHALLA™</h1>
+    <p>Have counsel review. Read to the end. The checkbox stays off until then.</p>
+    <div id="termsScroll" style="max-height:240px;overflow:auto;border:1px solid #1c1a16;padding:10px">
+      <p><b>Key points.</b> You must be 18 or older. Valhalla does not hold your keys or your funds. This is not financial advice. Crypto can go to zero. Sample results are not a promise. The Hive is optional and points are not cash. Rewards are points only for now.</p>
+      <p>TokenJunction LLC publishes Valhalla. This page has no street address and no EIN. You are responsible for your settings, wallets, and taxes. The software is provided as it is. Liability is capped at the fees you paid in the prior 12 months or $100, whichever is greater, to the extent the law allows. Third parties include wallets, RPCs, Google, and Cloudflare.</p>
+      <p>Governing law and arbitration are placeholders for counsel, including a class-action waiver and a 30 day opt-out by email to hello@valhalla-app.xyz. The full text is on the <a href="/terms/">Terms of Use</a>. <a href="/terms/valhalla-terms.pdf">Download a copy</a>.</p>
+      <div id="termsEnd" style="height:8px"></div>
+    </div>
+    <label><input id="termsAgree" type="checkbox" disabled> I agree</label>
+    <button id="termsSave" type="button" disabled>Save my response</button>
+  </div>
+</section>
 <section id="gateAccount" class="gate" hidden>
   <div class="card">
     <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
     <h1>VALHALLA™</h1>
-    <p>Sign in with Google or your email. This step uses openid, email, and profile only. It does not ask for Gmail or Drive. It does not hold a wallet key or a seed phrase.</p>
-    <label><input id="termsOk" type="checkbox"> I agree to the <a href="/terms/">Terms of Use</a>. I am 18 or older.</label>
-    <p id="termsNote" class="note"></p>
-    <button id="googleBtn" type="button">Sign in with Google</button>
-    <div id="googleSlot"></div>
+    <p>Create an account or log in. Google uses openid, email, and profile only. It does not ask for Gmail or Drive.</p>
+    <p>
+      <button id="showCreate" type="button">Create account</button>
+      <button id="showLogin" type="button">Log in</button>
+    </p>
+    <form id="createForm" hidden>
+      <label>Display name <input id="createName" autocomplete="name" required></label>
+      <label>Email <input id="createEmail" type="email" autocomplete="email" required></label>
+      <label>Preferred wallet
+        <select id="createWallet">
+          <option value="phantom">Phantom</option>
+          <option value="solflare">Solflare</option>
+          <option value="backpack">Backpack</option>
+          <option value="walletconnect">WalletConnect</option>
+          <option value="phantom-google">Google via Phantom</option>
+        </select>
+      </label>
+      <button type="submit">Create account</button>
+    </form>
     <form id="emailForm">
       <label>Email <input id="magicEmail" type="email" autocomplete="email" required></label>
-      <button type="submit">Email me a 6-digit code</button>
+      <button type="submit">Log in</button>
     </form>
+    <button id="googleBtn" type="button">Sign in with Google</button>
+    <div id="googleSlot"></div>
+    <button id="openPaper" type="button">Open the paper desk</button>
     <p id="accountNote" class="note"></p>
-    <p class="note">Google setup: create an OAuth web client. Authorized JavaScript origin: https://valhalla-app.xyz. Scopes stay at openid, email, and profile. Paste the client ID into GOOGLE_CLIENT_ID. The same value goes in the Worker. The sign-in Worker must be deployed and AUTH_URL set before a token is accepted. No code is sent until that Worker can mail it.</p>
+    <p class="note">Every login emails a 6-digit code. The server must be deployed before a code is sent. No code was sent while AUTH_URL is empty.</p>
   </div>
 </section>
 <section id="gateCode" class="gate" hidden>
@@ -57,6 +89,7 @@
     <h1>VALHALLA™</h1>
     <p>Connect a wallet and sign in. The signature is a message only. Valhalla™ does not store a private key and there is no custodial wallet.</p>
     <div id="loginButtons" class="login-stack"></div>
+    <button id="useDifferent" type="button">Use a different wallet</button>
     <button id="useOnFile" type="button" hidden>Use my wallet on file</button>
     <p id="walletNote" class="note"></p>
   </div>
@@ -66,6 +99,8 @@
     <img class="logo-mech" src="/assets/mech.jpg" alt="Valhalla™ mech logo">
     <div class="word"><strong>VALHALLA</strong><span>COMMAND CENTER · DEMO UNTIL YOU SIGN IN</span></div>
     <span class="badge" id="leaderBadge" hidden>MECHA LEADER</span>
+    <span class="badge" id="tierBadge">FREE</span>
+    <button id="upgradeBtn" type="button">Upgrade</button>
     <span class="badge" id="modeBadge">DEMO</span>
     <div class="tape" id="tape">DEMO DATA, illustrative only · sample tape · not a live market</div>
     <div class="chip" id="walletChip"></div>
@@ -139,11 +174,22 @@
         <div id="botSummary" hidden></div>
         <label><input id="botRiskAck" type="checkbox"> I understand crypto trading is risky and results aren't guaranteed</label>
         <p><button id="botStart" type="button" disabled>START</button> <button id="botStop" type="button">STOP</button></p>
+        <p>
+          <button id="botPause" type="button" data-min-tier="pro" disabled title="Upgrade">Pause</button>
+          <button id="botResume" type="button" data-min-tier="pro" disabled title="Upgrade">Resume</button>
+          <button id="botClose" type="button" data-min-tier="leader" disabled title="Upgrade">Close-all request</button>
+        </p>
         <p id="botLinkNote">Link your Valhalla agent to start</p>
         <label>Your agent URL <input id="botAgent" type="url" placeholder="http://127.0.0.1:8787" autocomplete="off"></label>
         <button id="botSaveAgent" type="button">Save agent link</button>
         <p><a href="#agent-howto">How to link your Valhalla agent</a></p>
         <div class="term" id="botLog"></div>
+        <p id="paperPnl" class="note">SIMULATED result: flat. Live-money trading is off.</p>
+        <form id="safetyForm">
+          <label>Token mint for a safety check <input id="safetyMint" autocomplete="off" spellcheck="false"></label>
+          <button type="submit">Check token</button>
+        </form>
+        <p id="safetyOut" class="note"></p>
         <div id="agent-howto">
           <p>Run Valhalla on your PC. The key stays on that computer. Paste its desk address, usually http://127.0.0.1:8787. Start and Stop call that app only. This website does not hold the key.</p>
         </div>
@@ -237,6 +283,16 @@
       </div>
     </div>
   </aside>
+  <aside id="deskChat" hidden>
+    <div class="ph"><b>ASK</b><span>YOUR BOT</span><button id="chatSpeak" type="button">Voice replies off</button></div>
+    <div id="chatLog" class="term"></div>
+    <form id="chatForm">
+      <input id="chatText" maxlength="500" placeholder="Ask your paper bot">
+      <button type="submit">Send</button>
+      <button id="chatMic" type="button">Mic</button>
+    </form>
+    <p class="note">SIMULATED answers are not promises. The bot cannot move funds.</p>
+  </aside>
   <footer class="foot">
     <span>Valhalla™ and the Valhalla mech logo are trademarks of TokenJunction LLC.</span>
     <span>DEMO DATA, illustrative only · no send or withdraw</span>
@@ -251,8 +307,26 @@
 <script src="/site-wallet.js"></script>
 <script src="gate.js"></script>
 <script src="bot.js"></script>
+<script src="desk-chat.js"></script>
 <script src="ledger.js"></script>
+<dialog id="upgradeModal">
+  <form method="dialog">
+    <p class="kicker">UPGRADE</p>
+    <h2>Pro subscription</h2>
+    <p>This is a subscription payment. It is not a deposit. Valhalla does not hold trading funds.</p>
+    <p id="payLive" class="note"></p>
+    <button id="payCard" type="button">Card, Apple Pay, Google Pay, or PayPal</button>
+    <button id="paySol" type="button">Solana Pay in SOL</button>
+    <button id="payUsdc" type="button">Solana Pay in USDC</button>
+    <button id="payUsdt" type="button">Solana Pay in USDT</button>
+    <button id="payOther" type="button">BTC, ETH, or other coins</button>
+    <p id="payNote" class="note"></p>
+    <button type="submit">Close</button>
+  </form>
+</dialog>
+<div id="newsToast" hidden></div>
 <script src="settings.js"></script>
+<script src="upgrade.js"></script>
 <script src="security.js"></script>
 <script src="hive.js"></script>
 <script src="/app/ask.js"></script>

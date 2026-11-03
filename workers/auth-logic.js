@@ -1,11 +1,7 @@
 /** Pure sign-in rules. No secrets and no codes. */
 
 export function needSecondFactor(input) {
-  if (input.codeThisLogin === true) return false;
-  if (input.leader === true) return true;
-  if (input.alwaysAsk === true) return true;
-  if (input.knownDevice !== true || input.knownIp !== true) return true;
-  return false;
+  return input.codeThisLogin !== true;
 }
 
 export function codeDecision(record, now) {
