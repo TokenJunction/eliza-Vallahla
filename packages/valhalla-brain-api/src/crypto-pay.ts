@@ -3,7 +3,7 @@ import { DISCLAIMER } from "./score.ts";
 import type { BrainEnv, MemoryStore } from "./worker.ts";
 
 /** Must match extension/trust.js. Crypto checkout stays off when this verify fails. */
-const PUBLIC_KEY_B64 = "GasF+x9XzQvsO07cTOCMoA5Vf314gd4gmf8gYGJWZ68=";
+const PUBLIC_KEY_B64 = "XZuPtlchqj37JLDx3ssEjztngYqhPjItESZEURBDY9A=";
 
 export type PlanId = "monthly" | "yearly" | "lifetime";
 export type PayAsset = "usdc" | "sol";
@@ -116,6 +116,7 @@ export function canonicalMonetization(doc: Record<string, unknown>): string {
     priceMonthlyUsd: Number(doc.priceMonthlyUsd),
     priceYearlyUsd: Number(doc.priceYearlyUsd),
     priceLifetimeUsd: Number(doc.priceLifetimeUsd),
+    platformFeeBps: Number(doc.platformFeeBps),
     proTradeAllowance: Number(doc.proTradeAllowance),
     trialDays: Number(doc.trialDays),
     offers: offers.map((row) => offerRow(row as Parameters<typeof offerRow>[0])),
