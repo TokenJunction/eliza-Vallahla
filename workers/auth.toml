@@ -18,6 +18,6 @@ GOOGLE_CLIENT_ID = "1085862906383-cmiqc9bu96uqigm73nb3jkp5vfjf9b7l.apps.googleus
 [[send_email]]
 name = "EMAIL"
 
-# [[kv_namespaces]]
-# binding = "AUTH_KV"
-# id = "paste-the-kv-id"
+[[kv_namespaces]]
+binding = "AUTH_KV"
+id = "9f0316ce34f84f53bf3ffa5ef31cbe72"

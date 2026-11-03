@@ -31,8 +31,8 @@ window.VALHALLA_SITE = {
   GOOGLE_CLIENT_ID: "1085862906383-cmiqc9bu96uqigm73nb3jkp5vfjf9b7l.apps.googleusercontent.com",
   /* Optional email sign-in Worker. POST {email}. Leave empty until that Worker exists. */
   MAGIC_LINK_URL: "",
-  /* Sign-in Worker. Empty until it is deployed. A Google token is not accepted in the browser alone. */
-  AUTH_URL: "",
+  /* Live sign-in Worker valhalla-auth: Google token check and the emailed 6-digit code. */
+  AUTH_URL: "https://valhalla-auth.valhalla-app.workers.dev",
   /* Paste the live Spring store URL before any buy button is enabled. */
   SPRING_STORE_URL: "",
   /* Merch card. Leave enabled false until shop.url is a live https store. */
