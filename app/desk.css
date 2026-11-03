@@ -7,6 +7,7 @@
 html, body { margin: 0; background: #050507; color: var(--text); font-family: "IBM Plex Mono", ui-monospace, monospace; }
 button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 .gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: radial-gradient(ellipse at 15% 0%, rgba(255,154,31,.12), transparent 45%), #050507; }
+.gate[hidden], #desk[hidden], .settings[hidden] { display: none !important; }
 .card { width: min(520px, 100%); border: 1px solid var(--line); background: #0a0a0e; padding: 22px; }
 .card h1 { margin: 0 0 8px; color: var(--amber2); letter-spacing: .16em; font-size: 22px; }
 .note { color: var(--muted); }
