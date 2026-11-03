@@ -1,10 +1,10 @@
-name = "valhalla-turnstile"
+# Reference only. The live Worker is already named valhalla-turnstile-verify
+# at https://valhalla-turnstile-verify.valhalla-app.workers.dev/api/verify
+# Do not run wrangler deploy from here unless you intend to replace that Worker.
+name = "valhalla-turnstile-verify"
 main = "turnstile.js"
 compatibility_date = "2026-11-03"
 
-# After you create the Turnstile widget for valhalla-app.xyz:
+# Secret, set in Cloudflare only. Never commit the value.
 #   npx wrangler secret put TURNSTILE_SECRET
-# Then attach a route so the site can call it:
-#   valhalla-app.xyz/api/verify
-# The site key goes in site-config.js as TURNSTILE_SITE_KEY.
-# The secret never goes in git.
+# The public site key is TURNSTILE_SITE_KEY in site-config.js.

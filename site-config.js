@@ -23,10 +23,10 @@ window.VALHALLA_SITE = {
   handle: "@ValhallaOS",
   xUrl: "https://x.com/intent/user?user_id=2092719999886475265",
   dmUrl: "https://x.com/messages/compose?recipient_id=2092719999886475265",
-  /* Paste the Turnstile site key for hostname valhalla-app.xyz. Leave the placeholder until it exists. */
-  TURNSTILE_SITE_KEY: "TURNSTILE_SITE_KEY_NOT_SET",
-  /* Worker route. The secret TURNSTILE_SECRET stays in Cloudflare, never in this file. */
-  TURNSTILE_VERIFY_URL: "https://valhalla-app.xyz/api/verify",
+  /* Public Turnstile site key for hostname valhalla-app.xyz. The secret stays in the Worker. */
+  TURNSTILE_SITE_KEY: "0x4AAAAAAFygFBUewoXH7oRO",
+  /* Live Worker valhalla-turnstile-verify. POST {token} returns {success, ok}. */
+  TURNSTILE_VERIFY_URL: "https://valhalla-turnstile-verify.valhalla-app.workers.dev/api/verify",
   /* Google OAuth web client. Authorized JavaScript origin: https://valhalla-app.xyz */
   GOOGLE_CLIENT_ID: "GOOGLE_CLIENT_ID_NOT_SET",
   /* Paste the live Spring store URL before any buy button is enabled. */
