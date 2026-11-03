@@ -1,16 +1,26 @@
 (function () {
   var cfg = window.VALHALLA_SITE || {};
-  var price = cfg.PRO_PRICE || "$19/month";
+  var price = cfg.PRO_PRICE || "$9.99/mo launch price";
   document.querySelectorAll("[data-price]").forEach(function (node) {
     node.textContent = price;
   });
 
+  function checkoutHref(base, source) {
+    var trimmed = (base || "").trim();
+    if (!trimmed) return "";
+    var url = new URL(trimmed);
+    var email = (cfg.SIGNED_IN_EMAIL || "").trim();
+    if (email.indexOf("@") > 0 && email.indexOf(" ") < 0) url.searchParams.set("checkout[email]", email);
+    url.searchParams.set("checkout[custom][source]", source || "website");
+    return url.toString();
+  }
+
   function proClick(event) {
-    var url = (cfg.LEMONSQUEEZY_CHECKOUT_URL || "").trim();
+    var url = checkoutHref(cfg.LEMONSQUEEZY_CHECKOUT_URL, "website");
     var note = document.getElementById("pro-note");
     if (!url) {
       event.preventDefault();
-      if (note) note.textContent = "Checkout is not connected yet. Set LEMONSQUEEZY_CHECKOUT_URL in site-config.js. Pro is " + price + ". This is not a promise of profit.";
+      if (note) note.textContent = "Checkout is not connected yet. Pro is " + price + ". This is not a promise of profit.";
       return;
     }
     event.currentTarget.setAttribute("href", url);
@@ -21,8 +31,31 @@
     link.href = store || "chrome/";
   });
   document.querySelectorAll("[data-pro]").forEach(function (link) {
+    var href = checkoutHref(cfg.LEMONSQUEEZY_CHECKOUT_URL, "website");
+    if (href) {
+      link.href = href;
+      link.classList.add("lemonsqueezy-button");
+    }
     link.addEventListener("click", proClick);
   });
+  function showPlan(name, raw) {
+    var href = checkoutHref(raw, "website");
+    document.querySelectorAll("[data-plan='" + name + "']").forEach(function (link) {
+      if (!href) {
+        link.hidden = true;
+        return;
+      }
+      link.hidden = false;
+      link.href = href;
+      link.classList.add("lemonsqueezy-button");
+    });
+    return Boolean(href);
+  }
+  var yearOn = showPlan("yearly", cfg.LEMONSQUEEZY_YEARLY_URL);
+  var lifeOn = showPlan("lifetime", cfg.LEMONSQUEEZY_LIFETIME_URL);
+  var soon = document.getElementById("plan-soon");
+  if (soon) soon.hidden = yearOn && lifeOn;
+  if (window.createLemonSqueezy) window.createLemonSqueezy();
 
   document.querySelectorAll("[data-tour]").forEach(function (button) {
     button.addEventListener("click", function () {
