@@ -48,6 +48,7 @@ button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 .light.stopped { color: var(--muted); }
 .light.running { color: var(--green); border-color: var(--green); }
 .light.error { color: var(--red); border-color: var(--red); }
+#useOnFile { display: flex; width: 100%; margin-top: 8px; background: #100e0a; color: var(--amber2); border: 1px solid rgba(255,154,31,.45); padding: 8px 12px; }
 #botForm label, #magicForm label { display: block; margin: 6px 0; color: var(--muted); font-size: 12px; }
 #botForm input, #botForm select, #botForm textarea, #magicEmail, #botAgent { width: 100%; margin-top: 4px; background: #050507; color: var(--text); border: 1px solid var(--line); padding: 8px; }
 #gear { background: transparent; color: var(--amber2); border: 1px solid var(--line); min-width: 44px; padding: 8px; }
