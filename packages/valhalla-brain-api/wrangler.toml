@@ -1,0 +1,17 @@
+name = "valhalla-brain-api"
+main = "src/worker.ts"
+compatibility_date = "2026-11-03"
+
+# TODO: TJ creates a free Cloudflare account, runs `wrangler login`,
+# then `wrangler d1 create valhalla-brain` and `wrangler kv namespace create VALHALLA_KV`.
+# Paste the ids below. Do not commit Helius, Birdeye, or API key secrets.
+# Set them with `wrangler secret put HELIUS_API_KEY` and `wrangler secret put BIRDEYE_API_KEY`.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "valhalla-brain"
+database_id = "TODO-TJ-FREE-ACCOUNT"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "TODO-TJ-FREE-ACCOUNT"
