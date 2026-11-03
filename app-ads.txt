@@ -1,0 +1,3 @@
+# Valhalla app-ads.txt
+# Replace the commented line with your AdMob publisher ID, then keep this file at the site root.
+# google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0

@@ -1,7 +1,3 @@
-Drop sales videos here. The page already points at these files.
+Drop sales videos here. The hero already looks for media/hero.mp4.
 
-hero.mp4 — background behind the title. Keep it short and muted.
-phone.mp4 — next to the phone mockup.
-desk.mp4 — under the Valhalla Brain API section.
-
-Until a file is here, the page uses the dark amber background.
+hero.mp4 — silent background behind the title.
