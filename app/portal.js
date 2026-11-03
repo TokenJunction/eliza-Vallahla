@@ -50,6 +50,19 @@ async function draw() {
   say("who", (me.email || "Wallet") + " · " + me.plan);
   const report = await send("/v1/me/report");
   document.getElementById("report").innerHTML = lock(!pro, report.locked ? report.preview : report.note);
+  const ad = document.getElementById("portal-ad");
+  if (ad) {
+    ad.hidden = pro || location.hash === "#account";
+    if (!ad.hidden && !ad.dataset.loaded) {
+      const script = document.createElement("script");
+      script.async = true;
+      script.crossOrigin = "anonymous";
+      script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6504655762357230";
+      script.onload = function () { (window.adsbygoogle = window.adsbygoogle || []).push({}); };
+      document.head.appendChild(script);
+      ad.dataset.loaded = "1";
+    }
+  }
   document.getElementById("upgrade")?.addEventListener("click", () => { location.hash = "#account"; });
   const balances = await send("/v1/me/balances");
   say("balances", balances.note);
