@@ -12,7 +12,7 @@ The phone can store, on that phone only:
 - The last status, chat lines, and error lines
 - Counts of how many times a house message was shown or opened
 
-It does not store a wallet seed, a secret key, or a payment card. Delete phone data is on the error screen. There is no Valhalla account on a server.
+A Phantom or Solflare connect shares the public key only. The app does not ask those wallets to sign or send a transaction. It does not store a wallet seed, a secret key, or a payment card. Delete phone data is on the error screen. There is no Valhalla account on a server.
 
 ## Ads
 
