@@ -1,0 +1,37 @@
+[
+  {
+    "q": "What is Valhalla?",
+    "keys": ["what", "valhalla", "product"],
+    "a": "Valhalla is a desk on your computer and a phone app that watches it. TokenJunction LLC publishes it. It is not financial advice."
+  },
+  {
+    "q": "Can the app move my funds?",
+    "keys": ["send", "withdraw", "funds", "money", "wallet", "key", "seed"],
+    "a": "No. The app never sends, withdraws, or moves funds. Keys stay on your computer. Do not share a seed phrase."
+  },
+  {
+    "q": "Is this a profit promise?",
+    "keys": ["profit", "money", "rich", "gain", "return"],
+    "a": "No. Crypto is risky. You can lose money. Valhalla does not promise profit."
+  },
+  {
+    "q": "What is free and what is Pro?",
+    "keys": ["free", "ads", "trial", "watchlist"],
+    "a": "Free has ads, 1 wallet, 3 watchlist coins, and 1 Brain score a day. A 3 day Pro trial is included. Pro removes ads. Pro is not a promise of profit."
+  },
+  {
+    "q": "How much is Pro?",
+    "keys": ["pro", "price", "cost", "pay", "lemon"],
+    "a": "Pro is $19 a month when checkout is connected. The price is a plan, not a promise of profit. Store apps use the app store instead."
+  },
+  {
+    "q": "Where do I download it?",
+    "keys": ["download", "apk", "android", "windows", "install"],
+    "a": "The Android APK is on the GitHub release. The Windows installer is on the GitHub release when that build is published. The site is valhalla-app.xyz."
+  },
+  {
+    "q": "What if the computer is off?",
+    "keys": ["off", "offline", "pc"],
+    "a": "The phone still opens. It shows the last saved status, or the pairing screen."
+  }
+]

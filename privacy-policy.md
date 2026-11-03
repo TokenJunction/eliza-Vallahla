@@ -16,7 +16,7 @@ It does not store a wallet seed, a secret key, or a payment card. Delete phone d
 
 ## Ads
 
-If ads are on, Google AdMob may use the advertising identifier. See https://policies.google.com/privacy. The app asks for consent where GDPR or CCPA requires it. House-message counts stay on the phone.
+The free plan can show ads. Pro does not. Ads are not shown on wallet connect or settings, and a full-screen ad does not run when the app opens. Google AdMob may use the advertising identifier. See https://policies.google.com/privacy. The app asks for consent where GDPR or CCPA requires it. House-message counts stay on the phone.
 
 ## This website
 
