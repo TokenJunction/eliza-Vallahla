@@ -4,27 +4,20 @@ on:
   schedule:
     - cron: "15 14 * * *"
   workflow_dispatch:
-  push:
-    branches:
-      - cursor/valhalla-android-companion-d28f
+  pull_request:
     paths:
-      - .github/workflows/valhalla-social.yml
       - social/**
+      - .github/workflows/valhalla-social.yml
 
 permissions:
   contents: read
 
 jobs:
-  post:
+  draft:
     runs-on: ubuntu-latest
-    env:
-      DRY_RUN: "true"
     steps:
       - uses: actions/checkout@v4
-      - name: Preview or post
-        env:
-          X_API_KEY: ${{ secrets.X_API_KEY }}
-          X_API_SECRET: ${{ secrets.X_API_SECRET }}
-          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
-          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
-        run: python3 social/post.py
+      - name: Test the dry run
+        run: python3 social/test_valhalla_x.py
+      - name: Show drafts
+        run: python3 social/valhalla-x draft

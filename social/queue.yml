@@ -1,5 +1,5 @@
-# One post per day, chosen by the UTC day of the year.
-# Each post stays under 280 characters. No profit promise.
+# Reference copy of the notes. valhalla-x does not post this file.
+# The approval queue is queue.json. Set approved to true there before --live.
 posts:
   - id: tip-status
     text: "Valhalla shows your desk status on the phone. Keys stay on the computer. Crypto is risky. Not financial advice. https://valhalla-app.xyz"
@@ -16,7 +16,7 @@ posts:
   - id: demo-desk
     text: "The Valhalla 9:16 clip shows the desk, alerts, and the risk guard. Demo data only. Crypto is risky. Not financial advice. https://valhalla-app.xyz"
   - id: launch-pro
-    text: "Valhalla Pro is $19/month when checkout is connected. It does not promise profit. Crypto is risky. Not financial advice. https://valhalla-app.xyz"
+    text: "Valhalla Pro is $9.99/month when checkout is connected. It does not promise profit. Crypto is risky. Not financial advice. https://valhalla-app.xyz"
   - id: launch-apk
     text: "The Valhalla Android APK is on GitHub Releases. Google Play is not open yet. Crypto is risky. Not financial advice. https://valhalla-app.xyz"
   - id: launch-company
