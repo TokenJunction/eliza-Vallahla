@@ -116,7 +116,6 @@ export function canonicalMonetization(doc: Record<string, unknown>): string {
     priceMonthlyUsd: Number(doc.priceMonthlyUsd),
     priceYearlyUsd: Number(doc.priceYearlyUsd),
     priceLifetimeUsd: Number(doc.priceLifetimeUsd),
-    platformFeeBps: Number(doc.platformFeeBps),
     proTradeAllowance: Number(doc.proTradeAllowance),
     trialDays: Number(doc.trialDays),
     offers: offers.map((row) => offerRow(row as Parameters<typeof offerRow>[0])),
