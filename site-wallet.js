@@ -1,10 +1,11 @@
 (function (root) {
-  var KNOWN = [
-    { id: "phantom", name: "Phantom", install: "https://phantom.app/download", color: "#ab9ff2" },
-    { id: "solflare", name: "Solflare", install: "https://solflare.com/download", color: "#ffb347" },
-    { id: "backpack", name: "Backpack", install: "https://backpack.app/download", color: "#e33e3f" }
-  ];
   var standard = [];
+  var ICONS = {
+    phantom: '<svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#AB9FF2"/><path fill="#fff" d="M9 15c0-4 3-7 7-7s7 3 7 7v7l-2.2-1.6L18.2 22 16 20.2 13.8 22 11.2 20.4 9 22v-7z"/></svg>',
+    solflare: '<svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1a120c"/><path fill="#FC7227" d="M16 5c2 4 1 6 4 9 2 2 4 4 4 8a8 8 0 1 1-14 0c0-3 2-5 3-8 1-2 1-5 3-9z"/></svg>',
+    backpack: '<svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#E33E3F"/><path fill="#fff" d="M12 8h8v3h2v14H10V11h2V8zm2 2v1h4v-1h-4z"/></svg>',
+    other: '<svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2c281f"/><circle cx="16" cy="16" r="6" fill="#ffb347"/></svg>'
+  };
 
   window.addEventListener("wallet-standard:register-wallet", function (event) {
     if (event.detail && standard.indexOf(event.detail) < 0) standard.push(event.detail);
@@ -17,23 +18,16 @@
     return null;
   }
 
-  function rows() {
-    var list = [];
-    KNOWN.forEach(function (item) {
-      var named = root.ValhallaConnect.pickNamed(standard, item.id);
-      var provider = injected(item.id);
-      if (named || provider) list.push({ item: item, named: named, provider: provider });
-    });
-    standard.forEach(function (wallet) {
-      var name = String(wallet.name || "Wallet");
-      var known = KNOWN.some(function (item) { return item.name.toLowerCase() === name.toLowerCase(); });
-      if (!known) list.push({ item: { id: "other", name: name, install: "", color: "#7a7468" }, named: wallet, provider: null });
-    });
-    return list;
+  function otherWallet() {
+    return standard.find(function (wallet) {
+      return !root.ValhallaConnect.pickNamed([wallet], "phantom")
+        && !root.ValhallaConnect.pickNamed([wallet], "solflare")
+        && !/backpack/i.test(wallet.name || "");
+    }) || null;
   }
 
-  function icon(color) {
-    return '<svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="' + color + '"/></svg>';
+  function mobile() {
+    return /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
   }
 
   function toB64(bytes) {
@@ -72,8 +66,6 @@
       localStorage.removeItem("valhalla-watch");
       sessionStorage.removeItem("valhalla-siws");
       slot.hidden = true;
-      var connect = document.getElementById("connectBtn");
-      if (connect) connect.hidden = false;
     });
     menu.appendChild(copy);
     menu.appendChild(view);
@@ -81,113 +73,78 @@
     button.addEventListener("click", function () { menu.hidden = !menu.hidden; });
     slot.appendChild(button);
     slot.appendChild(menu);
-    var connectBtn = document.getElementById("connectBtn");
-    if (connectBtn) connectBtn.hidden = true;
     var tail = document.getElementById("ownTail");
     if (tail) tail.textContent = "…" + String(pubkey).slice(-4);
   }
 
-  function openModal() {
-    var modal = document.getElementById("walletModal");
-    if (!modal) {
-      modal = document.createElement("div");
-      modal.id = "walletModal";
-      modal.className = "modal";
-      modal.innerHTML = '<div class="sheet" role="dialog" aria-labelledby="walletTitle"><h2 id="walletTitle">Connect a wallet</h2><p class="note">Your own wallet opens next. It asks you to approve the connection, then to sign in to Valhalla™. Nothing is paid on this step. Valhalla™ never asks for a seed phrase.</p><div id="detected"></div><div id="missing"></div><button type="button" id="closeModal">Close</button></div>';
-      document.body.appendChild(modal);
-      modal.addEventListener("click", function (event) { if (event.target === modal) modal.hidden = true; });
-      modal.querySelector("#closeModal").addEventListener("click", function () { modal.hidden = true; });
-    }
-    var detected = modal.querySelector("#detected");
-    var absent = modal.querySelector("#missing");
-    detected.innerHTML = "";
-    absent.innerHTML = "";
-    var seen = {};
-    rows().forEach(function (row) {
-      seen[row.item.id] = true;
-      var button = document.createElement("button");
-      button.type = "button";
-      button.className = "wallet";
-      button.innerHTML = icon(row.item.color) + "<span>" + row.item.name + '</span><span class="tag">Detected</span>';
-      button.addEventListener("click", function () {
-        signIn(row).catch(function (err) {
-          var note = document.createElement("p");
-          note.className = "note";
-          note.textContent = err && err.message ? err.message : "The sign-in was not accepted.";
-          detected.appendChild(note);
-        });
-      });
-      detected.appendChild(button);
-    });
-    KNOWN.forEach(function (item) {
-      if (seen[item.id]) return;
-      var link = document.createElement("a");
-      link.className = "wallet";
-      link.href = item.install;
-      link.innerHTML = icon(item.color) + "<span>Install " + item.name + "</span>";
-      absent.appendChild(link);
-    });
-    var form = document.createElement("form");
-    form.innerHTML = '<label class="note">Paste a Solana address <input id="pasteKey" autocomplete="off" spellcheck="false"></label> <button type="submit">Save address</button><p id="pasteErr" class="note"></p>';
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
-      var value = form.querySelector("#pasteKey").value.trim();
-      if (!root.ValhallaConnect.isPubkey(value)) {
-        form.querySelector("#pasteErr").textContent = "That is not a Solana address.";
-        return;
-      }
-      localStorage.setItem("valhalla-watch", value);
-      tellExtension({ source: "valhalla-connect", type: "watch", pubkey: value, signature: "", message: "" });
-      location.href = "/app/";
-    });
-    absent.appendChild(form);
-    modal.hidden = false;
-  }
-
-  function signIn(row) {
-    var adapterPromise = row.named
-      ? root.ValhallaConnect.adapterFromStandard(row.named)
-      : root.ValhallaConnect.adapterFromInjected(row.provider, row.item.name);
-    return adapterPromise.then(function (adapter) {
-      if (!adapter) throw new Error(row.item.name + " is not available in this tab.");
-      var now = Date.now();
-      return root.ValhallaConnect.signInWithAdapter(adapter, root.nacl, {
-        domain: location.host,
-        nonce: crypto.randomUUID(),
-        issuedAt: new Date(now).toISOString(),
-        expiresAt: new Date(now + 5 * 60 * 1000).toISOString()
-      });
+  function finish(adapter) {
+    if (!adapter) throw new Error("That wallet is not available in this tab.");
+    var now = Date.now();
+    return root.ValhallaConnect.signInWithAdapter(adapter, root.nacl, {
+      domain: location.host,
+      nonce: crypto.randomUUID(),
+      issuedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + 5 * 60 * 1000).toISOString()
     }).then(function (proof) {
       var packed = root.ValhallaConnect.handoff(proof, toB64(proof.signature));
       sessionStorage.setItem("valhalla-siws", JSON.stringify({ pubkey: packed.pubkey, message: packed.message, signature: packed.signature }));
       localStorage.setItem("valhalla-watch", packed.pubkey);
       tellExtension(packed);
-      var modal = document.getElementById("walletModal");
-      if (modal) modal.hidden = true;
       paintChip(packed.pubkey);
       return packed;
     });
   }
 
-  function eager() {
-    var watch = localStorage.getItem("valhalla-watch");
-    if (watch && root.ValhallaConnect.isPubkey(watch)) paintChip(watch);
-    rows().forEach(function (row) {
-      try {
-        if (row.provider && row.provider.connect) row.provider.connect({ onlyIfTrusted: true }).catch(function () {});
-        else if (row.named && row.named.features["standard:connect"]) row.named.features["standard:connect"].connect({ silent: true }).catch(function () {});
-      } catch (err) {
-        /* The wallet is not already approved. */
-      }
+  function continueWith(id) {
+    var provider = id === "other" ? null : injected(id);
+    var named = id === "other" ? otherWallet() : root.ValhallaConnect.pickNamed(standard, id);
+    var installed = Boolean((provider && provider.connect) || named);
+    var step = root.ValhallaConnect.walletStep(id, { installed: installed, mobile: mobile(), pageUrl: location.href });
+    if (step.action === "browse") {
+      location.href = step.url;
+      return Promise.resolve();
+    }
+    if (step.action === "install") {
+      window.open(step.url, "_blank", "noopener");
+      return Promise.resolve();
+    }
+    if (step.action !== "connect") {
+      return Promise.reject(new Error("No other wallet was detected."));
+    }
+    var pending = named
+      ? root.ValhallaConnect.adapterFromStandard(named)
+      : root.ValhallaConnect.adapterFromInjected(provider, id);
+    return pending.then(finish);
+  }
+
+  function mountButtons(host) {
+    if (!host || host.dataset.ready === "1") return;
+    host.dataset.ready = "1";
+    host.classList.add(host.id === "loginButtons" ? "login-stack" : "wallet-row");
+    root.ValhallaConnect.walletChoices().forEach(function (choice) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.innerHTML = (ICONS[choice.id] || "") + "<span>" + choice.label + "</span>";
+      button.addEventListener("click", function () {
+        continueWith(choice.id).catch(function (err) {
+          var note = document.getElementById("loginNote");
+          if (note) note.textContent = err && err.message ? err.message : "The sign-in was not accepted.";
+        });
+      });
+      host.appendChild(button);
     });
   }
 
-  root.ValhallaSite = { openModal: openModal, signIn: signIn };
+  root.ValhallaSite = { mountButtons: mountButtons, continueWith: continueWith };
 
   function boot() {
     window.dispatchEvent(new Event("wallet-standard:app-ready"));
-    if (/\/connect\/?$/.test(location.pathname)) openModal();
-    eager();
+    var stack = document.getElementById("loginButtons");
+    if (stack) mountButtons(stack);
+    var watch = localStorage.getItem("valhalla-watch");
+    if (watch && root.ValhallaConnect.isPubkey(watch)) paintChip(watch);
+    var asked = new URLSearchParams(location.search).get("wallet");
+    if (asked) continueWith(asked).catch(function () {});
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

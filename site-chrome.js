@@ -22,15 +22,12 @@
       else brand.insertAdjacentHTML("beforeend", " VALHALLA™");
     }
     var nav = header.querySelector("nav") || header;
-    if (!document.getElementById("connectBtn")) {
-      var button = document.createElement("button");
-      button.id = "connectBtn";
-      button.type = "button";
-      button.textContent = "Connect Wallet";
-      button.addEventListener("click", function () {
-        if (window.ValhallaSite) window.ValhallaSite.openModal();
-      });
-      nav.appendChild(button);
+    if (!document.getElementById("walletButtons") && window.ValhallaSite) {
+      var row = document.createElement("div");
+      row.id = "walletButtons";
+      row.className = "wallet-row";
+      nav.appendChild(row);
+      window.ValhallaSite.mountButtons(row);
     }
     if (!header.querySelector(".xlink")) {
       var link = document.createElement("a");

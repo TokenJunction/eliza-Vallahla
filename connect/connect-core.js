@@ -143,6 +143,52 @@
     return CONNECT_ORIGINS.includes(String(origin || ""));
   }
 
+  function originOf(pageUrl) {
+    try {
+      return new URL(pageUrl).origin;
+    } catch {
+      return "";
+    }
+  }
+
+  function walletChoices() {
+    return [
+      {
+        id: "phantom",
+        label: "Continue with Phantom",
+        install: "https://phantom.com/download",
+        browse(pageUrl) {
+          return `https://phantom.app/ul/browse/${encodeURIComponent(pageUrl)}?ref=${encodeURIComponent(originOf(pageUrl))}`;
+        },
+      },
+      {
+        id: "solflare",
+        label: "Continue with Solflare",
+        install: "https://solflare.com/download",
+        browse(pageUrl) {
+          return `https://solflare.com/ul/v1/browse/${encodeURIComponent(pageUrl)}?ref=${encodeURIComponent(originOf(pageUrl))}`;
+        },
+      },
+      {
+        id: "backpack",
+        label: "Continue with Backpack",
+        install: "https://backpack.app/download",
+        browse(pageUrl) {
+          return `https://backpack.app/ul/v1/browse/${encodeURIComponent(pageUrl)}`;
+        },
+      },
+      { id: "other", label: "Other wallet", install: "", browse: null },
+    ];
+  }
+
+  function walletStep(id, options) {
+    const choice = walletChoices().find((item) => item.id === id) || walletChoices()[3];
+    if (options.installed) return { action: "connect", id: choice.id };
+    if (options.mobile && choice.browse) return { action: "browse", url: choice.browse(options.pageUrl) };
+    if (choice.install) return { action: "install", url: choice.install };
+    return { action: "none", id: choice.id };
+  }
+
   function handoff(proof, signatureB64) {
     return {
       source: "valhalla-connect",
@@ -168,5 +214,7 @@
     connectPage,
     allowedOrigin,
     handoff,
+    walletChoices,
+    walletStep,
   };
 });
