@@ -218,10 +218,10 @@
         <p id="labStats" class="note"></p>
         <p id="leaderFeed" class="note">Leader offsite paper run is offline until the API is live.</p>
         <h2>Hive</h2>
-        <p id="hiveFlag">The Hive is off until a leader turns it on.</p>
-        <button id="hiveJoin" type="button" disabled>Join the Hive</button>
+        <label><input id="hiveOpt" type="checkbox"> Use this tab as a Hive node</label>
+        <p id="hiveFlag">Hive is off. This tab does no extra work until you opt in.</p>
         <label>CPU and GPU limit <input id="hiveThrottle" type="range" min="25" max="50" value="25" disabled></label>
-        <p id="hiveState" hidden><span class="pill">Hive active</span> <button id="hiveStop" type="button">Stop</button></p>
+        <p id="hiveMeter" class="note">Impact: off. Jobs 0. Verified 0. Engine —.</p>
         <p id="hivePoints" class="note">Contribution points: 0. Not transferable. No cash value.</p>
         <p class="note">Rewards are points only for now.</p>
       </div>
@@ -272,7 +272,8 @@
         </label>
         <label><input id="compactPick" type="checkbox"> Compact mode</label>
         <h2>Hive</h2>
-        <p id="hiveFlagSettings">The Hive is off until a leader turns it on. Joining is a separate choice from these terms.</p>
+        <label><input id="hiveOptSettings" type="checkbox"> Use this tab as a Hive node</label>
+        <p id="hiveFlagSettings">Hive is off until you opt in. It stops when you close the tab.</p>
         <p class="note">Rewards are points only for now.</p>
         <button id="payoutLink" type="button" disabled>Link a payout address</button>
         <p class="note">A payout address would be a public key confirmed with a sign-in message. Nothing is sent. The rewards treasury is not this site. Payouts stay off.</p>

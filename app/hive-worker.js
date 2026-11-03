@@ -33,8 +33,10 @@ onmessage = function (event) {
     }
     postMessage({
       jobId: String(job && job.id || ""),
+      kind: String(job && job.kind || "paper"),
       cash: Math.round(cash * 10000) / 10000,
       n: steps,
+      engine: event.data && event.data.engine === "gpu" ? "gpu" : "cpu",
       simulated: true
     });
   }
