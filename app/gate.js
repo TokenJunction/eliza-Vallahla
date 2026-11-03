@@ -7,7 +7,7 @@
   var TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
   function show(id) {
-    ["gateHuman", "gateChoice", "desk"].forEach(function (name) {
+    ["gateHuman", "gateAccount", "gateWallet", "desk"].forEach(function (name) {
       var node = document.getElementById(name);
       if (node) node.hidden = name !== id;
     });
@@ -24,9 +24,21 @@
     }
   }
 
+  var ACCOUNT_KEY = "valhalla-account";
+
+  function readAccount() {
+    try { return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (err) { return null; }
+  }
+
+  function writeAccount(data) {
+    data.at = Date.now();
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(data));
+  }
+
   function markHuman() {
     sessionStorage.setItem(HUMAN_KEY, JSON.stringify({ ok: true, at: Date.now() }));
-    show("gateChoice");
+    show("gateAccount");
+    mountAccount();
   }
 
   function keyReady(value) {
@@ -68,41 +80,67 @@
     document.head.appendChild(script);
   }
 
-  function mountChoice() {
+  function mountAccount() {
+    var google = document.getElementById("googleBtn");
+    var note = document.getElementById("accountNote");
+    if (!keyReady(cfg.GOOGLE_CLIENT_ID)) {
+      google.onclick = function () {
+        note.textContent = "Google client ID is not set. Create an OAuth web client. Authorized JavaScript origin: https://valhalla-app.xyz. Paste the client ID into GOOGLE_CLIENT_ID.";
+      };
+    } else {
+      google.hidden = true;
+      var script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.onload = function () {
+        window.google.accounts.id.initialize({
+          client_id: cfg.GOOGLE_CLIENT_ID,
+          callback: function (resp) {
+            var part = String(resp.credential || "").split(".")[1] || "";
+            var pad = part.replace(/-/g, "+").replace(/_/g, "/");
+            while (pad.length % 4) pad += "=";
+            var json = JSON.parse(atob(pad));
+            var prior = readAccount() || {};
+            writeAccount({ email: json.email || "", name: json.name || "", picture: json.picture || "", wallet: prior.wallet || "", agentUrl: prior.agentUrl || "", bot: prior.bot || null, riskAccepted: prior.riskAccepted === true });
+            show("gateWallet");
+            mountWallet();
+          }
+        });
+        window.google.accounts.id.renderButton(document.getElementById("googleSlot"), { theme: "filled_black", size: "large", text: "continue_with", shape: "rectangular", width: 360 });
+      };
+      document.head.appendChild(script);
+    }
+    var form = document.getElementById("magicForm");
+    if (form && !form.dataset.bound) {
+      form.dataset.bound = "1";
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var email = document.getElementById("magicEmail").value.trim();
+        if (!cfg.MAGIC_LINK_URL) {
+          note.textContent = "Email sign-in is not live. Deploy a Worker that emails a one-time link, then set MAGIC_LINK_URL. No message was sent.";
+          return;
+        }
+        fetch(cfg.MAGIC_LINK_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email }) })
+          .then(function (res) { note.textContent = res.ok ? "Check your email for the sign-in link." : "The email link was not sent."; })
+          .catch(function () { note.textContent = "The email link service did not answer."; });
+      });
+    }
+  }
+
+  function mountWallet() {
     var host = document.getElementById("loginButtons");
     if (window.ValhallaSite) window.ValhallaSite.mountButtons(host);
-    window.addEventListener("valhalla-signed", function (event) {
-      var packed = event.detail || {};
-      if (!packed.pubkey) return;
-      saveSession({ kind: "wallet", pubkey: packed.pubkey });
-      if (fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS)) openDesk();
-    });
-    var google = document.getElementById("googleBtn");
-    if (!keyReady(cfg.GOOGLE_CLIENT_ID)) {
-      google.addEventListener("click", function () {
-        document.getElementById("loginNote").textContent = "Google client ID is not set. Create an OAuth web client for origin https://valhalla-app.xyz and paste it into GOOGLE_CLIENT_ID.";
-      });
-      return;
+    var account = readAccount() || {};
+    var onFile = document.getElementById("useOnFile");
+    var note = document.getElementById("walletNote");
+    if (account.wallet && window.ValhallaConnect.isPubkey(account.wallet)) {
+      onFile.hidden = false;
+      onFile.textContent = "Use my wallet on file …" + account.wallet.slice(-4);
+      onFile.onclick = function () {
+        window.__valhallaExpected = account.wallet;
+        note.textContent = "Sign the login message with the wallet that ends in " + account.wallet.slice(-4) + ". The address on file is public only.";
+      };
     }
-    google.hidden = true;
-    var script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.onload = function () {
-      window.google.accounts.id.initialize({
-        client_id: cfg.GOOGLE_CLIENT_ID,
-        callback: function (resp) {
-          var part = String(resp.credential || "").split(".")[1] || "";
-          var pad = part.replace(/-/g, "+").replace(/_/g, "/");
-          while (pad.length % 4) pad += "=";
-          var json = JSON.parse(atob(pad));
-          saveSession({ kind: "google", name: json.name || json.email || "Google", email: json.email || "", picture: json.picture || "", at: Date.now() });
-          openDesk();
-        }
-      });
-      window.google.accounts.id.renderButton(document.getElementById("googleSlot"), { theme: "filled_black", size: "large", text: "continue_with", shape: "rectangular", width: 360 });
-    };
-    document.head.appendChild(script);
   }
 
   function saveSession(data) {
@@ -285,16 +323,36 @@
     document.getElementById("footWho").textContent = "watching …" + value.slice(-4);
   });
 
+  window.addEventListener("valhalla-signed", function (event) {
+    var packed = event.detail || {};
+    if (!packed.pubkey) return;
+    var expected = window.__valhallaExpected || "";
+    var note = document.getElementById("walletNote");
+    if (expected && packed.pubkey !== expected) {
+      if (note) note.textContent = "That signature is for a different wallet. Use the address on file, ending " + expected.slice(-4) + ".";
+      return;
+    }
+    var account = readAccount() || {};
+    account.wallet = packed.pubkey;
+    writeAccount(account);
+    saveSession({ kind: "wallet", pubkey: packed.pubkey, email: account.email || "" });
+    sessionStorage.setItem("valhalla-wallet-ok", "1");
+    if (fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS) && account.email) openDesk();
+  });
+
   var human = fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS);
-  var session = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
-  if (human && session) openDesk();
-  else if (human) {
-    show("gateChoice");
-    mountChoice();
+  var account = readAccount();
+  var signed = sessionStorage.getItem("valhalla-wallet-ok") === "1";
+  if (human && account && account.email && signed) openDesk();
+  else if (human && account && account.email) {
+    show("gateWallet");
+    mountWallet();
+  } else if (human) {
+    show("gateAccount");
+    mountAccount();
   } else {
     show("gateHuman");
     mountTurnstile();
-    mountChoice();
   }
 
 })();

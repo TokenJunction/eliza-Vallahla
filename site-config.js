@@ -29,6 +29,8 @@ window.VALHALLA_SITE = {
   TURNSTILE_VERIFY_URL: "https://valhalla-turnstile-verify.valhalla-app.workers.dev/api/verify",
   /* Google OAuth web client. Authorized JavaScript origin: https://valhalla-app.xyz */
   GOOGLE_CLIENT_ID: "GOOGLE_CLIENT_ID_NOT_SET",
+  /* Optional email sign-in Worker. POST {email}. Leave empty until that Worker exists. */
+  MAGIC_LINK_URL: "",
   /* Paste the live Spring store URL before any buy button is enabled. */
   SPRING_STORE_URL: ""
 };

@@ -19,16 +19,29 @@
     <button id="humanPlaceholder" type="button" hidden>Site key is not set. Continue to sign-in.</button>
   </div>
 </section>
-<section id="gateChoice" class="gate" hidden>
+<section id="gateAccount" class="gate" hidden>
   <div class="card">
     <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
     <h1>VALHALLA™</h1>
-    <p>Choose one way in. A wallet button opens that wallet only, then asks you to sign in. Nothing is paid.</p>
-    <div id="loginButtons" class="login-stack"></div>
+    <p>Sign in with your email. This account does not hold a wallet key or a seed phrase.</p>
     <button id="googleBtn" type="button">Continue with Google</button>
     <div id="googleSlot"></div>
-    <p id="loginNote" class="note"></p>
-    <p class="note">Valhalla™ never asks for a seed phrase. Not financial advice.</p>
+    <form id="magicForm">
+      <label>Email <input id="magicEmail" type="email" autocomplete="email" required></label>
+      <button type="submit">Email me a sign-in link</button>
+    </form>
+    <p id="accountNote" class="note"></p>
+    <p class="note">Google setup: in Google Cloud, create an OAuth web client. Set the authorized JavaScript origin to https://valhalla-app.xyz. Paste the client ID into GOOGLE_CLIENT_ID in site-config.js. Email link setup: deploy a Worker that emails a one-time link, then set MAGIC_LINK_URL. Until then, this form does not sign you in.</p>
+  </div>
+</section>
+<section id="gateWallet" class="gate" hidden>
+  <div class="card">
+    <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
+    <h1>VALHALLA™</h1>
+    <p>Connect a wallet and sign in. The signature is a message only. Valhalla™ does not store a private key and there is no custodial wallet.</p>
+    <div id="loginButtons" class="login-stack"></div>
+    <button id="useOnFile" type="button" hidden>Use my wallet on file</button>
+    <p id="walletNote" class="note"></p>
   </div>
 </section>
 <section id="desk" class="hud" hidden>
@@ -82,12 +95,33 @@
         <p class="note">DEMO DATA, illustrative only</p>
       </div>
     </article>
-    <article class="panel">
-      <div class="ph"><b>02</b><span>POSITIONS</span><span>sample</span></div>
+    <article class="panel" id="botPanel">
+      <div class="ph"><b>02</b><span>BOT CONTROL</span><span id="botLight" class="light stopped">Stopped</span></div>
       <div class="pb">
-        <p>SAMPLE …a1c4 · -0.018 SOL</p>
-        <p class="note" style="color:#00ff88">SAMPLE …b7e2 · +0.011 SOL</p>
-        <p>SAMPLE …c390 · -0.004 SOL</p>
+        <p class="note">Crypto trading is risky. Results are not guaranteed. This page never holds a key and never signs a trade.</p>
+        <form id="botForm">
+          <label>Risk level <select id="botRisk"><option>low</option><option selected>medium</option><option>high</option></select></label>
+          <label>Max position size, SOL <input id="botSize" type="number" min="0.01" step="0.01" value="0.1"></label>
+          <label>Max open positions <input id="botSlots" type="number" min="1" max="5" value="3"></label>
+          <label>Take-profit % <input id="botTp" type="number" min="1" value="25"></label>
+          <label>Stop-loss % <input id="botSl" type="number" min="1" value="15"></label>
+          <label>Min liquidity, USD <input id="botLiq" type="number" min="0" value="10000"></label>
+          <label>Min token age, hours <input id="botAge" type="number" min="0" value="1"></label>
+          <label>Wallets to copy, one public address per line <textarea id="botCopies" rows="3"></textarea></label>
+          <label>Daily loss limit, SOL <input id="botLoss" type="number" min="0" step="0.01" value="0.5"></label>
+          <button id="botReview" type="button">Review settings</button>
+        </form>
+        <div id="botSummary" hidden></div>
+        <label><input id="botRiskAck" type="checkbox"> I understand crypto trading is risky and results aren't guaranteed</label>
+        <p><button id="botStart" type="button" disabled>START</button> <button id="botStop" type="button">STOP</button></p>
+        <p id="botLinkNote">Link your Valhalla agent to start</p>
+        <label>Your agent URL <input id="botAgent" type="url" placeholder="http://127.0.0.1:8787" autocomplete="off"></label>
+        <button id="botSaveAgent" type="button">Save agent link</button>
+        <p><a href="#agent-howto">How to link your Valhalla agent</a></p>
+        <div class="term" id="botLog"></div>
+        <div id="agent-howto">
+          <p>Run Valhalla on your PC. The key stays on that computer. Paste its desk address, usually http://127.0.0.1:8787. Start and Stop call that app only. This website does not hold the key.</p>
+        </div>
       </div>
     </article>
     <article class="panel">
@@ -147,6 +181,7 @@
 <script src="/connect-core.js"></script>
 <script src="/site-wallet.js"></script>
 <script src="gate.js"></script>
+<script src="bot.js"></script>
 <script src="settings.js"></script>
 </body>
 </html>
