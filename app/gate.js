@@ -144,8 +144,18 @@
     }).join("");
   }
 
+  function deviceKeys() {
+    try { return JSON.parse(localStorage.getItem("valhalla-device-keys") || "{}"); } catch (err) { return {}; }
+  }
+
+  function rpcUrl() {
+    var custom = String(deviceKeys().rpc || "");
+    if (custom.indexOf("https://") === 0) return custom;
+    return RPC;
+  }
+
   async function rpc(method, params) {
-    var response = await fetch(RPC, {
+    var response = await fetch(rpcUrl(), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: method, params: params })
@@ -155,20 +165,40 @@
     return body.result;
   }
 
+  async function birdeyePrice(mint, key) {
+    var response = await fetch("https://public-api.birdeye.so/defi/price?address=" + encodeURIComponent(mint), {
+      headers: { "X-API-KEY": key, "x-chain": "solana" }
+    });
+    if (!response.ok) return "";
+    var body = await response.json();
+    var value = body && body.data && body.data.value;
+    return Number.isFinite(Number(value)) ? " · $" + Number(value).toFixed(4) : "";
+  }
+
   async function balances(address) {
     var line = document.getElementById("solLine");
     var tokens = document.getElementById("tokenLines");
+    var label = document.querySelector("#desk .sub");
+    if (label) label.textContent = deviceKeys().birdeye ? "YOUR BALANCE · BIRDEYE + RPC" : "YOUR BALANCE · FREE RPC";
     try {
       var lamports = await rpc("getBalance", [address]);
       var sol = Number(lamports && lamports.value) / 1e9;
       line.textContent = (Number.isFinite(sol) ? sol.toFixed(4) : "0") + " SOL";
       var owned = await rpc("getTokenAccountsByOwner", [address, { programId: TOKEN_PROGRAM }, { encoding: "jsonParsed" }]);
-      tokens.innerHTML = ((owned && owned.value) || []).slice(0, 6).map(function (row) {
-        var info = row.account && row.account.data && row.account.data.parsed && row.account.data.parsed.info;
-        var mint = info && info.mint ? String(info.mint).slice(-4) : "coin";
+      var rows = ((owned && owned.value) || []).slice(0, 6);
+      var key = String(deviceKeys().birdeye || "");
+      var html = "";
+      for (var i = 0; i < rows.length; i += 1) {
+        var info = rows[i].account && rows[i].account.data && rows[i].account.data.parsed && rows[i].account.data.parsed.info;
+        var mint = info && info.mint ? String(info.mint) : "";
         var amount = info && info.tokenAmount && info.tokenAmount.uiAmountString ? info.tokenAmount.uiAmountString : "0";
-        return "<div>…" + mint + " " + amount + "</div>";
-      }).join("");
+        var price = "";
+        if (key && mint) {
+          try { price = await birdeyePrice(mint, key); } catch (err) { price = ""; }
+        }
+        html += "<div>…" + (mint ? mint.slice(-4) : "coin") + " " + amount + price + "</div>";
+      }
+      tokens.innerHTML = html;
     } catch (err) {
       line.textContent = "Balance did not load";
     }
@@ -238,6 +268,11 @@
     slot.appendChild(button);
     slot.appendChild(menu);
   }
+
+  window.addEventListener("valhalla-keys", function () {
+    var current = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
+    if (current && current.pubkey) balances(current.pubkey);
+  });
 
   document.getElementById("pasteForm").addEventListener("submit", function (event) {
     event.preventDefault();

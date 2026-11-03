@@ -43,6 +43,19 @@ button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 .term { color: #9cffb0; font-size: 11px; line-height: 1.45; }
 #net { width: 100%; height: 180px; display: block; }
 .foot { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; }
+#gear { background: transparent; color: var(--amber2); border: 1px solid var(--line); min-width: 44px; padding: 8px; }
+.settings { position: fixed; inset: 0; background: rgba(5,5,7,.72); z-index: 40; display: flex; justify-content: flex-end; }
+.settings[hidden] { display: none; }
+.settings .panel { width: min(420px, 100%); height: 100%; background: #0a0a0e; overflow: auto; }
+.settings h2 { color: var(--amber2); letter-spacing: .12em; font-size: 13px; margin: 16px 0 6px; }
+.settings label { display: block; margin: 8px 0; color: var(--muted); font-size: 12px; }
+.settings input, .settings select { width: 100%; margin-top: 4px; background: #050507; color: var(--text); border: 1px solid var(--line); padding: 8px; }
+.settings button { margin: 6px 6px 0 0; background: #100e0a; color: var(--amber2); border: 1px solid rgba(255,154,31,.45); }
+body[data-theme="day"] { --bg: #efe8da; --panel: #f7f1e6; --text: #1c140c; --muted: #5e564c; --line: #d9cbb6; background: var(--bg); color: var(--text); }
+body[data-theme="day"] .panel, body[data-theme="day"] .settings .panel, body[data-theme="day"] .topbar { background: var(--panel); }
+body.compact .hero-mech { display: none; }
+body.compact .hud { padding: 4px; gap: 4px; }
+body.compact .big { font-size: 28px; }
 @media (max-width: 900px) {
   .hud { height: auto; grid-template-rows: auto auto auto; }
   .grid { display: flex; flex-direction: column; }
