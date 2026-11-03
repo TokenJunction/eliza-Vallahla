@@ -1,0 +1,51 @@
+:root {
+  --bg: #050507; --panel: #0a0a0e; --line: #1c1a16;
+  --amber: #ff9a1f; --amber2: #ffb347; --green: #00ff88; --red: #ff3b4a;
+  --muted: #7a7468; --text: #f2ead8;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #050507; color: var(--text); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
+.gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: radial-gradient(ellipse at 15% 0%, rgba(255,154,31,.12), transparent 45%), #050507; }
+.card { width: min(520px, 100%); border: 1px solid var(--line); background: #0a0a0e; padding: 22px; }
+.card h1 { margin: 0 0 8px; color: var(--amber2); letter-spacing: .16em; font-size: 22px; }
+.note { color: var(--muted); }
+.login-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.login-stack button, #googleBtn { display: flex; align-items: center; gap: 10px; width: 100%; background: #100e0a; color: var(--amber2); border: 1px solid rgba(255,154,31,.45); padding: 8px 12px; text-align: left; }
+.hud { display: grid; grid-template-rows: 56px 1fr 28px; height: 100vh; padding: 10px 12px 6px; gap: 8px; }
+.topbar { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); background: linear-gradient(180deg, #0f0e0b, #0a0908); padding: 6px 12px; position: relative; overflow: hidden; }
+.topbar::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: linear-gradient(var(--amber), var(--green)); }
+.logo-mech { width: 40px; height: 40px; object-fit: contain; }
+.word { display: flex; flex-direction: column; line-height: 1.05; }
+.word strong { color: var(--amber2); letter-spacing: .16em; }
+.word span, .sub { color: var(--muted); font-size: 9px; letter-spacing: .14em; }
+.badge { font-size: 9px; padding: 3px 8px; border: 1px solid rgba(255,154,31,.4); color: var(--amber2); letter-spacing: .12em; }
+.tape { flex: 1; overflow: hidden; white-space: nowrap; font-size: 10px; color: var(--muted); }
+.chip { position: relative; }
+.chip > button { background: transparent; color: var(--text); border: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+.menu { position: absolute; right: 0; top: 46px; background: #0a0a0e; border: 1px solid var(--line); min-width: 180px; z-index: 5; }
+.menu button, .menu a { display: block; width: 100%; background: transparent; color: var(--text); border: 0; text-align: left; text-decoration: none; padding: 8px 10px; }
+.clock { color: var(--amber2); font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: 1.05fr 1.35fr .9fr; grid-template-rows: 1.05fr .95fr; gap: 8px; min-height: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); min-height: 0; display: flex; flex-direction: column; position: relative; }
+.panel::after { content: ""; position: absolute; top: 0; right: 0; width: 16px; height: 16px; border-top: 1px solid var(--amber); border-right: 1px solid var(--amber); opacity: .5; }
+.ph { display: flex; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #16140f; letter-spacing: .14em; font-size: 11px; }
+.ph b { color: var(--amber); }
+.pb { padding: 8px 10px; overflow: auto; font-size: 12px; }
+.big { font-size: 42px; color: var(--green); line-height: 1; text-shadow: 0 0 24px rgba(0,255,136,.35); }
+.down { color: var(--red); }
+.hero-mech { width: 110px; justify-self: end; }
+.eq { display: grid; grid-template-columns: 1fr 120px; gap: 8px; align-items: center; }
+.stages { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.stage { border: 1px solid #1a1814; padding: 4px; background: #08080c; }
+.stage b { color: var(--amber2); font-size: 10px; }
+.kill { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid #14120f; padding: 3px 0; }
+.term { color: #9cffb0; font-size: 11px; line-height: 1.45; }
+#net { width: 100%; height: 180px; display: block; }
+.foot { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; }
+@media (max-width: 900px) {
+  .hud { height: auto; grid-template-rows: auto auto auto; }
+  .grid { display: flex; flex-direction: column; }
+  .topbar { flex-wrap: wrap; }
+  .stages { grid-template-columns: 1fr 1fr; }
+}

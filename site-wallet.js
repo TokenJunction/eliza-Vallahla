@@ -91,6 +91,7 @@
       localStorage.setItem("valhalla-watch", packed.pubkey);
       tellExtension(packed);
       paintChip(packed.pubkey);
+      window.dispatchEvent(new CustomEvent("valhalla-signed", { detail: packed }));
       return packed;
     });
   }
@@ -138,13 +139,14 @@
   root.ValhallaSite = { mountButtons: mountButtons, continueWith: continueWith };
 
   function boot() {
+    if (document.body && document.body.dataset.marketing === "1") return;
     window.dispatchEvent(new Event("wallet-standard:app-ready"));
     var stack = document.getElementById("loginButtons");
-    if (stack) mountButtons(stack);
+    if (stack && document.body.dataset.page !== "app") mountButtons(stack);
     var watch = localStorage.getItem("valhalla-watch");
     if (watch && root.ValhallaConnect.isPubkey(watch)) paintChip(watch);
     var asked = new URLSearchParams(location.search).get("wallet");
-    if (asked) continueWith(asked).catch(function () {});
+    if (asked && document.body.dataset.page !== "app") continueWith(asked).catch(function () {});
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

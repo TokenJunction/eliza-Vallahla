@@ -1,0 +1,10 @@
+name = "valhalla-turnstile"
+main = "turnstile.js"
+compatibility_date = "2026-11-03"
+
+# After you create the Turnstile widget for valhalla-app.xyz:
+#   npx wrangler secret put TURNSTILE_SECRET
+# Then attach a route so the site can call it:
+#   valhalla-app.xyz/api/verify
+# The site key goes in site-config.js as TURNSTILE_SITE_KEY.
+# The secret never goes in git.

@@ -22,13 +22,6 @@
       else brand.insertAdjacentHTML("beforeend", " VALHALLA™");
     }
     var nav = header.querySelector("nav") || header;
-    if (!document.getElementById("walletButtons") && window.ValhallaSite) {
-      var row = document.createElement("div");
-      row.id = "walletButtons";
-      row.className = "wallet-row";
-      nav.appendChild(row);
-      window.ValhallaSite.mountButtons(row);
-    }
     if (!header.querySelector(".xlink")) {
       var link = document.createElement("a");
       link.className = "xlink";

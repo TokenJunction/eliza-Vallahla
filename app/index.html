@@ -1,45 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta name="google-adsense-account" content="ca-pub-6504655762357230">
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6504655762357230" crossorigin="anonymous"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Valhalla Pro</title>
-<style>
-body { margin: 0; font: 16px/1.45 system-ui, sans-serif; background: #07080b; color: #e7eef8; }
-main { max-width: 880px; margin: 0 auto; padding: 32px 16px 64px; }
-h1 { color: #e8b65a; letter-spacing: .08em; }
-button, a.btn { background: #e8b65a; color: #07080b; border: 0; min-height: 40px; padding: 0 16px; font-weight: 700; text-decoration: none; display: inline-block; line-height: 40px; }
-.note { color: #93a4ba; }
-.lock { filter: grayscale(1); opacity: .72; border: 1px solid #3a3428; padding: 12px; }
-section { margin: 24px 0; }
-</style>
+<title>ACCELERATION · Valhalla™</title>
+<meta name="twitter:site" content="@ValhallaOS">
+<link rel="stylesheet" href="desk.css">
 </head>
-<body>
-<main>
-<h1>VALHALLA™</h1>
-<p class="note">Read-only portal. Sign-in proves you hold the wallet. It does not send or withdraw. Not financial advice. The login cookie is set by this host. For the public site, use https://valhalla-app.xyz/app until app.valhalla-app.xyz points here.</p>
-<section id="login">
-<h2>Log in</h2>
-<button id="siws" type="button">Sign in with Phantom, Solflare, or Backpack</button>
-<div id="google"></div>
-<p id="login-note" class="note">The login message expires quickly. Valhalla never asks for a seed phrase.</p>
+<body data-page="app">
+<section id="gateHuman" class="gate">
+  <div class="card">
+    <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
+    <h1>VALHALLA™</h1>
+    <p class="kicker">HUMAN CHECK</p>
+    <p>Confirm you are a person. This does not connect a wallet and it does not ask for a payment.</p>
+    <div id="turnstile"></div>
+    <p id="humanNote" class="note"></p>
+    <button id="humanPlaceholder" type="button" hidden>Site key is not set. Continue to sign-in.</button>
+  </div>
 </section>
-<section id="app" hidden>
-<p id="who"></p>
-<nav><a href="#dashboard">Dashboard</a> <a href="#account">Account</a> <button id="logout" type="button">Sign out</button></nav>
-<section id="dashboard"><h2>Dashboard</h2><p id="balances"></p><h3>Trader Report Card</h3><div id="report"></div>
-<aside id="portal-ad" hidden><p class="note">Advertisement</p><ins class="adsbygoogle" style="display:block;min-height:90px" data-ad-client="ca-pub-6504655762357230" data-ad-format="auto" data-full-width-responsive="true"></ins></aside>
+<section id="gateChoice" class="gate" hidden>
+  <div class="card">
+    <img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="48" height="48">
+    <h1>VALHALLA™</h1>
+    <p>Choose one way in. A wallet button opens that wallet only, then asks you to sign in. Nothing is paid.</p>
+    <div id="loginButtons" class="login-stack"></div>
+    <button id="googleBtn" type="button">Continue with Google</button>
+    <div id="googleSlot"></div>
+    <p id="loginNote" class="note"></p>
+    <p class="note">Valhalla™ never asks for a seed phrase. Not financial advice.</p>
+  </div>
 </section>
-<section id="account"><h2>Account</h2><p id="account"></p><p><a class="btn" id="billing" href="https://app.lemonsqueezy.com/my-orders">Manage billing</a></p></section>
-</main>
-<script src="/app/portal.js"></script>
-
+<section id="desk" class="hud" hidden>
+  <header class="topbar">
+    <img class="logo-mech" src="/assets/mech.jpg" alt="Valhalla™ mech logo">
+    <div class="word"><strong>ACCELERATION</strong><span>VALHALLA™ · COMMAND CENTER</span></div>
+    <span class="badge" id="modeBadge">DEMO</span>
+    <div class="tape" id="tape">DEMO DATA, illustrative only · sample tape · not a live market</div>
+    <div class="chip" id="walletChip"></div>
+    <img id="googleAvatar" alt="" width="32" height="32" hidden>
+    <div class="clock" id="clock">00:00:00</div>
+  </header>
+  <div class="grid">
+    <article class="panel">
+      <div class="ph"><b>00</b><span>WALLET</span></div>
+      <div class="pb eq">
+        <div>
+          <div class="sub">YOUR BALANCE · PUBLIC RPC</div>
+          <div class="big" id="solLine">—</div>
+          <div id="tokenLines"></div>
+          <div class="sub">DEMO P&amp;L · NOT YOUR RESULTS</div>
+          <div class="down" id="demoPnl">-0.011 SOL sample</div>
+          <p class="note">SAMPLE …a1c4 -0.018 · SAMPLE …b7e2 +0.011 · SAMPLE …c390 -0.004</p>
+          <p class="note">Not financial advice. Past or sample results don't predict future results.</p>
+          <form id="pasteForm" hidden>
+            <label>Paste a Solana address to watch <input id="pasteKey" autocomplete="off" spellcheck="false"></label>
+            <button type="submit">Watch address</button>
+          </form>
+        </div>
+        <img class="hero-mech" src="/assets/mech.jpg" alt="Valhalla™ mech">
+      </div>
+    </article>
+    <article class="panel">
+      <div class="ph"><b>01</b><span>FUNNEL</span><span id="funnelHint">450 wallets</span></div>
+      <div class="pb">
+        <canvas id="net"></canvas>
+        <div id="legend"></div>
+        <div class="stages" id="stages"></div>
+      </div>
+    </article>
+    <article class="panel">
+      <div class="ph"><b>05</b><span>SYSTEM</span></div>
+      <div class="pb">
+        <p><b>EXITS</b></p>
+        <p>take-profit · stop · copied-wallet-sell exit · 2h max hold</p>
+        <p><b>BRAIN</b></p>
+        <p>Sample score 64. Not a live coin.</p>
+        <p class="note">DEMO DATA, illustrative only</p>
+      </div>
+    </article>
+    <article class="panel">
+      <div class="ph"><b>02</b><span>POSITIONS</span><span>sample</span></div>
+      <div class="pb">
+        <p>SAMPLE …a1c4 · -0.018 SOL</p>
+        <p class="note" style="color:#00ff88">SAMPLE …b7e2 · +0.011 SOL</p>
+        <p>SAMPLE …c390 · -0.004 SOL</p>
+      </div>
+    </article>
+    <article class="panel">
+      <div class="ph"><b>03</b><span>COPY LOG</span></div>
+      <div class="pb term" id="term">
+        <div>DEMO DATA, illustrative only</div>
+        <div>&gt; scout scanned the sample book</div>
+        <div>&gt; filter stopped a thin pool</div>
+        <div>&gt; risk held a new buy</div>
+      </div>
+    </article>
+    <article class="panel">
+      <div class="ph"><b>04</b><span>SKIPPED</span></div>
+      <div class="pb" id="skips"></div>
+    </article>
+  </div>
+  <footer class="foot">
+    <span>Valhalla™ and the Valhalla mech logo are trademarks of TokenJunction LLC.</span>
+    <span>DEMO DATA, illustrative only · no send or withdraw</span>
+    <span id="footWho"></span>
+  </footer>
+</section>
 <script src="/site-config.js"></script>
 <script src="/nacl.min.js"></script>
 <script src="/connect-core.js"></script>
 <script src="/site-wallet.js"></script>
-<script src="/site-chrome.js"></script>
+<script src="gate.js"></script>
 </body>
 </html>
