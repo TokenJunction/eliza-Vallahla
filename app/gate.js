@@ -5,6 +5,7 @@
   var cfg = window.VALHALLA_SITE || {};
   var RPC = "https://api.mainnet-beta.solana.com";
   var TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+  var clockTimer = 0;
 
   function show(id) {
     ["gateHuman", "gateTerms", "gateAccount", "gateCode", "gateWallet", "desk"].forEach(function (name) {
@@ -201,29 +202,30 @@
     show("gateCode");
   }
 
-  function acceptAccount(body, next) {
+  function acceptAccount(body) {
     var prior = readAccount() || {};
-    writeAccount({
+    var account = {
       email: body.email || prior.email || "",
       name: body.name || prior.name || "",
       picture: body.picture || prior.picture || "",
       wallet: prior.wallet || "",
+      method: prior.method || body.method || "email",
       agentUrl: prior.agentUrl || "",
       bot: prior.bot || null,
       riskAccepted: prior.riskAccepted === true,
       termsAccepted: true
-    });
+    };
+    writeAccount(account);
     sessionStorage.setItem("valhalla-auth", "1");
-    saveRemember({ email: body.email || prior.email, name: body.name || prior.name, wallet: prior.wallet, walletPref: prior.walletPref, plan: prior.plan }, prior.method || "email");
+    saveRemember({ email: account.email, name: account.name, wallet: prior.wallet, walletPref: prior.walletPref, plan: prior.plan }, account.method);
     if (body.session) sessionStorage.setItem("valhalla-auth-token", body.session);
-    if (body.needCode) showCode(body.email, "wallet");
-    else {
+    if (body.needCode) {
+      sessionStorage.removeItem("valhalla-code-ok");
+      showCode(account.email, "wallet");
+    } else {
       sessionStorage.setItem("valhalla-code-ok", "1");
-      if (next === "desk") openDesk();
-      else {
-        show("gateWallet");
-        mountWallet();
-      }
+      saveSession(accountSession(account));
+      openDesk();
     }
   }
 
@@ -251,6 +253,7 @@
           picture: info.picture || prior.picture || "",
           wallet: prior.wallet || "",
           walletPref: prior.walletPref || "",
+          method: "google",
           agentUrl: prior.agentUrl || "",
           bot: prior.bot || null,
           riskAccepted: prior.riskAccepted === true,
@@ -271,7 +274,7 @@
             else fail(note, "V-AUTH", "google worker " + (body.error || ""), function () { verifyGoogle(credential, note); });
             return;
           }
-          acceptAccount(body, "wallet");
+          acceptAccount(body);
         }).catch(function (err) {
           fail(note, "V-AUTH", String(err && err.message || err), function () { verifyGoogle(credential, note); });
         });
@@ -366,6 +369,9 @@
           width: 360
         });
       };
+      script.onerror = function () {
+        fail(note, "V-AUTH", "google identity script failed to load", function () { location.reload(); });
+      };
       document.head.appendChild(script);
     }
     var showCreate = document.getElementById("showCreate");
@@ -394,6 +400,7 @@
         account.name = document.getElementById("createName").value.trim();
         account.email = document.getElementById("createEmail").value.trim().toLowerCase();
         account.walletPref = document.getElementById("createWallet").value;
+        account.method = "email";
         account.termsAccepted = true;
         account.plan = "free";
         writeAccount(account);
@@ -408,6 +415,8 @@
             else fail(note, "V-MAIL", "create code " + (body.error || ""), function () { createForm.requestSubmit(); });
           }
           else showCode(account.email, "wallet");
+        }).catch(function (err) {
+          fail(note, "V-MAIL", "create code request failed: " + String(err && err.message || err), function () { createForm.requestSubmit(); });
         });
       });
     }
@@ -445,6 +454,7 @@
           }
           var prior = readAccount() || {};
           prior.email = email;
+          prior.method = "email";
           prior.termsAccepted = true;
           writeAccount(prior);
           note.textContent = "The code was sent. It expires in 10 minutes.";
@@ -467,7 +477,7 @@
             return;
           }
           sessionStorage.setItem("valhalla-code-ok", "1");
-          acceptAccount(body, sessionStorage.getItem("valhalla-code-next") || "wallet");
+          acceptAccount(body);
         }).catch(function () {
           if (codeNote) fail(codeNote, "V-MAIL", "email verify request failed", function () { codeForm.requestSubmit(); });
         });
@@ -515,6 +525,15 @@
   function saveSession(data) {
     data.at = Date.now();
     localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  }
+
+  function accountSession(account) {
+    return {
+      kind: account.method === "google" ? "google" : "account",
+      name: account.name || account.email || "Account",
+      email: account.email || "",
+      picture: account.picture || ""
+    };
   }
 
   function drawFunnel() {
@@ -614,8 +633,26 @@
   function openDesk() {
     var session = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
     if (!session) {
-      show("gateChoice");
-      return;
+      var account = readAccount();
+      var verified = account && account.email &&
+        sessionStorage.getItem("valhalla-auth") === "1" &&
+        sessionStorage.getItem("valhalla-code-ok") === "1";
+      if (verified) {
+        session = accountSession(account);
+        saveSession(session);
+      } else {
+        var pendingEmail = sessionStorage.getItem("valhalla-pending-email");
+        if (pendingEmail && sessionStorage.getItem("valhalla-code-ok") !== "1") {
+          show("gateCode");
+        } else if (fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS)) {
+          show("gateAccount");
+          mountAccount();
+        } else {
+          show("gateHuman");
+          mountTurnstile();
+        }
+        return;
+      }
     }
     show("desk");
     var banner = document.getElementById("connectBanner");
@@ -624,13 +661,13 @@
     var who = document.getElementById("footWho");
     var avatar = document.getElementById("googleAvatar");
     var paste = document.getElementById("pasteForm");
-    if (session.kind === "google") {
-      who.textContent = session.name || "Google";
+    if (session.kind === "google" || session.kind === "account") {
+      who.textContent = session.name || session.email || "Account";
       if (session.picture) {
         avatar.hidden = false;
         avatar.src = session.picture;
         avatar.alt = "Google profile";
-      }
+      } else avatar.hidden = true;
       paste.hidden = false;
       document.getElementById("modeBadge").textContent = "READ ONLY";
     } else if (session.kind === "paper") {
@@ -647,7 +684,7 @@
       paintMenu(session.pubkey);
     }
     tick();
-    window.setInterval(tick, 1000);
+    if (!clockTimer) clockTimer = window.setInterval(tick, 1000);
     window.dispatchEvent(new Event("valhalla-desk"));
   }
 
@@ -667,10 +704,12 @@
     var menu = document.createElement("div");
     menu.className = "menu";
     menu.hidden = true;
-    [["Copy address", function () { if (navigator.clipboard) navigator.clipboard.writeText(pubkey); }], ["Balances", function () { balances(pubkey); }], ["Disconnect", function () {
+    [["Copy address", function () { if (navigator.clipboard) navigator.clipboard.writeText(pubkey); }], ["Balances", function () { balances(pubkey); }], ["Disconnect wallet", function () {
       localStorage.removeItem(SESSION_KEY);
       localStorage.removeItem("valhalla-watch");
-      show("gateChoice");
+      sessionStorage.removeItem("valhalla-wallet-ok");
+      sessionStorage.removeItem("valhalla-proof");
+      openDesk();
     }]].forEach(function (item) {
       var node = document.createElement("button");
       node.type = "button";
@@ -762,10 +801,10 @@
   var account = readAccount();
   var signed = sessionStorage.getItem("valhalla-wallet-ok") === "1";
   var authed = sessionStorage.getItem("valhalla-auth") === "1" && sessionStorage.getItem("valhalla-code-ok") === "1";
-  if (human && account && account.email && authed && signed) openDesk();
-  else if (human && account && account.email && authed) {
-    show("gateWallet");
-    mountWallet();
+  if (human && account && account.email && authed) {
+    var savedSession = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
+    if (!signed || !savedSession || savedSession.kind !== "wallet") saveSession(accountSession(account));
+    openDesk();
   } else if (human && sessionStorage.getItem("valhalla-pending-email") && sessionStorage.getItem("valhalla-code-ok") !== "1") {
     show("gateCode");
     mountAccount();

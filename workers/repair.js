@@ -9,15 +9,27 @@ import { actionFor, alertFor } from "./repair-logic.js";
 
 var NAMES = ["VALHALLA CORE", "MECHA BRAIN", "ASK VALHALLA", "ODIN FEED", "FORGE LAB", "HEIMDALL GATE", "SENTINEL WATCH"];
 
-function stateOf(ok) {
-  return ok ? "LIVE" : "DEGRADED";
+function stateOf(check) {
+  if (check === "up") return "LIVE";
+  if (check === "down") return "OFFLINE";
+  return "DEGRADED";
+}
+
+function statusHeaders(request) {
+  var headers = new Headers({ "cache-control": "no-store" });
+  var origin = request.headers.get("origin") || "";
+  if (origin === "https://valhalla-app.xyz" || origin === "https://www.valhalla-app.xyz") {
+    headers.set("access-control-allow-origin", origin);
+    headers.set("vary", "Origin");
+  }
+  return headers;
 }
 
 async function probe(url) {
   if (!url) return "unknown";
   try {
     var response = await fetch(url, { method: "GET" });
-    if (response.ok || response.status === 204 || response.status === 405) return "up";
+    if (response.ok) return "up";
     return "down";
   } catch (err) {
     return "down";
@@ -38,8 +50,9 @@ export default {
     var url = new URL(request.url);
     if (url.pathname === "/status") {
       var pub = env.REPAIR_KV ? await env.REPAIR_KV.get("status:public") : "";
-      if (!pub) return Response.json({ unavailable: true }, { status: 503 });
-      return Response.json(JSON.parse(pub), { headers: { "cache-control": "public, max-age=60" } });
+      var headers = statusHeaders(request);
+      if (!pub) return Response.json({ unavailable: true }, { status: 503, headers: headers });
+      return Response.json(JSON.parse(pub), { headers: headers });
     }
     if (url.pathname === "/signals") {
       var restart = env.REPAIR_KV ? await env.REPAIR_KV.get("paper:restart") : "";
@@ -130,20 +143,19 @@ async function run(env) {
     }).catch(function () {});
     await sentry(env, alerts.join(" "));
   }
-  var degraded = Object.keys(checks).some(function (name) { return checks[name] === "down"; });
+  var degraded = Object.keys(checks).some(function (name) { return checks[name] !== "up"; });
   var lines = [
-    { name: "VALHALLA CORE", state: stateOf(checks.status !== "down") },
-    { name: "MECHA BRAIN", state: stateOf(checks.chat !== "down") },
-    { name: "ASK VALHALLA", state: stateOf(checks.chat !== "down") },
-    { name: "ODIN FEED", state: stateOf(checks.ticker !== "down") },
+    { name: "VALHALLA CORE", state: stateOf(checks.status) },
+    { name: "MECHA BRAIN", state: stateOf(checks.chat) },
+    { name: "ASK VALHALLA", state: stateOf(checks.chat) },
+    { name: "ODIN FEED", state: stateOf(checks.ticker) },
     { name: "FORGE LAB", state: "DEGRADED" },
-    { name: "HEIMDALL GATE", state: stateOf(checks.auth !== "down") },
-    { name: "SENTINEL WATCH", state: "LIVE" }
+    { name: "HEIMDALL GATE", state: stateOf(checks.auth) },
+    { name: "SENTINEL WATCH", state: stateOf(checks.status) }
   ];
   if (lines.some(function (line) { return !NAMES.includes(line.name); })) return;
   await env.REPAIR_KV.put("status:public", JSON.stringify({
     overall: degraded ? "SYSTEMS DEGRADED" : "ALL SYSTEMS LIVE",
-    uptime7d: 0,
     checkedAt: Date.now(),
     lines: lines
   }));

@@ -54,6 +54,9 @@ text = text[:start] + '''  function register() {
 ''' + text[end:]
 path.write_text(text)
 patch('site-wallet.js', 'window.dispatchEvent(new Event("wallet-standard:app-ready"));', 'window.dispatchEvent(new CustomEvent("wallet-standard:app-ready", { detail: walletApp }));')
+patch('site-wallet.js', '''    var installed = Boolean((provider && provider.connect) || named);
+    var step = root.ValhallaConnect.walletStep(id, { installed: installed, mobile: mobile(), pageUrl: location.href });''', '''        var installed = root.ValhallaConnect.hasInjectedProvider(provider) || root.ValhallaConnect.hasStandardWallet(named);
+    var step = root.ValhallaConnect.walletStep(id, { installed: installed, mobile: mobile(), pageUrl: location.href });''')
 patch('site-wallet.js', 'var pending = named\n      ? root.ValhallaConnect.adapterFromStandard(named)\n      : root.ValhallaConnect.adapterFromInjected(provider, id);', 'var pending = provider && typeof provider.connect === "function" && typeof provider.signMessage === "function"\n      ? root.ValhallaConnect.adapterFromInjected(provider, id)\n      : root.ValhallaConnect.adapterFromStandard(named);')
 patch('site-wallet.js', '''      button.addEventListener("click", function () {
         continueWith(choice.id).catch(function (err) {

@@ -107,6 +107,21 @@
     };
   }
 
+  function hasInjectedProvider(provider) {
+    return Boolean(provider && typeof provider.connect === "function" && typeof provider.signMessage === "function");
+  }
+
+  function hasStandardWallet(wallet) {
+    const features = wallet && wallet.features;
+    return Boolean(
+      features &&
+      features["standard:connect"] &&
+      typeof features["standard:connect"].connect === "function" &&
+      features["solana:signMessage"] &&
+      typeof features["solana:signMessage"].signMessage === "function"
+    );
+  }
+
   function pickNamed(list, which) {
     const pattern = which === "solflare" ? /solflare/i : /phantom/i;
     return (list || []).find((item) => pattern.test(item.name || "")) || null;
@@ -209,6 +224,8 @@
     verifySiws,
     adapterFromStandard,
     adapterFromInjected,
+    hasInjectedProvider,
+    hasStandardWallet,
     pickNamed,
     signInWithAdapter,
     connectPage,

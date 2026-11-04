@@ -1,0 +1,7 @@
+# Public market-data proxy for the homepage and desk ticker.
+# Deploy from the repository root with:
+#   npx wrangler deploy --config workers/ticker.toml
+name = "valhalla-ticker"
+main = "ticker.js"
+compatibility_date = "2026-11-04"
+workers_dev = true

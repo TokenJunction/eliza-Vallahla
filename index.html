@@ -17,12 +17,13 @@
     <a class="brand" href="/"><img src="assets/mark.svg" alt="Valhalla™ mech logo" width="32" height="32"> VALHALLA™</a>
     <a class="btn solid" href="app/">Get started</a>
   </header>
-  <div data-ticker hidden class="ticker" aria-label="Live prices. Not financial advice."></div>
+  <div class="system-status-slot" data-status-slot></div>
+  <div data-ticker hidden class="ticker" aria-label="Live prices. Not financial advice." role="status"></div>
   <section class="hero-grid">
     <div class="hero-copy">
-      <p class="kicker">VALHALLA™</p>
-      <h1>Your trading desk, in the browser.</h1>
-      <p class="sub">Sign up, open the desk, and run a paper bot on live prices. Keys stay on your device. This is not financial advice.</p>
+      <p class="kicker">A CLEARER VIEW OF YOUR WORKFLOW</p>
+      <h1>Your trading command center.</h1>
+      <p class="sub">Explore your desk, monitor public market data, and test ideas in paper mode. Your keys stay on your device. No order is sent from this website.</p>
       <div class="cta-row">
         <a class="btn solid" href="app/">Get started</a>
         <a class="btn" href="#how">See how it works</a>
@@ -108,6 +109,7 @@
 </div>
 <script src="site-config.js"></script>
 <script src="ticker.js"></script>
+<script src="status.js"></script>
 <script src="site-chrome.js"></script>
 <script>
   document.getElementById("emailCapture").addEventListener("submit", function (event) {

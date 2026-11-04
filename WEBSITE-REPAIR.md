@@ -13,3 +13,12 @@ The workflow refuses deployment if expected function boundaries or existing logo
 
 ## Rollback
 Revert this workflow change to restore the original deployed gate behavior. The earlier preview files remain in source, but the updated deployment does not load the preview over /app/.
+
+## Live price and system tickers
+The homepage and desk contain separate price and system-status strips. `site-config.js` deliberately leaves `TICKER_URL` and `STATUS_URL` empty until their services are deployed; the interface reports each feed as unavailable rather than showing sample or fabricated live values.
+
+The public price Worker can be deployed separately from the repository root with `npx wrangler deploy --config workers/ticker.toml`. After deployment, verify its HTTPS URL returns SOL data and has the expected CORS response, then set `TICKER_URL` in `site-config.js` to that URL. It returns SOL pricing and up to ten Solana tokens from DexScreener's top-boost feed.
+
+The status strip requires a public health endpoint configured as `STATUS_URL`. The existing `valhalla-repair` Worker writes status on an hourly schedule, so it is not a real-time feed; the UI marks reports older than 15 minutes unavailable. Configure and deploy a suitably frequent, verified health monitor before setting `STATUS_URL`.
+
+After both endpoints are configured, merge the site changes to `docs/site` (or manually start the Pages workflow). GitHub Actions builds and verifies the site, then publishes it to Pages. The price Worker deploy and Pages deploy are separate operations; publishing the website alone does not deploy either Worker.

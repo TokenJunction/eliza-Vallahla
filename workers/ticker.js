@@ -2,6 +2,16 @@
 var cache = { at: 0, body: null };
 var SOL = "So11111111111111111111111111111111111111112";
 
+function headers(request) {
+  var output = new Headers({ "cache-control": "public, max-age=15" });
+  var origin = request.headers.get("origin") || "";
+  if (origin === "https://valhalla-app.xyz" || origin === "https://www.valhalla-app.xyz") {
+    output.set("access-control-allow-origin", origin);
+    output.set("vary", "Origin");
+  }
+  return output;
+}
+
 async function jupiter() {
   var response = await fetch("https://lite-api.jup.ag/price/v2?ids=" + SOL);
   if (!response.ok) throw new Error("jupiter");
@@ -23,7 +33,7 @@ async function trending() {
   var response = await fetch("https://api.dexscreener.com/token-boosts/top/v1");
   if (!response.ok) return [];
   var rows = await response.json();
-  var list = (Array.isArray(rows) ? rows : []).filter(function (row) { return row.chainId === "solana" && row.tokenAddress; }).slice(0, 8);
+  var list = (Array.isArray(rows) ? rows : []).filter(function (row) { return row.chainId === "solana" && row.tokenAddress; }).slice(0, 10);
   if (!list.length) return [];
   var addresses = list.map(function (row) { return row.tokenAddress; }).join(",");
   var pairsResponse = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + addresses);
@@ -34,7 +44,7 @@ async function trending() {
     if (pair.chainId !== "solana" || seen[pair.baseToken.address]) return false;
     seen[pair.baseToken.address] = true;
     return true;
-  }).slice(0, 8).map(function (pair) {
+  }).slice(0, 10).map(function (pair) {
     var liq = Number(pair.liquidity && pair.liquidity.usd) || 0;
     return {
       symbol: String(pair.baseToken.symbol || "TOKEN").slice(0, 12),
@@ -46,9 +56,10 @@ async function trending() {
 }
 
 export default {
-  async fetch() {
+  async fetch(request) {
+    var responseHeaders = headers(request);
     if (cache.body && Date.now() - cache.at < 15000) {
-      return Response.json(cache.body, { headers: { "cache-control": "public, max-age=15", "access-control-allow-origin": "https://valhalla-app.xyz" } });
+      return Response.json(cache.body, { headers: responseHeaders });
     }
     var sol = { usd: 0, change24h: 0, source: "" };
     try {
@@ -63,12 +74,12 @@ export default {
       sol.change24h = fallback.change24h;
       sol.source = sol.source ? sol.source + ", CoinGecko" : "CoinGecko";
     } catch (err) {
-      if (!sol.usd) return Response.json({ unavailable: true }, { status: 503 });
+      if (!sol.usd) return Response.json({ unavailable: true }, { status: 503, headers: responseHeaders });
     }
     var tokens = [];
     try { tokens = await trending(); } catch (err) { tokens = []; }
     cache.body = { sol: sol, tokens: tokens, sources: sol.source + (tokens.length ? ", DexScreener" : ""), at: Date.now() };
     cache.at = Date.now();
-    return Response.json(cache.body, { headers: { "cache-control": "public, max-age=15", "access-control-allow-origin": "https://valhalla-app.xyz" } });
+    return Response.json(cache.body, { headers: responseHeaders });
   }
 };

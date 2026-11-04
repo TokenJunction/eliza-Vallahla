@@ -117,12 +117,13 @@
 <section id="desk" class="hud" hidden>
   <header class="topbar">
     <img class="logo-mech" src="/assets/mech.jpg" alt="Valhalla™ mech logo">
-    <div class="word"><strong>VALHALLA</strong><span>COMMAND CENTER · DEMO UNTIL YOU SIGN IN</span></div>
+    <div class="word"><strong>VALHALLA</strong><span>PAPER DESK · READ-ONLY BY DEFAULT</span></div>
     <span class="badge" id="leaderBadge" hidden>MECHA LEADER</span>
     <span class="badge" id="tierBadge">FREE</span>
     <button id="upgradeBtn" type="button">Upgrade</button>
     <span class="badge" id="modeBadge">DEMO</span>
-    <div class="tape" id="tape">DEMO DATA, illustrative only · sample tape · not a live market</div>
+    <div class="system-status-slot" data-status-slot></div>
+    <div class="tape" id="tape">PAPER MODE · no orders are sent from this website</div>
     <div class="chip" id="walletChip"></div>
     <img id="googleAvatar" alt="" width="32" height="32" hidden>
     <button id="gear" type="button" aria-label="Settings">
@@ -130,7 +131,7 @@
     </button>
     <div class="clock" id="clock">00:00:00</div>
   </header>
-  <div data-ticker hidden class="ticker" aria-label="Live prices. Not financial advice."></div>
+  <div data-ticker hidden class="ticker" aria-label="Live prices. Not financial advice." role="status"></div>
     <p id="connectBanner" class="note" hidden><svg viewBox="0 0 64 64" width="36" height="36" aria-hidden="true"><rect x="22" y="8" width="20" height="14" rx="3" fill="#ffb347"/><rect x="16" y="24" width="32" height="22" rx="4" fill="#1a140c" stroke="#ffb347"/><circle cx="26" cy="34" r="3" fill="#7a7468"/><circle cx="38" cy="34" r="3" fill="#7a7468"/></svg> Connect wallet to load your data <button id="connectFromDesk" type="button">Connect wallet</button></p>
     <aside id="debugPanel" hidden>
       <p class="kicker">DEBUG</p>
@@ -267,7 +268,7 @@
         <h2>Wallet</h2>
         <p id="setWallet">No wallet connected.</p>
         <button id="setCopy" type="button">Copy address</button>
-        <button id="setDisconnect" type="button">Disconnect</button>
+        <button id="setDisconnect" type="button">Disconnect wallet</button>
         <h2>Data APIs</h2>
         <p class="note">Stored on this device only. A key is sent only to that provider, never to Valhalla™ servers.</p>
         <label>Birdeye API key <input id="keyBirdeye" type="password" autocomplete="off"></label>
