@@ -7,8 +7,18 @@
     other: '<svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2c281f"/><circle cx="16" cy="16" r="6" fill="#ffb347"/></svg>'
   };
 
+  function register() {
+    var wallets = Array.prototype.slice.call(arguments);
+    wallets.forEach(function (wallet) {
+      if (wallet && wallet.features && standard.indexOf(wallet) < 0) standard.push(wallet);
+    });
+    return function () {
+      wallets.forEach(function (wallet) { var i = standard.indexOf(wallet); if (i >= 0) standard.splice(i, 1); });
+    };
+  }
+  var walletApp = Object.freeze({ register: register });
   window.addEventListener("wallet-standard:register-wallet", function (event) {
-    if (event.detail && standard.indexOf(event.detail) < 0) standard.push(event.detail);
+    if (typeof event.detail === "function") event.detail(walletApp);
   });
 
   function injected(id) {
@@ -22,7 +32,7 @@
     return standard.find(function (wallet) {
       return !root.ValhallaConnect.pickNamed([wallet], "phantom")
         && !root.ValhallaConnect.pickNamed([wallet], "solflare")
-        && !/backpack/i.test(wallet.name || "");
+        && !root.ValhallaConnect.pickNamed([wallet], "backpack");
     }) || null;
   }
 
@@ -99,7 +109,7 @@
   function continueWith(id) {
     var provider = id === "other" ? null : injected(id);
     var named = id === "other" ? otherWallet() : root.ValhallaConnect.pickNamed(standard, id);
-    var installed = Boolean((provider && provider.connect) || named);
+    var installed = root.ValhallaConnect.hasInjectedProvider(provider) || root.ValhallaConnect.hasStandardWallet(named);
     var step = root.ValhallaConnect.walletStep(id, { installed: installed, mobile: mobile(), pageUrl: location.href });
     if (step.action === "browse") {
       location.href = step.url;
@@ -112,9 +122,9 @@
     if (step.action !== "connect") {
       return Promise.reject(new Error("No other wallet was detected."));
     }
-    var pending = named
-      ? root.ValhallaConnect.adapterFromStandard(named)
-      : root.ValhallaConnect.adapterFromInjected(provider, id);
+    var pending = provider && typeof provider.connect === "function" && typeof provider.signMessage === "function"
+      ? root.ValhallaConnect.adapterFromInjected(provider, id)
+      : root.ValhallaConnect.adapterFromStandard(named);
     return pending.then(finish);
   }
 
@@ -126,10 +136,29 @@
       var button = document.createElement("button");
       button.type = "button";
       button.innerHTML = (ICONS[choice.id] || "") + "<span>" + choice.label + "</span>";
+      button.className = "valhalla-wallet-button";
+      button.dataset.wallet = choice.id;
+      button.style.cssText = "display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;min-height:48px;padding:12px 16px;margin:8px 0;border:1px solid #a67c3e;border-radius:10px;background:#171b22;color:#f4ead8;font:600 16px system-ui;cursor:pointer";
       button.addEventListener("click", function () {
-        continueWith(choice.id).catch(function (err) {
-          var note = document.getElementById("loginNote");
-          if (note) note.textContent = err && err.message ? err.message : "The sign-in was not accepted.";
+        if (host.dataset.busy === "1") return;
+        host.dataset.busy = "1";
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        var label = button.querySelector("span");
+        label.textContent = "Opening " + (choice.id === "other" ? "wallet" : choice.id) + "...";
+        var note = document.getElementById("walletNote") || document.getElementById("loginNote");
+        if (note) { note.setAttribute("role", "status"); note.textContent = "Approve the connection and sign-in message in your wallet. No transaction is requested."; }
+        var pending;
+        try { pending = continueWith(choice.id); } catch (err) { pending = Promise.reject(err); }
+        Promise.resolve(pending).then(function (proof) {
+          if (note) note.textContent = proof && proof.pubkey ? "Wallet connected: ..." + proof.pubkey.slice(-4) : "Wallet app or download page opened. Return here to continue.";
+        }).catch(function (err) {
+          if (note) note.textContent = err && err.message ? err.message : "Connection was not completed. You can try again.";
+        }).finally(function () {
+          host.dataset.busy = "0";
+          button.disabled = false;
+          button.removeAttribute("aria-busy");
+          label.textContent = choice.label;
         });
       });
       host.appendChild(button);
@@ -140,7 +169,7 @@
 
   function boot() {
     if (document.body && document.body.dataset.marketing === "1") return;
-    window.dispatchEvent(new Event("wallet-standard:app-ready"));
+    window.dispatchEvent(new CustomEvent("wallet-standard:app-ready", { detail: walletApp }));
     var stack = document.getElementById("loginButtons");
     if (stack && document.body.dataset.page !== "app") mountButtons(stack);
     var watch = localStorage.getItem("valhalla-watch");

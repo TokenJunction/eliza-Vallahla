@@ -76,15 +76,15 @@
     const connect = wallet.features && wallet.features["standard:connect"] && wallet.features["standard:connect"].connect;
     const sign = wallet.features && wallet.features["solana:signMessage"] && wallet.features["solana:signMessage"].signMessage;
     if (typeof connect !== "function" || typeof sign !== "function") return null;
-    const result = await connect();
+    const result = await connect.call(wallet.features["standard:connect"]);
     const accounts = (result && result.accounts) || wallet.accounts || [];
-    const account = accounts[0];
+    const account = accounts.find((item) => isPubkey(item.address) && (!item.chains || item.chains.some((chain) => chain.startsWith("solana:"))) && (!item.features || item.features.includes("solana:signMessage")));
     if (!account || !isPubkey(account.address)) return null;
     return {
       name: wallet.name || "",
       address: account.address,
       signMessage: async (bytes) => {
-        const signed = await sign([{ account, message: bytes }]);
+        const signed = await sign.call(wallet.features["solana:signMessage"], { account, message: bytes });
         const row = Array.isArray(signed) ? signed[0] : signed;
         return row && row.signature;
       },
@@ -123,7 +123,8 @@
   }
 
   function pickNamed(list, which) {
-    const pattern = which === "solflare" ? /solflare/i : /phantom/i;
+    const pattern = ({ solflare: /solflare/i, phantom: /phantom/i, backpack: /backpack/i })[which];
+    if (!pattern) return null;
     return (list || []).find((item) => pattern.test(item.name || "")) || null;
   }
 
