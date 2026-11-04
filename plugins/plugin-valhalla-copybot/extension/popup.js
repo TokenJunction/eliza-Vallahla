@@ -44,6 +44,8 @@ document.getElementById("use-paste")?.addEventListener("click", () => {
 });
 document.getElementById("use-phantom")?.addEventListener("click", () => openConnect("phantom"));
 document.getElementById("use-solflare")?.addEventListener("click", () => openConnect("solflare"));
+document.getElementById("use-backpack")?.addEventListener("click", () => openConnect("backpack"));
+document.getElementById("use-other")?.addEventListener("click", () => openConnect("other"));
 
 async function saveAddress(address) {
   if (!ValhallaConnect.isPubkey(address)) {
