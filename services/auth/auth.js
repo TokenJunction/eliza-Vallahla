@@ -167,7 +167,8 @@ async function limited(env, key, max) {
   return true;
 }
 
-async function startCode(env, email, request) {
+async function startCode(env, email, request, options) {
+  options = options || {};
   var emailHash = await sha256(email);
   var ip = request.headers.get("CF-Connecting-IP") || "";
   var ipHash = await sha256(ip || "none");
@@ -187,6 +188,7 @@ async function startCode(env, email, request) {
     salt: salt,
     hash: await sha256(code + ":" + salt + ":" + email),
     attempts: 0,
+    alwaysAsk: options.alwaysAsk === true,
     exp: Date.now() + 10 * 60 * 1000
   }), { expirationTtl: 600 });
   return { ok: true };
@@ -206,7 +208,7 @@ async function checkCode(env, email, code) {
     return { ok: false, error: record.attempts >= 5 ? "locked" : "code" };
   }
   await env.AUTH_KV.delete(key);
-  return { ok: true, emailHash: emailHash };
+  return { ok: true, emailHash: emailHash, alwaysAsk: record.alwaysAsk === true };
 }
 
 async function sessionFor(env, emailHash, request, codeThisLogin) {
@@ -315,11 +317,12 @@ export default {
       if (!info) return json({ ok: false, error: "google" }, 401, request);
       var emailHash = await sha256(info.email);
       var account = await accountOf(env, emailHash);
+      account.email = info.email;
       if (body.alwaysAsk === true) account.alwaysAsk = true;
       await saveAccount(env, emailHash, account);
       var next = await sessionFor(env, emailHash, request, false);
       if (next.needCode) {
-        var sent = await startCode(env, info.email, request);
+        var sent = await startCode(env, info.email, request, { alwaysAsk: body.alwaysAsk === true });
         if (!sent.ok) return json(sent, sent.error === "rate" ? 429 : 503, request);
         return json({ ok: true, needCode: true, email: info.email, name: info.name, picture: info.picture }, 200, request);
       }
@@ -328,24 +331,26 @@ export default {
     if (url.pathname === "/auth/email/start" && request.method === "POST") {
       var email = String(body.email || "").toLowerCase().trim();
       if (!validEmail(email)) return json({ ok: false, error: "email" }, 400, request);
-      if (body.alwaysAsk === true) {
-        var hash = await sha256(email);
-        var existing = await accountOf(env, hash);
-        existing.alwaysAsk = true;
-        await saveAccount(env, hash, existing);
-      }
-      var started = await startCode(env, email, request);
+      var started = await startCode(env, email, request, { alwaysAsk: body.alwaysAsk === true });
       return json(started.ok ? { ok: true } : started, started.ok ? 200 : started.error === "rate" ? 429 : 503, request);
     }
     if (url.pathname === "/auth/email/verify" && request.method === "POST") {
       var checkEmail = String(body.email || "").toLowerCase().trim();
       var checked = await checkCode(env, checkEmail, String(body.code || ""));
       if (!checked.ok) return json({ ok: false, error: checked.error }, 401, request);
+      var verifiedAccount = await accountOf(env, checked.emailHash);
+      verifiedAccount.email = checkEmail;
+      if (checked.alwaysAsk) verifiedAccount.alwaysAsk = true;
+      await saveAccount(env, checked.emailHash, verifiedAccount);
       var ready = await sessionFor(env, checked.emailHash, request, true);
       return json({ ok: true, needCode: false, email: checkEmail, session: ready.session }, 200, request, { "set-cookie": ready.cookie });
     }
     var session = await readToken(env.DEVICE_COOKIE_SECRET, bearer(request));
     if (!session) return json({ ok: false, error: "session" }, 401, request);
+    var activeAccount = await accountOf(env, session.eh);
+    if (!(activeAccount.devices || []).some(function (row) { return row.id === session.did; })) {
+      return json({ ok: false, error: "session-revoked" }, 401, request);
+    }
     if (url.pathname === "/auth/leader" && request.method === "POST") {
       var isLeader = await leaderProof(env, body);
       var must = needSecondFactor({
@@ -355,6 +360,12 @@ export default {
         leader: isLeader,
         codeThisLogin: session.code === true
       });
+      if (isLeader && must) {
+        if (!validEmail(activeAccount.email)) return json({ ok: false, error: "email-not-configured" }, 503, request);
+        var leaderCode = await startCode(env, activeAccount.email, request);
+        if (!leaderCode.ok) return json(leaderCode, leaderCode.error === "rate" ? 429 : 503, request);
+        return json({ ok: true, role: "leader", needCode: true, email: activeAccount.email }, 200, request);
+      }
       return json({ ok: true, role: isLeader ? "leader" : "member", needCode: must }, 200, request);
     }
     if (url.pathname === "/auth/devices" && request.method === "GET") {
