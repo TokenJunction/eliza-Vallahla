@@ -26,10 +26,17 @@
     if (status) status.textContent = text;
   }
 
-  window.addEventListener("wallet-standard:register-wallet", (event) => {
-    const wallet = event.detail;
+  function registerWallet(wallet) {
     if (wallet && !wallets.includes(wallet)) wallets.push(wallet);
+  }
+  window.addEventListener("wallet-standard:register-wallet", (event) => {
+    const detail = event && event.detail;
+    if (typeof detail === "function") { try { detail(registerWallet); } catch {} return; }
+    if (detail && (detail.features || detail.name)) registerWallet(detail);
   });
+  try {
+    window.dispatchEvent(new CustomEvent("wallet-standard:app-ready", { detail: { register: registerWallet } }));
+  } catch {}
   window.dispatchEvent(new Event("wallet-standard:app-ready"));
 
   function injected() {

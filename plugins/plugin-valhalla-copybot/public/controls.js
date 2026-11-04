@@ -54,20 +54,28 @@ function tickLiveBadge() {
 }
 
 const standardWallets = [];
-window.addEventListener("wallet-standard:register-wallet", (event) => {
-  const wallet = event.detail;
+function registerStandardWallet(wallet) {
   if (wallet && !standardWallets.includes(wallet)) standardWallets.push(wallet);
+}
+window.addEventListener("wallet-standard:register-wallet", (event) => {
+  const detail = event && event.detail;
+  if (typeof detail === "function") { try { detail(registerStandardWallet); } catch {} return; }
+  if (detail && (detail.features || detail.name)) registerStandardWallet(detail);
 });
+try {
+  window.dispatchEvent(new CustomEvent("wallet-standard:app-ready", { detail: { register: registerStandardWallet } }));
+} catch {}
 window.dispatchEvent(new Event("wallet-standard:app-ready"));
 
 async function connectStandardWallet(choice) {
   const compatible = standardWallets.filter((wallet) => {
     const features = wallet.features || {};
-    return typeof features["standard:connect"]?.connect === "function";
+    return typeof features["standard:connect"]?.connect === "function" &&
+      typeof features["solana:signMessage"]?.signMessage === "function";
   });
   const wallet = choice === "backpack"
     ? compatible.find((item) => /backpack/i.test(item.name || ""))
-    : compatible.find((item) => !/phantom|solflare/i.test(item.name || ""));
+    : compatible.find((item) => !/phantom|solflare|backpack/i.test(item.name || ""));
   if (!wallet) throw new Error(choice === "backpack" ? "Backpack was not detected." : "No other compatible Solana wallet was detected.");
   const result = await wallet.features["standard:connect"].connect();
   const account = (result && result.accounts && result.accounts[0]) || (wallet.accounts || [])[0];

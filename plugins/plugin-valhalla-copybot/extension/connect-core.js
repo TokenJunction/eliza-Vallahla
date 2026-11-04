@@ -107,8 +107,10 @@
     if (which === "other") {
       return (list || []).find((item) => {
         const features = item.features || {};
-        return typeof features["standard:connect"]?.connect === "function" &&
+        const compatible =
+          typeof features["standard:connect"]?.connect === "function" &&
           typeof features["solana:signMessage"]?.signMessage === "function";
+        return compatible && !/phantom|solflare|backpack/i.test(item.name || "");
       }) || null;
     }
     const pattern = patterns[which] || patterns.phantom;
