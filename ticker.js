@@ -1,4 +1,6 @@
 (function () {
+  var MAX_TOKENS = 10;
+
   function node(tag, className, text) {
     var item = document.createElement(tag);
     if (className) item.className = className;
@@ -10,8 +12,8 @@
     var number = Number(value);
     if (!Number.isFinite(number) || number <= 0) return "—";
     return new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: number < 0.01 ? 8 : 2
+      minimumFractionDigits: number < 1 ? 4 : 2,
+      maximumFractionDigits: number < 0.0001 ? 10 : number < 1 ? 8 : 2
     }).format(number);
   }
 
@@ -33,12 +35,16 @@
   function paint(bar, data) {
     var items = document.createElement("div");
     var sol = data.sol || {};
-    appendQuote(items, "SOL", sol.usd, sol.change24h, "");
-    (data.tokens || []).slice(0, 10).forEach(function (token) {
+    if (Number(sol.usd) > 0) appendQuote(items, "SOL", sol.usd, sol.change24h, "");
+    (data.tokens || []).slice(0, MAX_TOKENS).forEach(function (token) {
       var symbol = String(token.symbol || "TOKEN").slice(0, 12);
       appendQuote(items, symbol, token.price, token.change24h, String(token.badge || ""));
     });
-    items.appendChild(node("span", "ticker-source", "Sources: " + String(data.sources || "public prices") + " · Not financial advice"));
+    var labels = [];
+    if (Number(sol.usd) > 0) labels.push("SOL");
+    if ((data.tokens || []).length) labels.push("DexScreener");
+    items.appendChild(node("span", "ticker-source",
+      "Live · " + (labels.join(" + ") || "public market data") + " · Not financial advice"));
 
     var line = document.createElement("div");
     line.className = "ticker-track";
@@ -57,6 +63,79 @@
     bar.dataset.updatedAt = String(Number(data.at) || Date.now());
   }
 
+  async function getJson(url, signal) {
+    var response = await fetch(url, { cache: "no-store", signal: signal });
+    if (!response.ok) throw new Error("market data " + response.status);
+    return response.json();
+  }
+
+  async function directData(signal) {
+    var tasks = await Promise.allSettled([
+      getJson("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true", signal),
+      getJson("https://api.dexscreener.com/token-boosts/top/v1", signal)
+    ]);
+
+    var sol = null;
+    if (tasks[0].status === "fulfilled") {
+      var solRow = tasks[0].value && tasks[0].value.solana;
+      var usd = Number(solRow && solRow.usd);
+      if (Number.isFinite(usd) && usd > 0) {
+        sol = { usd: usd, change24h: Number(solRow.usd_24h_change) || 0 };
+      }
+    }
+
+    var rows = tasks[1].status === "fulfilled" && Array.isArray(tasks[1].value) ? tasks[1].value : [];
+    var addresses = [];
+    var seen = Object.create(null);
+    rows.forEach(function (row) {
+      var address = row && row.chainId === "solana" ? String(row.tokenAddress || "") : "";
+      if (!address || seen[address]) return;
+      seen[address] = true;
+      addresses.push(address);
+    });
+    addresses = addresses.slice(0, MAX_TOKENS);
+
+    var tokens = [];
+    if (addresses.length) {
+      var pairsBody = await getJson(
+        "https://api.dexscreener.com/latest/dex/tokens/" + addresses.map(encodeURIComponent).join(","),
+        signal
+      );
+      var addressSet = Object.create(null);
+      addresses.forEach(function (address) { addressSet[address] = true; });
+      var bestByAddress = Object.create(null);
+      (pairsBody.pairs || []).forEach(function (pair) {
+        var address = String(pair && pair.baseToken && pair.baseToken.address || "");
+        var priceUsd = Number(pair && pair.priceUsd);
+        if (!pair || pair.chainId !== "solana" || !addressSet[address] ||
+            !Number.isFinite(priceUsd) || priceUsd <= 0) return;
+        var liquidity = Number(pair.liquidity && pair.liquidity.usd) || 0;
+        if (!bestByAddress[address] || liquidity > bestByAddress[address].liquidity) {
+          bestByAddress[address] = { pair: pair, liquidity: liquidity };
+        }
+      });
+      addresses.forEach(function (address) {
+        var selected = bestByAddress[address];
+        if (!selected) return;
+        var pair = selected.pair;
+        tokens.push({
+          symbol: String(pair.baseToken.symbol || "TOKEN").slice(0, 12),
+          price: Number(pair.priceUsd),
+          change24h: Number(pair.priceChange && pair.priceChange.h24) || 0,
+          badge: selected.liquidity >= 20000 ? "Liq" : "Thin"
+        });
+      });
+    }
+
+    if (!sol && !tokens.length) throw new Error("all public price sources unavailable");
+    return {
+      sol: sol,
+      tokens: tokens,
+      sources: (sol ? "CoinGecko" : "") + (tokens.length ? (sol ? ", " : "") + "DexScreener" : ""),
+      at: Date.now()
+    };
+  }
+
   function unavailable(bar, text) {
     bar.textContent = "";
     bar.appendChild(node("span", "ticker-status", text));
@@ -68,24 +147,22 @@
   async function pull() {
     var bars = Array.prototype.slice.call(document.querySelectorAll("[data-ticker]"));
     var url = String((window.VALHALLA_SITE || {}).TICKER_URL || "");
-    if (!url) {
-      bars.forEach(function (bar) {
-        unavailable(bar, "PRICE FEED · UNAVAILABLE · market data service is not connected");
-      });
-      return;
-    }
-
     var controller = typeof AbortController === "function" ? new AbortController() : null;
-    var timeout = controller ? window.setTimeout(function () { controller.abort(); }, 8000) : 0;
+    var timeout = controller ? window.setTimeout(function () { controller.abort(); }, 12000) : 0;
     try {
-      var response = await fetch(url, {
-        cache: "no-store",
-        signal: controller ? controller.signal : undefined
-      });
-      if (!response.ok) throw new Error("ticker " + response.status);
-      var data = await response.json();
+      var data;
+      if (url) {
+        try {
+          data = await getJson(url, controller ? controller.signal : undefined);
+        } catch (workerError) {
+          console.debug("valhalla", "V-TICK", "aggregator unavailable; using public sources");
+          data = await directData(controller ? controller.signal : undefined);
+        }
+      } else {
+        data = await directData(controller ? controller.signal : undefined);
+      }
       if (!data || !data.sol || !Number.isFinite(Number(data.sol.usd)) || Number(data.sol.usd) <= 0) {
-        throw new Error("price data unavailable");
+        if (!data || !(data.tokens || []).length) throw new Error("price data unavailable");
       }
       window.ValhallaTicker.last = data;
       bars.forEach(function (bar) { paint(bar, data); });
@@ -106,9 +183,11 @@
   }
 
   window.ValhallaTicker = { last: null };
+  var directInterval = 60000;
   function boot() {
     pull();
-    window.setInterval(pull, 20000);
+    var url = String((window.VALHALLA_SITE || {}).TICKER_URL || "");
+    window.setInterval(pull, url ? 20000 : directInterval);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

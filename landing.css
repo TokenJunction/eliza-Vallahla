@@ -14,9 +14,9 @@ body.landing {
 }
 
 .land {
-  width: min(1180px, calc(100% - 40px));
+  width: min(1440px, calc(100% - 56px));
   margin: 0 auto;
-  padding: 18px 0 56px;
+  padding: 22px 0 68px;
 }
 
 .land-nav {
@@ -190,7 +190,7 @@ button.system-status-line {
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, .92fr);
+  grid-template-columns: minmax(0, 1.04fr) minmax(360px, .96fr);
   gap: clamp(24px, 5vw, 64px);
   align-items: center;
   padding: clamp(30px, 7vw, 90px) 0;
@@ -265,7 +265,7 @@ button.system-status-line {
 }
 
 .land section {
-  padding: clamp(28px, 4vw, 46px) 0;
+  padding: clamp(32px, 4vw, 56px) 0;
   border-top: 1px solid rgba(231, 173, 91, .13);
 }
 
@@ -293,6 +293,15 @@ button.system-status-line {
 .prices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .features { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+@media (min-width: 1500px) {
+  .land { width: min(1520px, calc(100% - 96px)); }
+  .land-nav { padding-bottom: 22px; }
+  .hero-grid { gap: clamp(64px, 7vw, 112px); padding: 96px 0 112px; }
+  .hero-copy h1 { font-size: clamp(80px, 6.5vw, 104px); }
+  .features { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .blocks { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
 .land article,
 .land .price {
@@ -382,7 +391,7 @@ button.system-status-line {
 }
 
 @media (max-width: 620px) {
-  .land { width: min(calc(100% - 28px), 1180px); padding-top: 8px; }
+  .land { width: min(calc(100% - 28px), 1440px); padding-top: 8px; }
   .land-nav { padding: 10px 0 14px; }
   .land-nav .brand { letter-spacing: .1em; font-size: 13px; }
   .land-nav .brand img { width: 28px; height: 28px; }
