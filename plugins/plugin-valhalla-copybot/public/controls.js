@@ -53,12 +53,37 @@ function tickLiveBadge() {
   }
 }
 
+const standardWallets = [];
+window.addEventListener("wallet-standard:register-wallet", (event) => {
+  const wallet = event.detail;
+  if (wallet && !standardWallets.includes(wallet)) standardWallets.push(wallet);
+});
+window.dispatchEvent(new Event("wallet-standard:app-ready"));
+
+async function connectStandardWallet(choice) {
+  const compatible = standardWallets.filter((wallet) => {
+    const features = wallet.features || {};
+    return typeof features["standard:connect"]?.connect === "function";
+  });
+  const wallet = choice === "backpack"
+    ? compatible.find((item) => /backpack/i.test(item.name || ""))
+    : compatible.find((item) => !/phantom|solflare/i.test(item.name || ""));
+  if (!wallet) throw new Error(choice === "backpack" ? "Backpack was not detected." : "No other compatible Solana wallet was detected.");
+  const result = await wallet.features["standard:connect"].connect();
+  const account = (result && result.accounts && result.accounts[0]) || (wallet.accounts || [])[0];
+  const address = account && account.address ? String(account.address) : "";
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) throw new Error("The wallet did not share a valid public key.");
+  return { address, short: window.ValhallaWallet?.shortAddress ? window.ValhallaWallet.shortAddress(address) : "…" + address.slice(-4) };
+}
+
 async function connectChoice(choice) {
-  if (!window.ValhallaWallet) {
+  if (!window.ValhallaWallet && (choice === "phantom" || choice === "solflare")) {
     say("The wallet script did not load.");
     return;
   }
-  const linked = await window.ValhallaWallet.connect(choice);
+  const linked = choice === "phantom" || choice === "solflare"
+    ? await window.ValhallaWallet.connect(choice)
+    : await connectStandardWallet(choice);
   liveAddress = linked.address;
   document.getElementById("walletPanel").textContent = "Connected " + linked.short + ". Read-only.";
   await api("/api/watch", { address: linked.address });
@@ -67,6 +92,8 @@ async function connectChoice(choice) {
 
 document.getElementById("btnPhantom")?.addEventListener("click", () => connectChoice("phantom").catch((err) => say(err.message)));
 document.getElementById("btnSolflare")?.addEventListener("click", () => connectChoice("solflare").catch((err) => say(err.message)));
+document.getElementById("btnBackpack")?.addEventListener("click", () => connectChoice("backpack").catch((err) => say(err.message)));
+document.getElementById("btnOther")?.addEventListener("click", () => connectChoice("other").catch((err) => say(err.message)));
 document.getElementById("btnDisconnect")?.addEventListener("click", async () => {
   liveAddress = "";
   liveAt = 0;
