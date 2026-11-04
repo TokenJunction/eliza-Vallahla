@@ -1,19 +1,15 @@
 name: Publish Valhalla site
-
 on:
   push:
     branches: [docs/site]
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
 concurrency:
   group: valhalla-pages
   cancel-in-progress: true
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,52 +21,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Build temporary login-first site without Turnstile
-        shell: bash
+      - name: Build and verify login and wallet repairs
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import shutil
-
-          output = Path('site-build')
-          shutil.copytree('.', output, ignore=shutil.ignore_patterns('.git', '.github', 'site-build'))
-          gate = output / 'app/gate.js'
-          source = gate.read_text()
-          start_marker = '  function mountTurnstile() {'
-          end_marker = '  function termsOk() {'
-          assert source.count(start_marker) == 1, 'Unexpected gate structure; refusing to deploy'
-          assert source.count(end_marker) == 1, 'Unexpected terms structure; refusing to deploy'
-          start = source.index(start_marker)
-          end = source.index(end_marker, start)
-          assert 'turnstile.render' in source[start:end], 'Expected Turnstile implementation missing'
-          replacement = '''  function mountTurnstile() {
-              // Temporary owner-requested removal of the human-check entry step.
-              // This advances to terms/account; it does not authenticate an account.
-              markHuman();
-            }
-
-          '''
-          updated = source[:start] + replacement + source[end:]
-          assert updated[end if False else 0:] and 'function verifyGoogle(' in updated
-          assert 'function postAuth(' in updated and 'function mountAccount(' in updated
-          gate.write_text(updated)
-
-          errors = output / 'errors.js'
-          original = errors.read_text()
-          needle = "frame.title = 'Valhalla read-only preview';"
-          if needle in original:
-              position = original.index(needle)
-              beginning = original.rfind('\n(function () {', 0, position)
-              assert beginning > 0, 'Preview loader boundary missing; refusing to deploy'
-              original = original[:beginning] + '\n'
-          assert 'root.ValhallaErrors = ' in original
-          errors.write_text(original)
-          assert (output / 'assets/mark.svg').is_file(), 'Existing logo missing'
-          assert (output / 'assets/mech.jpg').is_file(), 'Existing desk logo missing'
-          assert (output / 'app/index.html').read_bytes() == Path('app/index.html').read_bytes()
-          PY
+          python3 scripts/build-site.py
           node --check site-build/app/gate.js
           node --check site-build/errors.js
+          node --check site-build/connect-core.js
+          node --check site-build/site-wallet.js
+          node scripts/test-wallet.cjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site-build
