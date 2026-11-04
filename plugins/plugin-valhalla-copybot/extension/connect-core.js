@@ -99,7 +99,19 @@
   }
 
   function pickNamed(list, which) {
-    const pattern = which === "solflare" ? /solflare/i : /phantom/i;
+    const patterns = {
+      solflare: /solflare/i,
+      backpack: /backpack/i,
+      phantom: /phantom/i,
+    };
+    if (which === "other") {
+      return (list || []).find((item) => {
+        const features = item.features || {};
+        return typeof features["standard:connect"]?.connect === "function" &&
+          typeof features["solana:signMessage"]?.signMessage === "function";
+      }) || null;
+    }
+    const pattern = patterns[which] || patterns.phantom;
     return (list || []).find((item) => pattern.test(item.name || "")) || null;
   }
 
