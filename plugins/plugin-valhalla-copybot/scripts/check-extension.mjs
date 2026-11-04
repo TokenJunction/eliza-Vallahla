@@ -24,7 +24,8 @@ execFileSync(
     "valhalla-command.css",
     "popup.js",
     "background.js",
-    "connect-bridge.js",
+    "connect.html",
+    "connect-page.js",
     "connect-core.js",
     "trust.js",
     "vendor",
@@ -40,7 +41,7 @@ const listing = execFileSync("unzip", ["-Z1", packed], { encoding: "utf8" });
 const names = listing.split("\n").map((line) => line.trim()).filter(Boolean);
 if (!names.includes("manifest.json")) fail("manifest.json is not at the zip root");
 if (names.some((name) => name.startsWith("extension/"))) fail("zip nests the extension folder");
-for (const required of ["popup.html", "popup.js", "background.js", "house-ads.json", "house/go-pro.png", "icons/icon-16.png", "icons/icon-32.png", "icons/icon-48.png", "icons/icon-128.png"]) {
+for (const required of ["popup.html", "popup.js", "background.js", "connect.html", "connect-page.js", "connect-core.js", "house-ads.json", "house/go-pro.png", "icons/icon-16.png", "icons/icon-32.png", "icons/icon-48.png", "icons/icon-128.png"]) {
   if (!names.includes(required)) fail(`zip is missing ${required}`);
 }
 execFileSync("unzip", ["-q", packed, "-d", unpacked]);
@@ -51,7 +52,7 @@ const permissions = manifest.permissions || [];
 if (permissions.length !== 1 || permissions[0] !== "storage") fail("permissions must be storage only");
 if (manifest.host_permissions?.length) fail("required host_permissions are set");
 const scripts = manifest.content_scripts || [];
-if (scripts.length !== 1 || scripts[0].js.join(",") !== "connect-bridge.js") fail("content script must be the connect bridge only");
+if (scripts.length) fail("content scripts are not needed; wallet handoff uses the extension service worker");
 const optional = manifest.optional_host_permissions || [];
 const allowedOptional = new Set([
   "http://127.0.0.1/*",
