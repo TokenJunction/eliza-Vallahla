@@ -1,7 +1,15 @@
-# Website repair: November 3, 2026
+# Website entry change: November 3, 2026
 
-Added /preview/ and an immediate preview overlay on /app/ through errors.js. Existing error handling and gate.js remain intact. Sign in reveals the original verification flow; Return to preview remains available. The preview does not create authentication flags, connect wallets, run a model, or enable trading.
+## Owner request
+Remove the blocking Cloudflare human-check step temporarily. Keep Google/email login and the existing Valhalla logo. Prioritize connectivity over a public preview.
 
-A push to docs/site triggers the existing Publish Valhalla site workflow. Deployment success and browser behavior must still be verified. This change does not repair the Turnstile backend, configure provider credentials, merge pending PRs, or refresh release/X imagery.
+## Deployment behavior
+The Pages workflow stages the website in site-build, replaces only mountTurnstile() with an advance to the existing terms/account flow, and removes the previously added preview overlay loader from the deployed errors.js. The original gate.js remains in source for restoration. app/index.html, Google/email authentication handlers, email-code verification, wallet logic, and existing logos are not replaced. No account-authentication flags are created by this build change.
 
-Rollback: revert this commit.
+Terms/risk acknowledgment remains; users are not marked as having accepted it automatically. Removal of Turnstile temporarily reduces the entry-layer bot protection. Backend authentication remains responsible for validating Google tokens, email codes, sessions, and access permissions.
+
+## Checks
+The workflow refuses deployment if expected function boundaries or existing logos are missing. It runs node --check on the staged gate.js and errors.js. These checks do not prove that Google/email backend services work. Deployment completion and actual sign-in must be verified separately.
+
+## Rollback
+Revert this workflow change to restore the original deployed gate behavior. The earlier preview files remain in source, but the updated deployment does not load the preview over /app/.
