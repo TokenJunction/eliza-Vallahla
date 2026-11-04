@@ -1,9 +1,21 @@
-(function () {
+(() => {
   const params = new URLSearchParams(location.search);
   const requested = params.get("wallet");
-  const which = ["solflare", "backpack", "other"].includes(requested) ? requested : "phantom";
-  const label = ({ solflare: "Solflare", backpack: "Backpack", other: "your wallet", phantom: "Phantom" })[which];
-  const downloadHref = which === "solflare" ? "https://solflare.com/download" : which === "backpack" ? "https://backpack.app/download" : "https://phantom.app/download";
+  const which = ["solflare", "backpack", "other"].includes(requested)
+    ? requested
+    : "phantom";
+  const label = {
+    solflare: "Solflare",
+    backpack: "Backpack",
+    other: "your wallet",
+    phantom: "Phantom",
+  }[which];
+  const downloadHref =
+    which === "solflare"
+      ? "https://solflare.com/download"
+      : which === "backpack"
+        ? "https://backpack.app/download"
+        : "https://phantom.app/download";
   const status = document.getElementById("status");
   const go = document.getElementById("go");
   const missing = document.getElementById("missing");
@@ -22,7 +34,8 @@
 
   function injected() {
     if (which === "solflare") return window.solflare || null;
-    if (which === "backpack") return (window.backpack && (window.backpack.solana || window.backpack)) || null;
+    if (which === "backpack")
+      return (window.backpack && (window.backpack.solana || window.backpack)) || null;
     if (which === "other") return null;
     const phantom = window.phantom && window.phantom.solana;
     return phantom || null;
@@ -34,14 +47,20 @@
 
   if (download) download.href = downloadHref;
   if (go) go.textContent = `Continue with ${label}`;
-  say(`Looking for ${label}. This page only asks you to connect and to sign in. It does not send a transaction.`);
+  say(
+    `Looking for ${label}. This page only asks you to connect and to sign in. It does not send a transaction.`
+  );
 
   window.setTimeout(() => {
     if (found()) return;
     if (missing) missing.hidden = false;
     if (download) download.hidden = which === "other";
     if (go) go.hidden = true;
-    say(which === "other" ? "No compatible Solana wallet was detected. Install a wallet that supports Wallet Standard sign-in, then reload." : `${label} was not detected. Install it, then reload this page.`);
+    say(
+      which === "other"
+        ? "No compatible Solana wallet was detected. Install a wallet that supports Wallet Standard sign-in, then reload."
+        : `${label} was not detected. Install it, then reload this page.`
+    );
   }, 1500);
 
   window.setInterval(() => {
@@ -92,7 +111,9 @@
       });
     }
     if (window.opener) window.opener.postMessage(payload, "https://valhalla-app.xyz");
-    say(`Signed in. Address ends in ${proof.address.slice(-4)}. Return to the Valhalla popup. Nothing was sent.`);
+    say(
+      `Signed in. Address ends in ${proof.address.slice(-4)}. Return to the Valhalla popup. Nothing was sent.`
+    );
   }
 
   go?.addEventListener("click", async () => {
