@@ -1,0 +1,81 @@
+name: Repair PR 11 merge conflicts
+on:
+  push:
+    branches: [cursor/valhalla-signin-codes-d28f]
+    paths: [.github/workflows/repair-pr11.yml]
+permissions:
+  contents: write
+concurrency:
+  group: repair-pr11
+  cancel-in-progress: false
+jobs:
+  repair:
+    if: github.repository == 'TokenJunction/eliza-valhalla'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Merge develop safely and record actual results
+        env:
+          TARGET_BRANCH: cursor/valhalla-signin-codes-d28f
+          BASE_SHA: 81f3956c3addbc60aa3cd143003db9ed7a719913
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 - <<'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          def git(*args, check=True):
+              return subprocess.run(['git', *args], text=True, capture_output=True, check=check)
+
+          head = git('rev-parse', 'HEAD').stdout.strip()
+          base = os.environ['BASE_SHA']
+          branch = os.environ['TARGET_BRANCH']
+          git('fetch', 'origin', branch, 'develop')
+          remote = git('rev-parse', 'origin/' + branch).stdout.strip()
+          if remote != head:
+              raise RuntimeError('PR branch changed after checkout; no write performed')
+          git('cat-file', '-e', base + '^{commit}')
+          result = git('merge', '--no-ff', '--no-commit', '-Xignore-space-change', base, check=False)
+          conflicts = git('diff', '--name-only', '--diff-filter=U').stdout.strip()
+          report = '# PR 11 three-way merge report\n\nHead: `' + head + '`\n\nDevelop revision: `' + base + '`\n\n'
+          failed = False
+          if conflicts or result.returncode:
+              details = git('diff', '--cc', check=False).stdout
+              report += 'Status: unresolved; no side was discarded.\n\nConflicting files:\n```text\n' + conflicts + '\n```\n\nActual merge output:\n```text\n' + result.stdout + result.stderr + '\n```\n\nActual conflict diff (first 18000 characters):\n```diff\n' + details[:18000] + '\n```\n'
+              git('merge', '--abort', check=False)
+              failed = True
+          else:
+              checks = [
+                  ['node', '--check', 'services/auth/auth.js'],
+                  ['node', '--test', 'services/auth/auth-logic.test.mjs'],
+                  ['node', '--check', 'plugins/plugin-valhalla-copybot/extension/connect-core.js'],
+                  ['node', '--check', 'plugins/plugin-valhalla-copybot/extension/connect-page.js'],
+                  ['node', '--check', 'plugins/plugin-valhalla-copybot/scripts/check-extension.mjs'],
+              ]
+              for command in checks:
+                  test = subprocess.run(command, text=True, capture_output=True)
+                  report += '## ' + ' '.join(command) + '\n\nExit: ' + str(test.returncode) + '\n```text\n' + (test.stdout + test.stderr)[-6000:] + '\n```\n'
+                  if test.returncode:
+                      failed = True
+              if failed:
+                  git('merge', '--abort', check=False)
+                  report += '\nStatus: merge rolled back because checks failed.\n'
+              else:
+                  report += '\nStatus: clean three-way merge; listed checks passed. Full monorepo checks and deployment were not run. PR remains open.\n'
+          Path('PR11-MERGE-REPORT.md').write_text(report)
+          git('add', 'PR11-MERGE-REPORT.md')
+          git('commit', '-m', 'Record PR 11 merge repair results' if failed else 'Merge develop into PR 11 preserving both branches')
+          git('push', 'origin', 'HEAD:refs/heads/' + branch)
+          if failed:
+              raise SystemExit('Repair needs substantive resolution; see PR11-MERGE-REPORT.md on the PR branch')
+          PY
