@@ -43,3 +43,38 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
+
+  - type: web
+    name: valhalla-site
+    runtime: node
+    plan: free
+    branch: docs/site
+    buildCommand: python3 scripts/build-site.py
+    startCommand: node valhallaMasterEngineV35.js
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUBLIC_ORIGIN
+        value: https://valhalla-app.xyz
+      - key: VALHALLA_EXECUTION_MODE
+        value: paper
+      - key: VALHALLA_TRADING_ENABLED
+        value: "false"
+      - key: VALHALLA_SOCIAL_ENABLED
+        value: "false"
+      - key: VALHALLA_KEY_STORAGE_ENABLED
+        value: "false"
+      - key: ELIZA_URL
+        sync: false
+      - key: LEADER_EMAIL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

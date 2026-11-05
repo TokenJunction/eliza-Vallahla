@@ -1,5 +1,6 @@
 import { logger, type IAgentRuntime, type Project, type ProjectAgent } from '@elizaos/core';
-import { character, gorgoCharacter } from './character.ts';
+import { character, gorgoCharacter, cerberusCharacter } from './character.ts';
+import { cerberusPlugin } from './cerberus.ts';
 import { valhallaStatusPlugin } from './plugin.ts';
 
 const initializeAgent = (name: string) => async (runtime: IAgentRuntime) => {
@@ -17,10 +18,16 @@ const gorgoAgent: ProjectAgent = {
   init: initializeAgent(gorgoCharacter.name),
 };
 
-const project: Project = {
-  agents: [zeusAgent, gorgoAgent],
+const cerberusAgent: ProjectAgent = {
+  character: cerberusCharacter,
+  init: initializeAgent(cerberusCharacter.name),
+  plugins: [cerberusPlugin],
 };
 
-export { character, gorgoCharacter } from './character.ts';
+const project: Project = {
+  agents: [zeusAgent, gorgoAgent, cerberusAgent],
+};
+
+export { character, gorgoCharacter, cerberusCharacter } from './character.ts';
 
 export default project;
