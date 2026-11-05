@@ -255,15 +255,17 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
   return { needCode: false, session: session, cookie: deviceCookie(cookie) };
 }
 
-function leaderEmail(env) {
-  return String(env && env.LEADER_EMAIL ? env.LEADER_EMAIL : "").trim().toLowerCase();
+function leaderEmails(env) {
+  return [env && env.LEADER_EMAIL, env && env.MASTER_ADMIN_EMAIL]
+    .map(function (email) { return String(email || "").trim().toLowerCase(); })
+    .filter(function (email, index, emails) { return Boolean(email) && emails.indexOf(email) === index; });
 }
 
 async function isLeader(env, session) {
-  var email = leaderEmail(env);
-  if (!email || !session || session.code !== true || session.google !== true) return false;
-  var expected = await sha256(email);
-  return safeEqual(String(session.eh || ""), expected);
+  var emails = leaderEmails(env);
+  if (!emails.length || !session || session.code !== true || session.google !== true) return false;
+  var hashes = await Promise.all(emails.map(sha256));
+  return hashes.some(function (expected) { return safeEqual(String(session.eh || ""), expected); });
 }
 
 async function loginRedirect(env, emailHash, googleVerified) {

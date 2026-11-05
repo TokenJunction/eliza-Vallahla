@@ -44,6 +44,28 @@ services:
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
 
+  - type: worker
+    name: valhalla-worker
+    runtime: node
+    plan: starter
+    branch: feat/supabase-redis-health
+    buildCommand: npm install --legacy-peer-deps
+    startCommand: node valhallaWorker.js
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VALHALLA_EXECUTION_MODE
+        value: paper
+      - key: VALHALLA_TRADING_ENABLED
+        value: "false"
+      - key: VALHALLA_SOCIAL_ENABLED
+        value: "false"
+      - key: VALHALLA_KEY_STORAGE_ENABLED
+        value: "false"
+      - key: REDIS_URL
+        sync: false
+
   - type: web
     name: valhalla-site
     runtime: node
