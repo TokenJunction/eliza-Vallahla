@@ -1,0 +1,33 @@
+# Valhalla V35 deployment readiness
+
+## Current deployment boundaries
+
+The public website is a static GitHub Pages site built from `site-build` by `.github/workflows/pages.yml` on `docs/site`. Render hosts the separate ElizaOS backend; the frontend must not be switched to Vercel or have its production DNS changed as part of this deployment.
+
+The ElizaOS runtime is for health reporting and simulated/paper workflows only. It must not store wallet private keys, sign transactions, submit trades, or autonomously post to social accounts. Trading, social dispatch, private-key storage, and Zeus idle jobs are explicitly off by default.
+
+## Local setup
+
+1. Use Node.js 23.3 or newer and Bun, as required by the current ElizaOS CLI.
+2. Install the static-site dependencies with `npm install` in the repository root and the ElizaOS project dependencies with `bun install` in `valhalla-elizaos`.
+3. Copy `.env.production.example` into the deployment provider's secret manager. Never commit populated environment files.
+4. Run `npm run build` and `npm test` from the repository root.
+5. Apply `supabase/migrations/20261105000000_valhalla_v35_foundation.sql` only after linking the intended Supabase project and reviewing the migration.
+
+The database policies use Supabase's authenticated `auth.uid()` claim, not an email address supplied by a client. Vault audit records are service-role-only. The service-role key must never be exposed to a browser.
+
+## Hosting setup
+
+- **GitHub Pages:** `.github/workflows/pages.yml` publishes the static website from `docs/site`. It does not deploy Workers or the ElizaOS runtime.
+- **Render:** `render.yaml` describes a separate Docker service with auto-deploy disabled and a public `/api/valhalla/health` check. Its free plan may sleep when idle and is not suitable for an always-on production service. The runtime exposes read-only Zeus and Gorgo agent definitions; these are not authenticated admin access or per-user sandboxes.
+- **Model providers:** the ElizaOS runtime loads the OpenAI and Google GenAI plugins only when their corresponding API keys are set. No social plugins, wallet integrations, or transaction executors are installed.
+- **Supabase:** provision and link the intended project before applying the migration.
+- **Upstash and model providers:** credentials in `.env.production.example` are blank. Add only the provider credentials the configured agent actually uses.
+
+The owner address is configured only as a server-side `LEADER_EMAIL` secret. Owner operations require both a server-verified Google identity and the sign-in code; an email-only login does not grant owner access. An unset secret fails closed.
+
+## Not included in this deployment
+
+No Supabase, Render, Vercel, or Upstash resources are provisioned by this repository. No production API keys, OAuth redirect changes, signing keys, transaction executor, X/Twitter dispatcher, or automated social-posting credentials are configured. Financial chart views must use real, labeled source data; placeholder or simulated values must not be presented as live P&L.
+
+The Render service is not production-ready until its required secrets and model credentials are supplied, a deployment is explicitly initiated, and its health endpoint is verified. The current runtime reports capabilities as disabled; it does not implement trading, key storage, social dispatch, per-user sandbox provisioning, or Zeus idle jobs.

@@ -1,6 +1,8 @@
 (function () {
   var KEY = "valhalla-hive";
   var worker = null;
+  var starting = false;
+  var joining = false;
 
   function cfg() {
     return window.VALHALLA_SITE || {};
@@ -25,30 +27,45 @@
 
   function paint() {
     var state = read();
+    var canRun = state.optIn === true && !joining && !starting && !worker && !document.hidden;
     ["hiveOpt", "hiveOptSettings"].forEach(function (id) {
       var box = document.getElementById(id);
       if (box) box.checked = state.optIn === true;
+    });
+    ["hiveRun", "hiveRunSettings"].forEach(function (id) {
+      var button = document.getElementById(id);
+      if (button) button.disabled = !canRun;
     });
     var slider = document.getElementById("hiveThrottle");
     if (slider) {
       slider.disabled = state.optIn !== true;
       if (state.cap) slider.value = String(state.cap);
     }
-    say("hiveFlag", state.optIn ? "This tab is a Hive node while it stays open." : "Hive is off. This tab does no extra work until you opt in.");
-    say("hiveFlagSettings", state.optIn ? "Opted in for this tab. Closing the tab stops the work." : "Hive is off until you opt in. It stops when you close the tab.");
+    var consentStatus = worker || starting
+      ? "One simulated paper job is running. No follow-up job will start automatically."
+      : joining
+        ? "Connecting to the configured Hive service after your click…"
+      : state.optIn
+        ? "Consent is on for this tab. No job runs until you click Run one simulated job."
+        : "Hive is off. Nothing runs until you opt in and click Run one simulated job.";
+    say("hiveFlag", consentStatus);
+    say("hiveFlagSettings", consentStatus);
     say("hiveMeter", "Impact: " + (state.optIn ? (state.paused ? "paused" : "on") : "off")
       + ". Jobs " + Number(state.jobs || 0)
       + ". Verified " + Number(state.verified || 0)
       + ". Engine " + (state.engine || "—")
-      + ". CPU cap " + (state.cap || 25) + "%."
+      + ". CPU work-slice target " + (state.cap || 25) + "%; not a device-wide cap."
       + " Unverified results are not used.");
     say("hivePoints", "Contribution points: " + Number(state.points || 0) + ". Not transferable. No cash value.");
     var payout = document.getElementById("payoutLink");
     if (payout) payout.disabled = cfg().REWARDS_PAYOUT_ENABLED !== true;
+    window.dispatchEvent(new CustomEvent("valhalla-hive-updated"));
   }
 
   function stop(reason) {
     if (worker) {
+      worker.onmessage = null;
+      worker.onerror = null;
       worker.terminate();
       worker = null;
     }
@@ -100,76 +117,98 @@
         simulated: true
       })
     });
-    if (!response.ok) return;
+    if (!response.ok) return false;
     var body = await response.json();
+    if (!body || body.ok !== true || !Number.isFinite(Number(body.points))) return false;
     var state = read();
-    if (Number.isFinite(Number(body.points))) state.points = Number(body.points);
+    state.points = Number(body.points);
     write(state);
     paint();
+    return true;
   }
 
-  async function engineName() {
-    if (!navigator.gpu) return "cpu";
-    try {
-      var adapter = await navigator.gpu.requestAdapter();
-      return adapter ? "gpu" : "cpu";
-    } catch (err) {
-      return "cpu";
+  async function nextJob() {
+    var base = String(cfg().HIVE_URL || "").replace(/\/$/, "");
+    var response = await fetch(base + "/hive/next", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ nodeId: read().nodeId })
+    });
+    if (!response.ok) throw new Error("The Hive did not provide a job (HTTP " + response.status + ").");
+    var job = await response.json();
+    if (!job || job.simulated !== true || !job.id || !Array.isArray(job.series) || !job.params) {
+      throw new Error("The Hive returned an invalid simulated job.");
     }
-  }
-
-  function localJob() {
-    var kinds = ["backtest", "paper", "sweep", "score"];
-    var state = read();
-    var kind = kinds[Number(state.jobs || 0) % kinds.length];
-    return {
-      id: "public-" + kind + "-" + Date.now(),
-      kind: kind,
-      simulated: true,
-      series: [100, 101, 100.4, 99.2, 100.1, 100.8, 99.6],
-      params: { stopPct: 15, takePct: 30, size: 0.05 }
-    };
+    return job;
   }
 
   async function runJob() {
-    var why = pausedByDevice() || await batteryPause();
-    if (why) {
-      stop(why);
-      return;
-    }
-    var job = localJob();
-    var engine = await engineName();
-    worker = new Worker("hive-worker.js");
-    worker.onmessage = async function (event) {
-      var result = event.data || {};
-      var state = read();
-      state.jobs = Number(state.jobs || 0) + 1;
-      state.engine = result.engine || engine;
-      state.pending = result.jobId;
-      write(state);
-      if (enabled() && state.nodeId) {
-        try { await finish(job, result); state = read(); state.verified = Number(state.verified || 0) + 1; write(state); }
-        catch (err) { state.verified = state.verified || 0; }
+    if (starting || worker || !read().optIn || !read().nodeId || !enabled()) return;
+    starting = true;
+    try {
+      var why = pausedByDevice() || await batteryPause();
+      if (why) {
+        stop(why);
+        return;
       }
+      var job = await nextJob();
+      if (!read().optIn || document.hidden) return;
+      var current = new Worker("hive-worker.js");
+      worker = current;
+      current.onmessage = async function (event) {
+        if (worker !== current) return;
+        var result = event.data || {};
+        var state = read();
+        state.jobs = Number(state.jobs || 0) + 1;
+        state.engine = "cpu";
+        state.pending = result.jobId;
+        write(state);
+        try {
+          if (await finish(job, result)) {
+            state = read();
+            state.verified = Number(state.verified || 0) + 1;
+            write(state);
+          } else {
+            say("hiveFlag", "The Hive did not verify this result. It was not counted as verified.");
+          }
+        } catch (err) {
+          say("hiveFlag", "Could not submit the simulated result. It was not counted as verified.");
+        }
+        current.terminate();
+        worker = null;
+        paint();
+        if (read().optIn && !document.hidden) {
+          nextTimer = setTimeout(function () {
+            nextTimer = 0;
+            runJob();
+          }, 1000);
+        }
+      };
+      current.onerror = function () {
+        current.terminate();
+        if (worker === current) worker = null;
+        stop("The local simulated job failed. No result was submitted.");
+      };
+      current.postMessage({ job: job, cap: Number(read().cap) || 25, engine: "cpu" });
+    } catch (err) {
+      var state = read();
+      state.optIn = false;
+      state.active = false;
+      write(state);
+      stop("Hive work stopped: " + String(err && err.message || "the job could not be loaded"));
+    } finally {
+      starting = false;
       paint();
-      worker.terminate();
-      worker = null;
-      if (read().optIn) setTimeout(runJob, 1000);
-    };
-    worker.postMessage({ job: job, cap: Number(read().cap) || 25, engine: engine });
+    }
   }
 
   async function join() {
-    if (!enabled()) {
-      paint();
-      return;
-    }
     var token = "";
     var input = document.querySelector("[name='cf-turnstile-response']");
     if (input) token = input.value;
     if (!token) {
       say("hiveFlag", "A human check is required before you join.");
-      return;
+      return false;
     }
     var slider = document.getElementById("hiveThrottle");
     var cap = slider ? Number(slider.value) : 25;
@@ -180,34 +219,64 @@
     });
     if (!response.ok) {
       say("hiveFlag", "The Hive did not accept this browser.");
-      return;
+      return false;
     }
     var body = await response.json();
     var state = read();
+    if (!state.optIn || !body.nodeId) return false;
     state.active = true;
     state.nodeId = body.nodeId;
     state.cap = Math.min(50, Math.max(25, cap));
     write(state);
     paint();
-    runJob();
+    return true;
   }
 
   function setOpt(on) {
     var state = read();
-    state.optIn = on === true;
-    state.active = state.optIn;
-    if (!state.optIn) {
+    if (on !== true) {
+      state.optIn = false;
+      state.active = false;
       write(state);
       stop("Hive stopped.");
       return;
     }
+    if (!enabled()) {
+      state.optIn = false;
+      state.active = false;
+      write(state);
+      paint();
+      say("hiveFlag", "The Hive service is not configured. No work was started.");
+      return;
+    }
     var slider = document.getElementById("hiveThrottle");
     state.cap = slider ? Math.min(50, Math.max(25, Number(slider.value) || 25)) : 25;
+    state.optIn = true;
+    state.active = false;
     state.jobs = state.jobs || 0;
     state.verified = state.verified || 0;
     write(state);
     paint();
-    runJob();
+    say("hiveFlag", "Consent saved for this tab. No work or network request starts until you click Run one simulated job.");
+  }
+
+  async function runOnce() {
+    if (!read().optIn || joining || starting || worker) return;
+    joining = true;
+    paint();
+    try {
+      var reason = pausedByDevice() || await batteryPause();
+      if (reason) {
+        say("hiveFlag", reason);
+        return;
+      }
+      if (await join()) runJob();
+    } catch (err) {
+      say("hiveFlag", "Hive could not be joined: " + String(err && err.message || "request failed"));
+    } finally {
+      joining = false;
+      paint();
+    }
   }
 
   function boot() {
@@ -221,6 +290,10 @@
       if (!box) return;
       box.checked = false;
       box.addEventListener("change", function () { setOpt(box.checked); });
+    });
+    ["hiveRun", "hiveRunSettings"].forEach(function (id) {
+      var button = document.getElementById(id);
+      if (button) button.addEventListener("click", runOnce);
     });
     var slider = document.getElementById("hiveThrottle");
     if (slider) slider.addEventListener("input", function () {
@@ -244,13 +317,14 @@
       var state = read();
       state.paused = false;
       write(state);
-      runJob();
+      paint();
     });
     window.addEventListener("pagehide", function () { stop(); });
     if (navigator.getBattery) {
       navigator.getBattery().then(function (battery) {
         battery.addEventListener("chargingchange", function () {
           if (!battery.charging && read().optIn) stop("This device is on battery. The Hive is paused.");
+          else if (battery.charging && read().optIn && !document.hidden) paint();
         });
       }).catch(function () {});
     }

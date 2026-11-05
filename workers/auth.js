@@ -1,13 +1,19 @@
 /**
  * Google ID-token check and email codes.
  * Secrets stay in the Worker: GOOGLE_CLIENT_ID, DEVICE_COOKIE_SECRET,
- * ADMIN_WALLETS, RESEND_API_KEY, and the AUTH_KV id.
+ * RESEND_API_KEY and the AUTH_KV id.
  * The code is emailed and stored only as a hash. It is not logged.
  */
 import { browserName, codeDecision, needSecondFactor, validEmail } from "./auth-logic.js";
 
 var ALLOWED = ["https://valhalla-app.xyz", "https://www.valhalla-app.xyz"];
 var TEXT = new TextEncoder();
+var CHAT_MODELS = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1-nano"];
+var ENGAGEMENT_EVENTS = [
+  "page_view", "paper_start", "paper_pause", "paper_stop", "chat_send",
+  "settings_open", "upgrade_open", "load_under_1s", "load_1_3s",
+  "load_3_5s", "load_over_5s"
+];
 
 function cors(request) {
   var origin = request.headers.get("Origin") || "";
@@ -167,7 +173,7 @@ async function limited(env, key, max) {
   return true;
 }
 
-async function startCode(env, email, request) {
+async function startCode(env, email, request, googleVerified) {
   var emailHash = await sha256(email);
   var ip = request.headers.get("CF-Connecting-IP") || "";
   var ipHash = await sha256(ip || "none");
@@ -187,6 +193,7 @@ async function startCode(env, email, request) {
     salt: salt,
     hash: await sha256(code + ":" + salt + ":" + email),
     attempts: 0,
+    googleVerified: googleVerified === true,
     exp: Date.now() + 10 * 60 * 1000
   }), { expirationTtl: 600 });
   return { ok: true };
@@ -206,10 +213,10 @@ async function checkCode(env, email, code) {
     return { ok: false, error: record.attempts >= 5 ? "locked" : "code" };
   }
   await env.AUTH_KV.delete(key);
-  return { ok: true, emailHash: emailHash };
+  return { ok: true, emailHash: emailHash, googleVerified: record.googleVerified === true };
 }
 
-async function sessionFor(env, emailHash, request, codeThisLogin) {
+async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified) {
   var account = await accountOf(env, emailHash);
   var ipHash = await sha256(request.headers.get("CF-Connecting-IP") || "none");
   var existing = await readToken(env.DEVICE_COOKIE_SECRET, cookieHeader(request));
@@ -237,9 +244,31 @@ async function sessionFor(env, emailHash, request, codeThisLogin) {
   account.signins.unshift({ at: now, city: place(request), browser: device.browser, ok: true });
   await saveAccount(env, emailHash, account);
   var exp = now + 12 * 60 * 60 * 1000;
-  var session = await issue(env.DEVICE_COOKIE_SECRET, { eh: emailHash, did: did, exp: exp, code: codeThisLogin === true });
+  var session = await issue(env.DEVICE_COOKIE_SECRET, {
+    eh: emailHash,
+    did: did,
+    exp: exp,
+    code: codeThisLogin === true,
+    google: googleVerified === true
+  });
   var cookie = await issue(env.DEVICE_COOKIE_SECRET, { eh: emailHash, did: did, exp: now + 30 * 24 * 60 * 60 * 1000 });
   return { needCode: false, session: session, cookie: deviceCookie(cookie) };
+}
+
+function leaderEmail(env) {
+  return String(env && env.LEADER_EMAIL ? env.LEADER_EMAIL : "").trim().toLowerCase();
+}
+
+async function isLeader(env, session) {
+  var email = leaderEmail(env);
+  if (!email || !session || session.code !== true || session.google !== true) return false;
+  var expected = await sha256(email);
+  return safeEqual(String(session.eh || ""), expected);
+}
+
+async function loginRedirect(env, emailHash, googleVerified) {
+  var leader = await isLeader(env, { eh: emailHash, code: true, google: googleVerified === true });
+  return leader ? "/admin/master-control/" : "/dashboard/analytics/";
 }
 
 function bearer(request) {
@@ -262,46 +291,6 @@ async function googleInfo(env, credential) {
   return { email: String(info.email).toLowerCase(), name: String(info.name || ""), picture: String(info.picture || "") };
 }
 
-function b58(text) {
-  var alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  var bytes = [0];
-  for (var i = 0; i < text.length; i += 1) {
-    var value = alphabet.indexOf(text[i]);
-    if (value < 0) return new Uint8Array();
-    var carry = value;
-    for (var j = 0; j < bytes.length; j += 1) {
-      carry += bytes[j] * 58;
-      bytes[j] = carry & 0xff;
-      carry >>= 8;
-    }
-    while (carry > 0) {
-      bytes.push(carry & 0xff);
-      carry >>= 8;
-    }
-  }
-  var zeros = 0;
-  while (zeros < text.length && text[zeros] === "1") zeros += 1;
-  var out = new Uint8Array(zeros + bytes.length);
-  for (var k = 0; k < bytes.length; k += 1) out[out.length - 1 - k] = bytes[k];
-  return out;
-}
-
-async function leaderProof(env, body) {
-  var allow = String(env.ADMIN_WALLETS || "").split(",").map(function (item) { return item.trim(); }).filter(Boolean);
-  var pubkey = String(body.pubkey || "");
-  var message = String(body.message || "");
-  if (!allow.length || allow.indexOf(pubkey) < 0) return false;
-  if (message.indexOf("Sign in to Valhalla") < 0 || message.indexOf("This is not a transaction.") < 0) return false;
-  if (message.indexOf(pubkey) < 0) return false;
-  var exp = Date.parse((message.match(/Expiration Time: (.+)/) || [])[1] || "");
-  if (!Number.isFinite(exp) || exp < Date.now()) return false;
-  var pub = b58(pubkey);
-  var sig = Uint8Array.from(atob(String(body.signature || "")), function (char) { return char.charCodeAt(0); });
-  if (pub.length !== 32 || sig.length !== 64) return false;
-  var key = await crypto.subtle.importKey("raw", pub, { name: "Ed25519" }, false, ["verify"]);
-  return crypto.subtle.verify("Ed25519", key, sig, TEXT.encode(message));
-}
-
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(request) });
@@ -317,13 +306,21 @@ export default {
       var account = await accountOf(env, emailHash);
       if (body.alwaysAsk === true) account.alwaysAsk = true;
       await saveAccount(env, emailHash, account);
-      var next = await sessionFor(env, emailHash, request, false);
+      var next = await sessionFor(env, emailHash, request, false, true);
       if (next.needCode) {
-        var sent = await startCode(env, info.email, request);
+        var sent = await startCode(env, info.email, request, true);
         if (!sent.ok) return json(sent, sent.error === "rate" ? 429 : 503, request);
         return json({ ok: true, needCode: true, email: info.email, name: info.name, picture: info.picture }, 200, request);
       }
-      return json({ ok: true, needCode: false, email: info.email, name: info.name, picture: info.picture, session: next.session }, 200, request, { "set-cookie": next.cookie });
+      return json({
+        ok: true,
+        needCode: false,
+        email: info.email,
+        name: info.name,
+        picture: info.picture,
+        session: next.session,
+        redirect: await loginRedirect(env, emailHash, true)
+      }, 200, request, { "set-cookie": next.cookie });
     }
     if (url.pathname === "/auth/email/start" && request.method === "POST") {
       var email = String(body.email || "").toLowerCase().trim();
@@ -334,28 +331,82 @@ export default {
         existing.alwaysAsk = true;
         await saveAccount(env, hash, existing);
       }
-      var started = await startCode(env, email, request);
+      var started = await startCode(env, email, request, false);
       return json(started.ok ? { ok: true } : started, started.ok ? 200 : started.error === "rate" ? 429 : 503, request);
     }
     if (url.pathname === "/auth/email/verify" && request.method === "POST") {
       var checkEmail = String(body.email || "").toLowerCase().trim();
       var checked = await checkCode(env, checkEmail, String(body.code || ""));
       if (!checked.ok) return json({ ok: false, error: checked.error }, 401, request);
-      var ready = await sessionFor(env, checked.emailHash, request, true);
-      return json({ ok: true, needCode: false, email: checkEmail, session: ready.session }, 200, request, { "set-cookie": ready.cookie });
+      var ready = await sessionFor(env, checked.emailHash, request, true, checked.googleVerified);
+      return json({
+        ok: true,
+        needCode: false,
+        email: checkEmail,
+        session: ready.session,
+        redirect: await loginRedirect(env, checked.emailHash, checked.googleVerified)
+      }, 200, request, { "set-cookie": ready.cookie });
+    }
+    if (url.pathname === "/auth/chat-config" && request.method === "GET") {
+      var config = JSON.parse((await env.AUTH_KV.get("manager:chat-config")) || "{}");
+      var model = CHAT_MODELS.indexOf(config.model) >= 0 ? config.model : CHAT_MODELS[0];
+      return json({ provider: "openai", model: model, models: CHAT_MODELS }, 200, request);
     }
     var session = await readToken(env.DEVICE_COOKIE_SECRET, bearer(request));
     if (!session) return json({ ok: false, error: "session" }, 401, request);
+    if (url.pathname === "/auth/access" && request.method === "GET") {
+      var account = await accountOf(env, session.eh);
+      var subscriber = account.plan === "pro";
+      var leader = await isLeader(env, session);
+      return json({
+        ok: true,
+        plan: subscriber ? "pro" : "free",
+        subscriber: subscriber,
+        leader: leader
+      }, 200, request);
+    }
     if (url.pathname === "/auth/leader" && request.method === "POST") {
-      var isLeader = await leaderProof(env, body);
-      var must = needSecondFactor({
-        knownDevice: true,
-        knownIp: true,
-        alwaysAsk: false,
-        leader: isLeader,
-        codeThisLogin: session.code === true
-      });
-      return json({ ok: true, role: isLeader ? "leader" : "member", needCode: must }, 200, request);
+      var leader = await isLeader(env, session);
+      return json({ ok: true, role: leader ? "leader" : "member" }, 200, request);
+    }
+    if (url.pathname === "/auth/chat-config" && request.method === "POST") {
+      if (!(await isLeader(env, session))) return json({ ok: false, error: "leader-required" }, 403, request);
+      var model = String(body.model || "");
+      if (CHAT_MODELS.indexOf(model) < 0) return json({ ok: false, error: "unsupported-model" }, 400, request);
+      await env.AUTH_KV.put("manager:chat-config", JSON.stringify({
+        provider: "openai",
+        model: model,
+        updatedAt: new Date().toISOString()
+      }));
+      return json({ ok: true, provider: "openai", model: model }, 200, request);
+    }
+    if (url.pathname === "/auth/engagement" && request.method === "POST") {
+      if (session.code !== true || body.analyticsConsent !== true) {
+        return json({ ok: false, error: "analytics-consent-required" }, 403, request);
+      }
+      var eventName = String(body.event || "");
+      if (ENGAGEMENT_EVENTS.indexOf(eventName) < 0) {
+        return json({ ok: false, error: "unsupported-event" }, 400, request);
+      }
+      var day = new Date().toISOString().slice(0, 10);
+      var key = "engagement:" + day + ":" + eventName;
+      var count = Number(await env.AUTH_KV.get(key)) || 0;
+      await env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 691200 });
+      return json({ ok: true }, 202, request);
+    }
+    if (url.pathname === "/auth/engagement" && request.method === "GET") {
+      if (!(await isLeader(env, session))) return json({ ok: false, error: "leader-required" }, 403, request);
+      var days = [];
+      for (var offset = 6; offset >= 0; offset -= 1) {
+        var date = new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10);
+        var row = { date: date };
+        for (var i = 0; i < ENGAGEMENT_EVENTS.length; i += 1) {
+          var eventName = ENGAGEMENT_EVENTS[i];
+          row[eventName] = Number(await env.AUTH_KV.get("engagement:" + date + ":" + eventName)) || 0;
+        }
+        days.push(row);
+      }
+      return json({ days: days, approximate: true }, 200, request);
     }
     if (url.pathname === "/auth/devices" && request.method === "GET") {
       var account = await accountOf(env, session.eh);

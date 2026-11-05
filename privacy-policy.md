@@ -1,6 +1,6 @@
 # Valhalla privacy policy
 
-Effective date: November 3, 2026
+Effective date: November 4, 2026
 
 TokenJunction LLC publishes Valhalla. TokenJunction LLC owns Valhalla. This policy covers the Valhalla website, the Pro web portal, the Android, iOS, and Windows apps, the Chrome extension, the Telegram bot, and the Brain API.
 
@@ -13,7 +13,7 @@ This page does not include an EIN or a street address.
 These are the Limited Use statements for user data. They apply to the Chrome extension and to every other Valhalla app in this policy.
 
 - We do not sell user data.
-- We do not transfer user data to third parties except as needed to provide the service, or as required by law. The named processors are Lemon Squeezy for payments, Google for sign-in and AdMob, Cloudflare for hosting, and Solana RPC providers for public balances.
+- We do not transfer user data to third parties except as needed to provide the service, or as required by law. The named processors include Lemon Squeezy for payments, Google for sign-in and AdMob, Cloudflare for hosting, DeepSeek for Thales chat when enabled, DexScreener for public market data, and Solana RPC providers for public balances.
 - We do not use or transfer user data for purposes unrelated to the item's single purpose.
 - We do not use or transfer user data to determine creditworthiness or for lending.
 - Humans do not read user data except with your consent, for security, or when the law requires it.
@@ -29,6 +29,8 @@ We collect only what the service needs:
 - Settings and watchlists that you save.
 - A license key, or the end of that key, so we can turn Pro on. We do not collect your card number. Lemon Squeezy processes the payment.
 - Usage and diagnostics, such as whether a request failed and how many API calls a key made.
+- If you opt into Analytics, approximate daily counts of signed-in page views, selected feature actions, and coarse browser load-time bands. These counts contain no message text, wallet, email, or per-user history and expire after eight days.
+- If Thales chat is enabled, the current message and up to eight recent turns held in browser memory are sent through Cloudflare to DeepSeek to generate a response. The desk chat does not write conversation history to local storage. The chat request does not include your sign-in email or display name. Cloudflare processes request metadata, including IP address, for rate limiting and security. Do not submit personal information, credentials, or confidential client details. DeepSeek's own current privacy and processing terms apply to submitted text.
 - On the free plan only, an advertising identifier through Google AdMob, and only after the consent screen. Pro has no ads.
 
 ## What we never collect
@@ -54,9 +56,11 @@ We use these processors only to provide Valhalla:
 - Lemon Squeezy, for payments and license checks
 - Google, for sign-in and, on the free plan, AdMob
 - Cloudflare, for hosting the Brain API and the portal
+- DeepSeek, to generate Thales chat responses when the feature is enabled
+- DexScreener, to retrieve public token and pair market data for relevant questions
 - Solana RPC providers, such as a public RPC or a provider you choose, to read public balances
 
-We do not allow these processors to use the data for their own purposes. Their own privacy policies apply to their services.
+Each provider's own current privacy and processing terms apply to its service. Review those terms before sharing information. The chat request does not include a Valhalla account email or display name.
 
 ## Ads
 

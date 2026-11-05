@@ -36,7 +36,7 @@ onmessage = function (event) {
       kind: String(job && job.kind || "paper"),
       cash: Math.round(cash * 10000) / 10000,
       n: steps,
-      engine: event.data && event.data.engine === "gpu" ? "gpu" : "cpu",
+      engine: "cpu",
       simulated: true
     });
   }

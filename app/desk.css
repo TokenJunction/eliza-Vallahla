@@ -1,29 +1,30 @@
 :root {
-  --bg: #050507; --panel: #0a0a0e; --line: #1c1a16;
-  --amber: #ff9a1f; --amber2: #ffb347; --green: #00ff88; --red: #ff3b4a;
-  --muted: #7a7468; --text: #f2ead8;
+  --bg: #02070b; --bg-strong: #040b12; --panel: rgba(10, 14, 18, .92); --panel-2: #0b1218; --line: rgba(146, 162, 168, .22);
+  --amber: #ffb250; --amber2: #ffc66d; --green: #2ff3b3; --green-strong: #0fe7a1; --red: #ff5d6c; --muted: #7b8c95; --text: #e7f0f3;
+  --shadow: 0 0 0 1px rgba(47, 243, 179, .08), 0 0 28px rgba(15, 231, 161, .08);
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: #050507; color: var(--text); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+html, body { margin: 0; background: radial-gradient(circle at top, rgba(25, 56, 54, .25), transparent 30%), var(--bg); color: var(--text); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+body[data-page="app"] { min-height: 100vh; }
 button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
-.gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: radial-gradient(ellipse at 15% 0%, rgba(255,154,31,.12), transparent 45%), #050507; }
+.gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: radial-gradient(ellipse at 15% 0%, rgba(255,154,31,.12), transparent 45%), var(--bg); }
 .gate[hidden], #desk[hidden], .settings[hidden] { display: none !important; }
-.card { width: min(520px, 100%); border: 1px solid var(--line); background: #0a0a0e; padding: 22px; }
+.card { width: min(520px, 100%); border: 1px solid var(--line); background: rgba(8, 12, 17, .94); padding: 22px; box-shadow: var(--shadow); }
 .card h1 { margin: 0 0 8px; color: var(--amber2); letter-spacing: .16em; font-size: 22px; }
 .note { color: var(--muted); }
 .login-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 #emailCode { letter-spacing: .4em; font-size: 22px; width: 100%; background: #100e0a; color: #f2ead8; border: 1px solid #ffb347; padding: 8px; }
 .device-row { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #1c1a16; padding: 6px 0; }
-.login-stack button, #googleBtn { display: flex; align-items: center; gap: 10px; width: 100%; background: #100e0a; color: var(--amber2); border: 1px solid rgba(255,154,31,.45); padding: 8px 12px; text-align: left; }
-.hud { display: grid; grid-template-rows: 56px 1fr 28px; height: 100vh; padding: 10px 12px 6px; gap: 8px; }
-.topbar { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); background: linear-gradient(180deg, #0f0e0b, #0a0908); padding: 6px 12px; position: relative; overflow: hidden; }
+.login-stack button, #googleBtn { display: flex; align-items: center; gap: 10px; width: 100%; background: rgba(15, 21, 24, .9); color: var(--amber2); border: 1px solid rgba(255,154,31,.45); padding: 8px 12px; text-align: left; }
+.hud { display: grid; grid-template-rows: 64px 1fr 28px; height: 100vh; padding: 12px 14px 8px; gap: 8px; background: var(--bg); }
+.topbar { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(10,15,18,.95), rgba(4,7,10,.94)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.02), 0 0 0 1px rgba(255,255,255,.02); padding: 6px 12px; position: relative; overflow: hidden; }
 .topbar::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: linear-gradient(var(--amber), var(--green)); }
-.logo-mech { width: 40px; height: 40px; object-fit: contain; }
+.logo-mech { width: 38px; height: 38px; object-fit: contain; filter: drop-shadow(0 0 14px rgba(255, 179, 71, .35)); }
 .word { display: flex; flex-direction: column; line-height: 1.05; }
-.word strong { color: var(--amber2); letter-spacing: .16em; }
-.word span, .sub { color: var(--muted); font-size: 9px; letter-spacing: .14em; }
-.badge { font-size: 9px; padding: 3px 8px; border: 1px solid rgba(255,154,31,.4); color: var(--amber2); letter-spacing: .12em; }
-.tape { flex: 1; overflow: hidden; white-space: nowrap; font-size: 10px; color: var(--muted); }
+.word strong { color: var(--amber2); letter-spacing: .18em; font-size: 14px; text-transform: uppercase; }
+.word span, .sub { color: var(--muted); font-size: 9px; letter-spacing: .12em; text-transform: lowercase; }
+.badge { font-size: 9px; padding: 3px 8px; border: 1px solid rgba(255,154,31,.4); color: var(--amber2); letter-spacing: .12em; text-transform: uppercase; }
+.tape { flex: 1; overflow: hidden; white-space: nowrap; font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: lowercase; }
 .chip { position: relative; }
 .chip > button { background: transparent; color: var(--text); border: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
 .menu { position: absolute; right: 0; top: 46px; background: #0a0a0e; border: 1px solid var(--line); min-width: 180px; z-index: 5; }
@@ -57,6 +58,11 @@ button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 #useOnFile { display: flex; width: 100%; margin-top: 8px; background: #100e0a; color: var(--amber2); border: 1px solid rgba(255,154,31,.45); padding: 8px 12px; }
 #botForm label, #magicForm label { display: block; margin: 6px 0; color: var(--muted); font-size: 12px; }
 #botForm input, #botForm select, #botForm textarea, #magicEmail, #botAgent { width: 100%; margin-top: 4px; background: #050507; color: var(--text); border: 1px solid var(--line); padding: 8px; }
+.yolo-panel { margin: 12px 0; padding: 10px; border: 1px solid rgba(255,154,31,.45); background: rgba(255,154,31,.045); }
+.yolo-panel label { display: block; color: var(--muted); font-size: 12px; }
+.yolo-panel input[type="checkbox"] { width: auto; }
+.yolo-panel button { margin: 4px 6px 4px 0; }
+.yolo-panel .kicker { color: var(--amber2); letter-spacing: .12em; }
 #gear { background: transparent; color: var(--amber2); border: 1px solid var(--line); min-width: 44px; padding: 8px; }
 .ticker { overflow: hidden; border-bottom: 1px solid #1c1a16; background: #07080c; color: #cfc6b6; font-size: 12px; }
 .ticker[hidden] { display: none !important; }
@@ -70,8 +76,9 @@ button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   #mechaBoot svg { animation: none; }
 }
-#deskChat { position: fixed; right: 12px; bottom: 36px; width: min(360px, calc(100% - 24px)); max-height: 70vh; z-index: 30; background: #0a0a0e; border: 1px solid #1c1a16; display: flex; flex-direction: column; }
+#deskChat { position: static; width: min(760px, 100%); margin: 0 auto; background: #0a0a0e; border: 1px solid #1c1a16; display: flex; flex-direction: column; }
 #deskChat[hidden] { display: none !important; }
+#chatBody[hidden] { display: none !important; }
 #chatLog { height: 220px; overflow: auto; }
 #chatForm { display: flex; gap: 6px; padding: 8px; }
 #chatText { flex: 1; background: #050507; color: #f2ead8; border: 1px solid #1c1a16; }
@@ -394,6 +401,94 @@ body[data-page="app"] #lab {
   background: rgba(14, 15, 18, .92);
 }
 
+body[data-page="app"] #performancePanel {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 179, 71, .16);
+}
+
+body[data-page="app"] #performancePanel .ph {
+  justify-content: space-between;
+}
+
+body[data-page="app"] #performanceSummary,
+body[data-page="app"] #performanceModels p {
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-page="app"] #performanceHive[data-state="on"] {
+  color: #a4ffd0;
+}
+
+body[data-page="app"] #performanceHive[data-state="off"] {
+  color: #a6a195;
+}
+
+body[data-page="app"] #performanceChart {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 120px;
+  max-height: 220px;
+  margin: 4px 0 8px;
+  overflow: visible;
+}
+
+body[data-page="app"] .performance-grid {
+  stroke: rgba(255, 255, 255, .09);
+  stroke-width: 1;
+}
+
+body[data-page="app"] .performance-axis-line {
+  stroke: rgba(255, 179, 71, .36);
+  stroke-width: 1;
+}
+
+body[data-page="app"] .performance-axis,
+body[data-page="app"] .performance-empty {
+  fill: #b7b1a6;
+  font: 11px "IBM Plex Mono", ui-monospace, monospace;
+}
+
+body[data-page="app"] .performance-bar {
+  opacity: .86;
+}
+
+body[data-page="app"] .performance-bar:hover {
+  opacity: 1;
+}
+
+body[data-page="app"] #performanceModels p {
+  margin: 6px 0;
+  color: #c1bbaf;
+  overflow-wrap: anywhere;
+}
+
+body[data-page="app"] .performance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+body[data-page="app"] .performance-actions button {
+  min-height: 38px;
+}
+
+body[data-theme="day"] #performancePanel .performance-grid {
+  stroke: rgba(28, 20, 12, .14);
+}
+
+body[data-theme="day"] #performancePanel .performance-axis-line {
+  stroke: rgba(117, 75, 20, .45);
+}
+
+body[data-theme="day"] #performancePanel .performance-axis,
+body[data-theme="day"] #performancePanel .performance-empty,
+body[data-theme="day"] #performanceModels p {
+  fill: #4a433a;
+  color: #4a433a;
+}
+
 body[data-page="app"] .foot {
   display: flex;
   flex-wrap: wrap;
@@ -504,11 +599,8 @@ body[data-page="app"] .card form + button {
   }
 
   body[data-page="app"] #deskChat {
-    right: 8px;
-    bottom: 8px;
-    width: calc(100% - 16px);
-    max-height: 75dvh;
-  }
+      width: 100%;
+    }
 
   body[data-page="app"] .foot {
     font-size: 9px;

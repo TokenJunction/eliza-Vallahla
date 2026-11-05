@@ -1,17 +1,26 @@
 (function () {
   var DAY = "valhalla-chat-day";
-  var MEMORY = "valhalla-chat-memory";
+  var conversation = [];
 
   function cfg() { return window.VALHALLA_SITE || {}; }
+  function clock() { return window.performance && window.performance.now ? window.performance.now() : Date.now(); }
+
+  function recordPerformance(started, status, provider, model, firstTextMs, outputChars) {
+    if (!window.ValhallaPerformance) return;
+    window.ValhallaPerformance.record({
+      provider: provider,
+      model: model,
+      durationMs: clock() - started,
+      firstTextMs: firstTextMs,
+      outputChars: outputChars,
+      status: status
+    });
+  }
 
   function secretLike(text) {
     var words = String(text || "").trim().toLowerCase().split(/\s+/);
     if (words.length >= 12 && words.length <= 24 && words.every(function (word) { return /^[a-z]+$/.test(word); })) return true;
     return /[1-9A-HJ-NP-Za-km-z]{64,}/.test(text || "");
-  }
-
-  function safeName(text) {
-    return String(text || "").replace(/[^\w .$-]/g, "").slice(0, 32) || "token";
   }
 
   function limit() {
@@ -26,23 +35,20 @@
     try { return JSON.parse(localStorage.getItem(DAY) || "{}"); } catch (err) { return {}; }
   }
 
-  function say(text) {
+  function speak(text) {
+    if (!text || localStorage.getItem("valhalla-chat-speak") !== "1" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(String(text).slice(0, 1000)));
+  }
+
+  function say(text, silent) {
     var log = document.getElementById("chatLog");
     if (!log) return;
     var row = document.createElement("div");
     row.textContent = text;
     log.appendChild(row);
     log.scrollTop = log.scrollHeight;
-    if (localStorage.getItem("valhalla-chat-speak") === "1" && window.speechSynthesis) {
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text.slice(0, 240)));
-    }
-  }
-
-  function remember(text) {
-    var list = [];
-    try { list = JSON.parse(localStorage.getItem(MEMORY) || "[]"); } catch (err) { list = []; }
-    list.push(String(text).slice(0, 160));
-    localStorage.setItem(MEMORY, JSON.stringify(list.slice(-20)));
+    if (!silent) speak(text);
   }
 
   function card(before, after, apply) {
@@ -117,24 +123,46 @@
   async function remote(text) {
     var base = String(cfg().CHAT_URL || cfg().AGENT_API_URL || "");
     if (!base) return "";
-    var response = await fetch(base.replace(/\/$/, "") + "/chat", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: text.slice(0, 500), plan: "free" })
-    });
-    if (!response.ok || !response.body) return "Assistant offline";
-    var reader = response.body.getReader();
-    var decoder = new TextDecoder();
+    var started = clock();
+    var provider = "unknown";
+    var model = "unreported";
+    var firstTextMs = null;
     var all = "";
-    say("");
-    var node = document.getElementById("chatLog").lastChild;
-    while (true) {
-      var step = await reader.read();
-      if (step.done) break;
-      all += decoder.decode(step.value, { stream: true });
-      node.textContent = all + " SIMULATED where a result is shown. Not financial advice.";
+    try {
+      var response = await fetch(base.replace(/\/$/, "") + "/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: text.slice(0, 500), history: conversation.slice(-8), stream: true })
+      });
+      provider = response.headers.get("x-valhalla-provider") || provider;
+      model = response.headers.get("x-valhalla-model") || model;
+      if (!response.ok) {
+        var error = await response.json().catch(function () { return {}; });
+        throw new Error(String(error.error || "Chat service returned HTTP " + response.status + " (V-CHAT-HTTP)."));
+      }
+      if (!response.body) throw new Error("Chat service returned no response (V-CHAT-EMPTY).");
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      say("", true);
+      var node = document.getElementById("chatLog").lastChild;
+      while (true) {
+        var step = await reader.read();
+        if (step.done) break;
+        var chunk = decoder.decode(step.value, { stream: true });
+        if (chunk && firstTextMs === null) firstTextMs = clock() - started;
+        all += chunk;
+        node.textContent = all + " Not financial advice.";
+      }
+      all += decoder.decode();
+      if (!all.trim()) throw new Error("The assistant returned an empty response (V-CHAT-EMPTY).");
+      node.textContent = all + " Not financial advice.";
+      recordPerformance(started, "ok", provider, model, firstTextMs, all.length);
+      speak(all);
+      return all;
+    } catch (error) {
+      recordPerformance(started, "error", provider, model, firstTextMs, all.length);
+      throw error;
     }
-    return all;
   }
 
   async function send(text) {
@@ -151,15 +179,26 @@
     }
     count.n += 1;
     localStorage.setItem(DAY, JSON.stringify(count));
-    remember(safeName(text));
-    say("You: " + text.slice(0, 500));
+    say("You: " + text.slice(0, 500), true);
     var tool = await localTool(text);
     if (tool) {
       say(tool);
+      conversation.push({ role: "user", content: text.slice(0, 500) });
+      conversation.push({ role: "assistant", content: tool.slice(0, 500) });
+      conversation = conversation.slice(-8);
       return;
     }
-    var answer = await remote(text).catch(function () { return "Assistant offline"; });
-    if (!answer) say("The assistant is temporarily unavailable. Please try again shortly. (V-CHAT)");
+    try {
+      var answer = await remote(text);
+      if (!answer) say("Chat service is not configured. Please try again later. (V-CHAT-CONFIG)");
+      else {
+        conversation.push({ role: "user", content: text.slice(0, 500) });
+        conversation.push({ role: "assistant", content: answer.slice(0, 500) });
+        conversation = conversation.slice(-8);
+      }
+    } catch (error) {
+      say(String(error && error.message || "Chat request failed (V-CHAT-NETWORK)."));
+    }
   }
 
   function boot() {
@@ -167,6 +206,16 @@
     var desk = document.getElementById("desk");
     if (!dock || !desk) return;
     dock.hidden = desk.hidden;
+    var chatBody = document.getElementById("chatBody");
+    var chatToggle = document.getElementById("chatToggle");
+    if (chatBody && chatToggle) {
+      chatToggle.addEventListener("click", function () {
+        var expanded = chatToggle.getAttribute("aria-expanded") === "true";
+        chatBody.hidden = expanded;
+        chatToggle.setAttribute("aria-expanded", String(!expanded));
+        chatToggle.textContent = expanded ? "Open chat" : "Close chat";
+      });
+    }
     document.getElementById("chatForm").addEventListener("submit", function (event) {
       event.preventDefault();
       var input = document.getElementById("chatText");
@@ -177,6 +226,7 @@
     document.getElementById("chatSpeak").addEventListener("click", function () {
       var on = localStorage.getItem("valhalla-chat-speak") === "1";
       localStorage.setItem("valhalla-chat-speak", on ? "0" : "1");
+      if (on && window.speechSynthesis) window.speechSynthesis.cancel();
       this.textContent = on ? "Voice replies off" : "Voice replies on";
     });
     document.getElementById("chatMic").addEventListener("click", function () {

@@ -1,0 +1,16 @@
+/site-build/
+/.wrangler/
+/.vscode/
+/node_modules/
+/__pycache__/
+*.py[cod]
+
+.env
+.env.*
+!.env.production.example
+
+/valhalla-elizaos/node_modules/
+/valhalla-elizaos/.env
+/valhalla-elizaos/.eliza/
+/valhalla-elizaos/dist/
+/valhalla-elizaos/*.tsbuildinfo

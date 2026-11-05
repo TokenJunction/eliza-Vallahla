@@ -2,7 +2,17 @@ from pathlib import Path
 import shutil
 
 out = Path('site-build')
-shutil.copytree('.', out, ignore=shutil.ignore_patterns('.git', '.github', 'site-build'))
+if out.exists():
+    shutil.rmtree(out)
+shutil.copytree(
+    '.',
+    out,
+    ignore=shutil.ignore_patterns(
+        '.git', '.github', '.wrangler', '.vscode', '__pycache__', 'node_modules', 'site-build',
+        '.env', '.env.*', 'package.json', 'package-lock.json', 'bun.lock',
+        'bun.lockb', 'render.yaml', 'valhalla-elizaos', 'supabase'
+    )
+)
 
 gate = out / 'app/gate.js'
 text = gate.read_text()

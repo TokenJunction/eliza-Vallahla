@@ -225,18 +225,6 @@
       link.click();
     });
   }
-  async function leader() {
-    var base = (window.VALHALLA_SITE || {}).AGENT_API_URL || "";
-    if (!base) return;
-    try {
-      var response = await fetch(base.replace(/\/$/, "") + "/session", { method: "GET" });
-      var body = await response.json();
-      if (body && body.role === "leader") {
-        document.getElementById("leaderBadge").hidden = false;
-        document.getElementById("leaderPanel").hidden = false;
-      }
-    } catch (err) { /* Leader mode stays off. */ }
-  }
   document.getElementById("saveAgentWallet").addEventListener("click", function () {
     var value = document.getElementById("agentWallet").value.trim();
     if (value && !window.ValhallaConnect.isPubkey(value)) return;
@@ -265,5 +253,4 @@
   }
   ads();
   lab();
-  leader();
 })();

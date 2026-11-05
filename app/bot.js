@@ -56,9 +56,134 @@
   var paused = false;
   var timer = 0;
   var lastPrice = 0;
+  var priceHistory = [];
+  var yoloAccess = false;
+  var yoloActive = false;
+  var YOLO_PRESET = {
+    risk: "high",
+    maxSol: "0.25",
+    slots: "5",
+    takeProfit: "10",
+    stopLoss: "8",
+    minLiquidity: "10000",
+    minAgeHours: "0.25",
+    copies: "",
+    dailyLoss: "0.25"
+  };
 
   function liveTrading() {
     return (window.VALHALLA_SITE || {}).LIVE_TRADING === true;
+  }
+
+  function paintYolo() {
+    var enable = document.getElementById("yoloEnable");
+    var disable = document.getElementById("yoloDisable");
+    var ack = document.getElementById("yoloRiskAck");
+    var upgrade = document.getElementById("yoloUpgrade");
+    if (enable) enable.disabled = !yoloAccess || !ack || !ack.checked || running || yoloActive;
+    if (disable) {
+      disable.hidden = !yoloActive;
+      disable.disabled = running;
+    }
+    if (ack) {
+      ack.disabled = !yoloAccess || yoloActive || running;
+      if (!yoloActive && !yoloAccess) ack.checked = false;
+    }
+    if (upgrade) upgrade.hidden = yoloAccess;
+  }
+
+  function restoreYoloSettings(account) {
+    if (account && account.yoloStandardBot) apply(account.yoloStandardBot);
+    else apply(null);
+  }
+
+  function lockYolo(noteText) {
+    var account = readAccount();
+    var savedMode = account.bot && account.bot.mode === "yolo";
+    if (yoloActive && running) stopPaper("YOLO access could not be verified; the paper run was stopped.");
+    yoloActive = false;
+    if (savedMode || account.yoloStandardBot) {
+      restoreYoloSettings(account);
+      account.bot = fields();
+      delete account.bot.mode;
+      delete account.yoloStandardBot;
+      writeAccount(account);
+    }
+    var note = document.getElementById("yoloAccess");
+    if (note) note.textContent = noteText;
+    paintYolo();
+    paintStart();
+  }
+
+  async function checkYoloAccess() {
+    var note = document.getElementById("yoloAccess");
+    var token = sessionStorage.getItem("valhalla-auth-token") || "";
+    var base = String((window.VALHALLA_SITE || {}).AUTH_URL || "").replace(/\/$/, "");
+    yoloAccess = false;
+    if (!token || base.indexOf("https://") !== 0) {
+      lockYolo("Sign in and verify an active Pro subscription to use YOLO. The account owner is also allowed.");
+      return;
+    }
+    try {
+      var response = await fetch(base + "/auth/access", {
+        method: "GET",
+        headers: { authorization: "Bearer " + token },
+        credentials: "omit"
+      });
+      if (!response.ok) throw new Error("Access check returned HTTP " + response.status + ".");
+      var access = await response.json();
+      yoloAccess = access.subscriber === true || access.leader === true;
+      var account = readAccount();
+      if (yoloAccess) {
+        if (note) note.textContent = access.leader
+          ? "Owner access verified. YOLO stays paper-only."
+          : "Pro subscription verified. YOLO stays paper-only.";
+        if (account.bot && account.bot.mode === "yolo") apply(account.bot);
+      } else {
+        lockYolo(access.plan === "pro"
+          ? "Access could not be verified for this account."
+          : "YOLO is for Pro subscribers and the account owner. No Pro entitlement is recorded for this account; checkout alone does not unlock it.");
+        return;
+      }
+    } catch (err) {
+      lockYolo("Subscription access could not be verified. YOLO is locked. " + String(err && err.message || err));
+      return;
+    }
+    paintYolo();
+  }
+
+  function enableYolo() {
+    if (!yoloAccess || running) return;
+    var account = readAccount();
+    account.yoloStandardBot = fields();
+    apply(YOLO_PRESET);
+    account.bot = fields();
+    account.bot.mode = "yolo";
+    writeAccount(account);
+    yoloActive = true;
+    priceHistory = [];
+    var note = document.getElementById("yoloAccess");
+    if (note) note.textContent = "YOLO paper mode enabled. Signals are simulated; no orders or live-agent calls are made.";
+    paintYolo();
+    paintStart();
+    log("YOLO paper preset enabled. No order will be sent.");
+  }
+
+  function disableYolo() {
+    if (running) return;
+    var account = readAccount();
+    yoloActive = false;
+    restoreYoloSettings(account);
+    account.bot = fields();
+    delete account.bot.mode;
+    delete account.yoloStandardBot;
+    writeAccount(account);
+    priceHistory = [];
+    var note = document.getElementById("yoloAccess");
+    if (note) note.textContent = "Standard paper settings restored.";
+    paintYolo();
+    paintStart();
+    log("YOLO paper mode disabled.");
   }
 
   function paintStart() {
@@ -69,13 +194,15 @@
     start.disabled = !accepted || running;
     if (note) {
       note.hidden = false;
-      note.textContent = liveTrading()
+      note.textContent = yoloActive
+        ? "YOLO paper mode. Simulated signals only; live-agent calls are bypassed."
+        : liveTrading()
         ? "Live-money trading is on. Start still needs your own agent. This website does not hold the key."
         : "Paper mode. Start uses live prices and sends no order. Live-money trading is off.";
     }
     ["botPause", "botResume"].forEach(function (id) {
       var node = document.getElementById(id);
-      if (!node || liveTrading()) return;
+      if (!node || (liveTrading() && !yoloActive)) return;
       node.disabled = false;
       node.title = id === "botPause" ? "Pause the paper run" : "Resume the paper run";
     });
@@ -104,7 +231,7 @@
     writeAccount(account);
     var box = document.getElementById("botSummary");
     box.hidden = false;
-    box.textContent = "Review: risk " + bot.risk + ", max " + bot.maxSol + " SOL, " + bot.slots + " open, take-profit " + bot.takeProfit + "%, stop " + bot.stopLoss + "%, min liquidity $" + bot.minLiquidity + ", min age " + bot.minAgeHours + "h, daily loss " + bot.dailyLoss + " SOL. Copy list: " + (bot.copies || "none") + ". This is not a promise of profit.";
+    box.textContent = "Review: " + (yoloActive ? "YOLO paper mode, " : "") + "risk " + bot.risk + ", max " + bot.maxSol + " SOL, " + bot.slots + " open, take-profit " + bot.takeProfit + "%, stop " + bot.stopLoss + "%, min liquidity $" + bot.minLiquidity + ", min age " + bot.minAgeHours + "h, daily loss " + bot.dailyLoss + " SOL. Copy list: " + (bot.copies || "none") + ". This is not a promise of profit.";
     log("Settings saved on this account for review.");
   });
 
@@ -142,8 +269,17 @@
     var bot = fields();
     var move = lastPrice && price ? ((price - lastPrice) / lastPrice) : 0;
     lastPrice = price || lastPrice;
-    var skipped = Math.abs(move) < Number(bot.stopLoss) / 1000;
+    if (!running || paused) return;
     var priceText = price ? "$" + price.toFixed(2) + " via " + source : "quiet";
+    if (yoloActive && price) {
+      priceHistory.push(price);
+      if (priceHistory.length > 4) priceHistory.shift();
+      var signal = window.ValhallaYoloLogic.signal(priceHistory, 0.0002);
+      log("SIMULATED YOLO " + signal + ". SOL " + priceText + ". Candidate signal only; no order or position was created.");
+      showPnl("SIMULATED YOLO signal: " + signal + ". No fill or profit/loss is simulated. Live-money trading is off.");
+      return;
+    }
+    var skipped = Math.abs(move) < Number(bot.stopLoss) / 1000;
     if (skipped) log("SIMULATED skip. Live SOL price " + priceText + ". Not financial advice. No order was sent.");
     else log("SIMULATED mark only. Live SOL price " + priceText + ". Size cap " + bot.maxSol + " SOL. Not financial advice. No order was sent.");
     showPnl("SIMULATED result: flat. Live-money trading is off. Not financial advice.");
@@ -152,6 +288,7 @@
   function startPaper() {
     running = true;
     paused = false;
+    if (yoloActive) priceHistory = [];
     light("running");
     log("Paper run started. Live prices only. No order will be sent.");
     var positions = document.getElementById("paperPositions");
@@ -171,6 +308,7 @@
       ctx.stroke();
     }
     paintStart();
+    paintYolo();
     paperTick();
     timer = window.setInterval(paperTick, 20000);
   }
@@ -182,6 +320,14 @@
     light("stopped");
     log(reason || "Paper run stopped. No order was sent.");
     paintStart();
+    paintYolo();
+  }
+
+  function pausePaper() {
+    if (!running || (liveTrading() && !yoloActive) || paused) return false;
+    paused = true;
+    log("Paper run paused. No order was sent.");
+    return true;
   }
 
   document.getElementById("botStart").addEventListener("click", function () {
@@ -191,8 +337,13 @@
       return;
     }
     account.bot = fields();
+    if (yoloActive) account.bot.mode = "yolo";
     account.riskAccepted = true;
     writeAccount(account);
+    if (yoloActive) {
+      startPaper();
+      return;
+    }
     if (liveTrading()) {
       callAgent("/api/start").then(function () {
         light("running");
@@ -207,7 +358,7 @@
   });
 
   document.getElementById("botStop").addEventListener("click", function () {
-    if (!liveTrading()) {
+    if (!liveTrading() || yoloActive) {
       stopPaper("Paper run stopped.");
       return;
     }
@@ -222,26 +373,41 @@
 
   var pauseBtn = document.getElementById("botPause");
   if (pauseBtn) pauseBtn.addEventListener("click", function () {
-    if (!running || liveTrading()) return;
-    paused = true;
-    log("Paper run paused. No order was sent.");
+    pausePaper();
   });
   var resumeBtn = document.getElementById("botResume");
   if (resumeBtn) resumeBtn.addEventListener("click", function () {
-    if (!running || liveTrading()) return;
+    if (!running || (liveTrading() && !yoloActive)) return;
     paused = false;
     log("Paper run resumed. Still simulated.");
   });
 
+  var yoloAck = document.getElementById("yoloRiskAck");
+  if (yoloAck) yoloAck.addEventListener("change", paintYolo);
+  var yoloEnable = document.getElementById("yoloEnable");
+  if (yoloEnable) yoloEnable.addEventListener("click", enableYolo);
+  var yoloDisable = document.getElementById("yoloDisable");
+  if (yoloDisable) yoloDisable.addEventListener("click", disableYolo);
+  var yoloUpgrade = document.getElementById("yoloUpgrade");
+  if (yoloUpgrade) yoloUpgrade.addEventListener("click", function () {
+    var upgrade = document.getElementById("upgradeBtn");
+    if (upgrade) upgrade.click();
+  });
+
   var saved = readAccount();
-  apply(saved.bot);
+  if (saved.bot && saved.bot.mode === "yolo") apply(saved.yoloStandardBot);
+  else apply(saved.bot);
   paintStart();
+  paintYolo();
+  checkYoloAccess();
+  window.addEventListener("focus", checkYoloAccess);
   light("stopped");
   window.ValhallaPaper = {
     running: function () { return running; },
     paused: function () { return paused; },
     start: startPaper,
     stop: stopPaper,
+    pause: pausePaper,
     fields: fields,
     log: log
   };

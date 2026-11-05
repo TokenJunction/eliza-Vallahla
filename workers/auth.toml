@@ -1,9 +1,11 @@
 # Sign-in Worker. Not deployed until the zone email and the client ID are ready.
 # Secrets and ids, never committed:
 #   DEVICE_COOKIE_SECRET      long random string for the device cookie and the session token
-#   ADMIN_WALLETS             comma-separated leader pubkeys
 #   RESEND_API_KEY            only if Cloudflare Email Sending is not onboarded yet
+#   LEADER_EMAIL              Google-authenticated account authorized for manager access
 #   AUTH_KV                   KV namespace id
+# Configure LEADER_EMAIL as a Worker secret; an unset value disables owner access.
+# Set it with: npx wrangler secret put LEADER_EMAIL --config workers/auth.toml
 # Email Sending on the valhalla-app.xyz zone can send to any inbox after the
 # domain is onboarded (Workers Paid). Before that, the EMAIL binding can send
 # only to verified destination addresses. Resend is the fallback.

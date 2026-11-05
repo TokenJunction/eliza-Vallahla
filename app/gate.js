@@ -225,6 +225,10 @@
     } else {
       sessionStorage.setItem("valhalla-code-ok", "1");
       saveSession(accountSession(account));
+      if (body.redirect === "/admin/master-control/" || body.redirect === "/dashboard/analytics/") {
+        window.location.assign(body.redirect);
+        return;
+      }
       openDesk();
     }
   }
@@ -770,19 +774,6 @@
     if (desk && !desk.hidden) {
       balances(packed.pubkey);
       paintMenu(packed.pubkey);
-      return;
-    }
-    if (authBase()) {
-      postAuth("/auth/leader", { pubkey: packed.pubkey, message: packed.message, signature: packed.signature }).then(function (body) {
-        if (body && body.role === "leader") {
-          var badge = document.getElementById("leaderBadge");
-          if (badge) badge.hidden = false;
-        }
-        openDesk();
-      }).catch(function (err) {
-        console.debug("valhalla", "V-AUTH", String(err && err.message || err));
-        openDesk();
-      });
       return;
     }
     openDesk();
