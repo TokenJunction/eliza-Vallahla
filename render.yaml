@@ -49,8 +49,8 @@ services:
     runtime: node
     plan: free
     branch: docs/site
-    buildCommand: npm ci --legacy-peer-deps && python3 scripts/build-site.py
-    startCommand: npm start
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    startCommand: node valhallaMasterEngineV35.js
     healthCheckPath: /healthz
     autoDeploy: false
     envVars:
@@ -75,6 +75,8 @@ services:
       - key: REDIS_URL
         sync: false
       - key: LEADER_EMAIL
+        sync: false
+      - key: MASTER_ADMIN_EMAIL
         sync: false
       - key: SUPABASE_URL
         sync: false

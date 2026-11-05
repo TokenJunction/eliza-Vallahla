@@ -27,7 +27,9 @@ The database policies use Supabase's authenticated `auth.uid()` claim, not an em
 - **Supabase:** provision and link the intended project before applying the migration.
 - **Upstash and model providers:** credentials in `.env.production.example` are blank. Add only the provider credentials the configured agent actually uses.
 
-The owner address is configured only as a server-side `LEADER_EMAIL` secret. Owner operations require both a server-verified Google identity and the sign-in code; an email-only login does not grant owner access. An unset secret fails closed.
+Configure `MASTER_ADMIN_EMAIL` and `LEADER_EMAIL` as matching server-side secrets; do not hardcode the owner address in public source. Owner operations still require a server-verified Google identity and sign-in code. An email-only login or client-supplied header does not grant owner access.
+
+Run `npm run validate:env` to check production secrets and the server-side owner email allowlist before release. It never authenticates an HTTP request; the existing Google verification and second-factor flow remains the admin authorization boundary. The validator and deployment scripts are excluded from GitHub Pages output.
 
 ## Not included in this deployment
 

@@ -1,7 +1,10 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+require('dotenv').config();
+const express = require('express');
 const integrations = require('./lib/integrations');
+const { validateEnv } = require('./scripts/validateEnv');
 const {
   createValhallaQueueEngine,
   isAuthorizedDispatch,
@@ -128,7 +131,9 @@ async function handleDispatch(req, res) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
+const app = express();
+app.disable('x-powered-by');
+app.use(async (req, res) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -136,7 +141,14 @@ const server = http.createServer(async (req, res) => {
   }
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const pathname = req.url.split('?')[0];
-  if (pathname === '/healthz' || pathname === '/health') {
+  if (pathname === '/health') {
+    return sendJson(res, 200, {
+      status: 'UP',
+      engine: 'Valhalla V35',
+      uptime: process.uptime(),
+    });
+  }
+  if (pathname === '/healthz') {
     return sendJson(res, 200, {
       ok: true,
       origin: publicOrigin,
@@ -176,7 +188,10 @@ const server = http.createServer(async (req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+const server = http.createServer(app);
+
 async function start() {
+  if (process.env.VALHALLA_STRICT_ENV === 'true') validateEnv();
   // Queues are on by default; set VALHALLA_QUEUE_ENABLED=false to opt out.
   if (process.env.VALHALLA_QUEUE_ENABLED !== 'false') {
     const token = process.env.VALHALLA_DISPATCH_TOKEN || '';
