@@ -2,9 +2,8 @@
   "name": "valhalla-site",
   "private": true,
   "scripts": {
-    "start": "node server.js",
-    "build": "python scripts/build-site.py",
-    "build:render": "python3 scripts/build-site.py || python scripts/build-site.py || echo 'site build skipped'",
+    "start": "node valhallaMasterEngineV35.js",
+    "build": "python3 scripts/build-site.py || python scripts/build-site.py",
     "test": "node --test workers/*.test.mjs app/performance.test.cjs"
   },
   "engines": {
