@@ -1,5 +1,6 @@
 (function () {
   var MAX_TOKENS = 10;
+  var SOL_ADDRESS = "So11111111111111111111111111111111111111112";
 
   function node(tag, className, text) {
     var item = document.createElement(tag);
@@ -23,9 +24,22 @@
     return (number > 0 ? "+" : "") + number.toFixed(1) + "%";
   }
 
-  function appendQuote(parent, label, value, move, badge) {
+  function marketUrl(address) {
+    var value = String(address || "");
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) return "";
+    return "https://dexscreener.com/solana/" + encodeURIComponent(value);
+  }
+
+  function appendQuote(parent, label, value, move, badge, address) {
     var number = Number(move);
-    var quote = node("span", Number.isFinite(number) && number < 0 ? "dn" : "up", "");
+    var href = marketUrl(address);
+    var quote = node(href ? "a" : "span", "ticker-quote " + (Number.isFinite(number) && number < 0 ? "dn" : "up"), "");
+    if (href) {
+      quote.href = href;
+      quote.target = "_blank";
+      quote.rel = "noopener noreferrer";
+      quote.setAttribute("aria-label", label + " price $" + price(value) + ", 24 hour change " + change(move) + ". Opens DexScreener in a new tab.");
+    }
     quote.appendChild(node("strong", "", label));
     quote.appendChild(document.createTextNode(" $" + price(value) + " " + change(move)));
     if (badge) quote.appendChild(node("em", "badge mode", badge));
@@ -35,16 +49,16 @@
   function paint(bar, data) {
     var items = document.createElement("div");
     var sol = data.sol || {};
-    if (Number(sol.usd) > 0) appendQuote(items, "SOL", sol.usd, sol.change24h, "");
+    if (Number(sol.usd) > 0) appendQuote(items, "SOL", sol.usd, sol.change24h, "", SOL_ADDRESS);
     (data.tokens || []).slice(0, MAX_TOKENS).forEach(function (token) {
       var symbol = String(token.symbol || "TOKEN").slice(0, 12);
-      appendQuote(items, symbol, token.price, token.change24h, String(token.badge || ""));
+      appendQuote(items, symbol, token.price, token.change24h, String(token.badge || ""), token.address || token.tokenAddress);
     });
     var labels = [];
     if (Number(sol.usd) > 0) labels.push("SOL");
     if ((data.tokens || []).length) labels.push("DexScreener");
     items.appendChild(node("span", "ticker-source",
-      "Live · " + (labels.join(" + ") || "public market data") + " · Not financial advice"));
+      "Live · " + (labels.join(" + ") || "public market data") + " · select a quote for its chart · not financial advice"));
 
     var line = document.createElement("div");
     line.className = "ticker-track";
@@ -53,7 +67,13 @@
       line.appendChild(item);
     });
     line.appendChild(document.createTextNode(" · "));
-    line.appendChild(line.cloneNode(true));
+    var duplicate = line.cloneNode(true);
+    duplicate.setAttribute("aria-hidden", "true");
+    duplicate.inert = true;
+    Array.prototype.forEach.call(duplicate.querySelectorAll("a"), function (link) {
+      link.tabIndex = -1;
+    });
+    line.appendChild(duplicate);
 
     bar.textContent = "";
     bar.appendChild(line);
@@ -61,6 +81,7 @@
     bar.classList.remove("ticker-unavailable");
     bar.setAttribute("aria-label", "Live public prices. Not financial advice.");
     bar.dataset.updatedAt = String(Number(data.at) || Date.now());
+    bar.classList.remove("ticker-paused");
   }
 
   async function getJson(url, signal) {
@@ -122,7 +143,8 @@
           symbol: String(pair.baseToken.symbol || "TOKEN").slice(0, 12),
           price: Number(pair.priceUsd),
           change24h: Number(pair.priceChange && pair.priceChange.h24) || 0,
-          badge: selected.liquidity >= 20000 ? "Liq" : "Thin"
+          badge: selected.liquidity >= 20000 ? "Liq" : "Thin",
+          address: address
         });
       });
     }
@@ -156,6 +178,11 @@
           data = await getJson(url, controller ? controller.signal : undefined);
         } catch (workerError) {
           console.debug("valhalla", "V-TICK", "aggregator unavailable; using public sources");
+          if (controller && controller.signal.aborted) {
+            window.clearTimeout(timeout);
+            controller = new AbortController();
+            timeout = window.setTimeout(function () { controller.abort(); }, 12000);
+          }
           data = await directData(controller ? controller.signal : undefined);
         }
       } else {
@@ -188,6 +215,21 @@
     pull();
     var url = String((window.VALHALLA_SITE || {}).TICKER_URL || "");
     window.setInterval(pull, url ? 20000 : directInterval);
+    var bars = document.querySelectorAll("[data-ticker]");
+    if ("IntersectionObserver" in window) {
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          entry.target.classList.toggle("ticker-paused", !entry.isIntersecting || document.hidden);
+        });
+      });
+      Array.prototype.forEach.call(bars, function (bar) { observer.observe(bar); });
+    }
+    document.addEventListener("visibilitychange", function () {
+      Array.prototype.forEach.call(bars, function (bar) {
+        if (document.hidden) bar.classList.add("ticker-paused");
+        else if (!("IntersectionObserver" in window)) bar.classList.remove("ticker-paused");
+      });
+    });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

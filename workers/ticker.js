@@ -50,7 +50,8 @@ async function trending() {
       symbol: String(pair.baseToken.symbol || "TOKEN").slice(0, 12),
       price: Number(pair.priceUsd) || 0,
       change24h: Number(pair.priceChange && pair.priceChange.h24) || 0,
-      badge: liq >= 20000 ? "Liq" : "Thin"
+      badge: liq >= 20000 ? "Liq" : "Thin",
+      address: String(pair.baseToken.address || "")
     };
   });
 }

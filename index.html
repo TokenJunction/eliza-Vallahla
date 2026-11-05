@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="landing-root">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,11 +15,16 @@
 <div class="land">
   <header class="land-nav" data-nav="locked">
     <a class="brand" href="/"><img src="assets/mark.svg" alt="Valhalla™ mech logo" width="32" height="32"> VALHALLA™</a>
+    <nav class="land-links" aria-label="Main navigation">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+    </nav>
     <a class="btn solid" href="app/">Get started</a>
   </header>
   <div class="system-status-slot" data-status-slot></div>
-  <div data-ticker hidden class="ticker" aria-label="Live prices. Not financial advice." role="status"></div>
-  <section class="hero-grid">
+  <div data-ticker hidden class="ticker" aria-label="Live public market prices. Not financial advice." aria-live="off"></div>
+  <section class="hero-grid" data-motion-hero>
     <div class="hero-copy">
       <p class="kicker">A CLEARER VIEW OF YOUR WORKFLOW</p>
       <h1>Your trading command center.</h1>
@@ -35,7 +40,7 @@
       <p class="note">Demo data</p>
     </a>
   </section>
-  <section>
+  <section data-motion-group>
     <p class="kicker">BENEFITS</p>
     <h2>What you get</h2>
     <div class="blocks">
@@ -45,7 +50,7 @@
       <article><h3>Plain language</h3><p>Safety checks, a chat with your bot, and a paper lab. No promise of profit.</p></article>
     </div>
   </section>
-  <section id="how">
+  <section id="how" data-motion-group>
     <p class="kicker">HOW IT WORKS</p>
     <h2>Three steps</h2>
     <div class="steps">
@@ -54,7 +59,7 @@
       <article><p class="kicker">03</p><h3>Run paper mode</h3><p>Tick the risk notice and press Start. The run is simulated. It does not send an order.</p></article>
     </div>
   </section>
-  <section>
+  <section id="features" data-motion-group>
     <p class="kicker">FEATURES</p>
     <h2>On the desk</h2>
     <div class="features">
@@ -66,7 +71,7 @@
       <article><h3>Non-custodial</h3><p>No seed phrase. No private key. No deposits held here.</p></article>
     </div>
   </section>
-  <section id="pricing">
+  <section id="pricing" data-motion-group>
     <p class="kicker">PRICING</p>
     <h2>Free and Pro</h2>
     <div class="prices">
@@ -74,7 +79,7 @@
       <article class="price"><h3>Pro</h3><p>$9.99 a month at the launch price. A 15 day trial is included. Ads come off. Not a promise of profit.</p><a class="btn" href="app/">Get started</a></article>
     </div>
   </section>
-  <section>
+  <section data-motion-group>
     <p class="kicker">TRUST</p>
     <h2>Safety</h2>
     <article>
@@ -82,7 +87,7 @@
       <p><a href="privacy/">Privacy</a> · <a href="terms/">Terms</a></p>
     </article>
   </section>
-  <section>
+  <section data-motion-group>
     <p class="kicker">FAQ</p>
     <h2>Before you start</h2>
     <article>
@@ -91,7 +96,7 @@
       <p><a href="faq/">Read the FAQ</a></p>
     </article>
   </section>
-  <section>
+  <section data-motion-group>
     <p class="kicker">START</p>
     <h2>Open the desk when you are ready.</h2>
     <a class="btn solid" href="app/">Get started</a>
@@ -110,6 +115,7 @@
 <script src="site-config.js"></script>
 <script src="ticker.js"></script>
 <script src="status.js"></script>
+<script src="site-motion.js"></script>
 <script src="site-chrome.js"></script>
 <script>
   document.getElementById("emailCapture").addEventListener("submit", function (event) {
