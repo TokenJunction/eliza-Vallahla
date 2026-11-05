@@ -9,17 +9,19 @@ The ElizaOS runtime is for health reporting and simulated/paper workflows only. 
 ## Local setup
 
 1. Use Node.js 23.3 or newer and Bun, as required by the current ElizaOS CLI.
-2. Install the static-site dependencies with `npm install` in the repository root and the ElizaOS project dependencies with `bun install` in `valhalla-elizaos`.
+2. Run `./setup.sh` on macOS/Linux or `.\setup.ps1` on Windows. The scripts use `npm ci --legacy-peer-deps` with the root lockfile, then `bun install --frozen-lockfile` and the ElizaOS TypeScript check. Install Node.js and Bun before running them; they do not make system-wide runtime changes.
 3. Copy `.env.production.example` into the deployment provider's secret manager. Never commit populated environment files.
 4. Run `npm run build` and `npm test` from the repository root.
 5. Apply `supabase/migrations/20261105000000_valhalla_v35_foundation.sql` only after linking the intended Supabase project and reviewing the migration.
+
+The ElizaOS `start` command validates its environment before launch. Production requires at least one configured model-provider key; Supabase and Upstash REST URL/token pairs must be complete when used, and unsupported trading, key-storage, social-dispatch, and Zeus idle-job switches must remain disabled. Redis and Supabase are optional integrations and are not represented as connected merely because a URL is configured.
 
 The database policies use Supabase's authenticated `auth.uid()` claim, not an email address supplied by a client. Vault audit records are service-role-only. The service-role key must never be exposed to a browser.
 
 ## Hosting setup
 
 - **GitHub Pages:** `.github/workflows/pages.yml` publishes the static website from `docs/site`. It does not deploy Workers or the ElizaOS runtime.
-- **Render:** `render.yaml` describes a separate Docker service with auto-deploy disabled and a public `/api/valhalla/health` check. Its free plan may sleep when idle and is not suitable for an always-on production service. The runtime exposes read-only Zeus and Gorgo agent definitions; these are not authenticated admin access or per-user sandboxes.
+- **Render:** `render.yaml` describes a separate Docker service with auto-deploy disabled and the ElizaOS `/health` check. Its free plan may sleep when idle and is not suitable for an always-on production service. The runtime exposes read-only Zeus and Gorgo agent definitions; these are not authenticated admin access or per-user sandboxes.
 - **Model providers:** the ElizaOS runtime loads the OpenAI and Google GenAI plugins only when their corresponding API keys are set. No social plugins, wallet integrations, or transaction executors are installed.
 - **Supabase:** provision and link the intended project before applying the migration.
 - **Upstash and model providers:** credentials in `.env.production.example` are blank. Add only the provider credentials the configured agent actually uses.

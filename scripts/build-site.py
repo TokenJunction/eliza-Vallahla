@@ -10,7 +10,7 @@ shutil.copytree(
     ignore=shutil.ignore_patterns(
         '.git', '.github', '.wrangler', '.vscode', '__pycache__', 'node_modules', 'site-build',
         '.env', '.env.*', 'package.json', 'package-lock.json', 'bun.lock',
-        'bun.lockb', 'render.yaml', 'valhalla-elizaos', 'supabase'
+        'bun.lockb', 'render.yaml', 'valhalla-elizaos', 'supabase', 'lib'
     )
 )
 

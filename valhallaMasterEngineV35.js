@@ -1,6 +1,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const integrations = require('./lib/integrations');
 
 const root = fs.existsSync(path.join(__dirname, 'site-build', 'index.html'))
   ? path.join(__dirname, 'site-build')
@@ -16,7 +17,7 @@ const types = {
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml',
   '.mp4': 'video/mp4', '.md': 'text/markdown; charset=utf-8',
 };
-const hidden = /(^|[\\/])(\.|node_modules|workers|supabase|scripts|valhalla-elizaos)/;
+const hidden = /(^|[\\/])(\.[^\\/]*|(node_modules|workers|supabase|scripts|lib|valhalla-elizaos)([\\/]|$))/;
 
 function resolve(urlPath) {
   const rel = path.normalize(decodeURIComponent(urlPath.split('?')[0])).replace(/^([\\/]|\.\.)+/, '');
@@ -27,22 +28,79 @@ function resolve(urlPath) {
   return fs.existsSync(file) && fs.statSync(file).isFile() ? file : null;
 }
 
-http.createServer((req, res) => {
+const elizaBase = (process.env.ELIZA_URL || '').replace(/\/+$/, '');
+const MAX_PROXY_BODY = 64 * 1024;
+
+function sendJson(res, status, body, extra = {}) {
+  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...extra });
+  res.end(JSON.stringify(body));
+}
+
+function clientIp(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+}
+
+async function proxyToEliza(req, res) {
+  if (!elizaBase) return sendJson(res, 503, { error: 'eliza_not_configured' });
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_PROXY_BODY) return sendJson(res, 413, { error: 'payload_too_large' });
+    chunks.push(chunk);
+  }
+  try {
+    const upstream = await fetch(`${elizaBase}${req.url}`, {
+      method: req.method,
+      headers: { 'Content-Type': req.headers['content-type'] || 'application/json' },
+      body: chunks.length ? Buffer.concat(chunks) : undefined,
+      signal: AbortSignal.timeout(15000),
+    });
+    res.writeHead(upstream.status, {
+      'Content-Type': upstream.headers.get('content-type') || 'application/json',
+      'Cache-Control': 'no-store',
+    });
+    res.end(Buffer.from(await upstream.arrayBuffer()));
+  } catch {
+    sendJson(res, 502, { error: 'eliza_unreachable' });
+  }
+}
+
+async function handleHealth(req, res) {
+  const limit = await integrations.rateLimit(`health:${clientIp(req)}`, 60, 60);
+  if (!limit.allowed) return sendJson(res, 429, { error: 'rate_limited' }, { 'Retry-After': '60' });
+  // Redis-backed 15s cache keeps probe load constant regardless of dashboard traffic.
+  let health = await integrations.cacheGet('health:snapshot');
+  if (!health) {
+    health = await integrations.collectHealth();
+    await integrations.cacheSet('health:snapshot', health, 15);
+  }
+  sendJson(res, health.status === 'degraded' ? 503 : 200, { ...health, origin: publicOrigin });
+}
+
+http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  if (req.url === '/healthz') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({
+  const pathname = req.url.split('?')[0];
+  if (pathname === '/healthz') {
+    return sendJson(res, 200, {
       ok: true,
       origin: publicOrigin,
-      redis: Boolean(process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL),
-      supabase: Boolean(process.env.SUPABASE_URL),
+      redis: Boolean(integrations.upstashConfig()),
+      supabase: Boolean(integrations.supabaseConfig()),
+      eliza: Boolean(elizaBase),
       adminConfigured: Boolean(process.env.LEADER_EMAIL),
-    }));
+    });
+  }
+  if (pathname === '/api/health' && (req.method === 'GET' || req.method === 'HEAD')) {
+    return handleHealth(req, res).catch(() => sendJson(res, 500, { error: 'health_failed' }));
+  }
+  if (pathname.startsWith('/api/valhalla/') && (req.method === 'GET' || req.method === 'POST')) {
+    return proxyToEliza(req, res);
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
   let file;
