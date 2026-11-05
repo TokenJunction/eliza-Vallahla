@@ -7,6 +7,7 @@
 <meta name="twitter:site" content="@ValhallaOS">
 <link rel="stylesheet" href="/valhalla-command.css">
 <link rel="stylesheet" href="desk.css">
+<link rel="stylesheet" href="leadership.css">
 </head>
 <body data-page="app">
 <div id="mechaBoot" role="status" aria-label="Valhalla is starting">
@@ -119,6 +120,7 @@
     <img class="logo-mech" src="/assets/mech.jpg" alt="Valhalla™ mech logo">
     <div class="word"><strong>VALHALLA</strong><span>PAPER DESK · READ-ONLY BY DEFAULT</span></div>
     <span class="badge" id="leaderBadge" hidden>MECHA LEADER</span>
+    <button id="leaderOpen" type="button" aria-controls="leadership" aria-expanded="false" hidden>Leadership</button>
     <span class="badge" id="tierBadge">FREE</span>
     <button id="upgradeBtn" type="button">Upgrade</button>
     <span class="badge" id="modeBadge">DEMO</span>
@@ -132,6 +134,79 @@
     <div class="clock" id="clock">00:00:00</div>
   </header>
   <div data-ticker hidden class="ticker" aria-label="Live prices. Not financial advice." role="status"></div>
+  <section id="leadership" hidden aria-labelledby="leaderTitle">
+    <header class="leader-heading">
+      <div>
+        <h1 id="leaderTitle">Leadership console</h1>
+        <p>Owner access · verified email session · controls apply to configured services only</p>
+      </div>
+      <button id="leaderClose" type="button">Return to desk</button>
+    </header>
+    <p id="leaderStatus" class="leader-status" role="status">Verifying owner session…</p>
+    <section class="leader-section leader-overseer" aria-labelledby="zeusTitle">
+      <div class="leader-section-heading">
+        <h2 id="zeusTitle">ZEUS MASTER OVERSEER</h2>
+        <span class="leader-state">IDLE GOVERNANCE · SOCIAL DISPATCH · ADMIN ROUTING</span>
+      </div>
+      <p>When the system is idle, Zeus manages network health, sub-agent dispatch, and the owner’s command view. This layer exists to coordinate the Quant Flywheel, the DeepSeek repair engine, and the social automation queue without moving funds.</p>
+      <div class="leader-table" role="list" aria-label="Zeus master modules">
+        <div class="leader-row"><span>Quant Flywheel</span><strong data-state="live">Active</strong></div>
+        <div class="leader-row"><span>DeepSeek repair</span><strong data-state="live">Monitoring</strong></div>
+        <div class="leader-row"><span>Social automation</span><strong data-state="degraded">Queued</strong></div>
+      <div class="leader-row"><span>Owner controls</span><strong data-state="live">Private admin path</strong></div>
+      </div>
+    </section>
+    <div class="leader-layout">
+      <section class="leader-section leader-model" aria-labelledby="leaderModelTitle">
+        <div class="leader-section-heading">
+          <h2 id="leaderModelTitle">Assistant model</h2>
+          <span class="leader-state">OPENAI · NON-LLAMA</span>
+        </div>
+        <p>Switch the website assistant model. The provider key stays in the Chat Worker; this setting is shared by all visitors.</p>
+        <div class="leader-model-controls">
+          <label for="leaderModel">Active model</label>
+          <select id="leaderModel" disabled>
+            <option>Loading available models…</option>
+          </select>
+          <button id="leaderSaveModel" type="button" disabled>Apply model</button>
+        </div>
+        <p id="leaderModelNote" class="leader-note" role="status">Loading model configuration.</p>
+      </section>
+      <section class="leader-section" aria-labelledby="leaderSystemsTitle">
+        <div class="leader-section-heading">
+          <h2 id="leaderSystemsTitle">System health</h2>
+          <button id="leaderRefresh" type="button">Refresh data</button>
+        </div>
+        <p id="leaderSystemsNote" class="leader-note">Health is unreported until a status feed is configured.</p>
+        <div id="leaderSystems" class="leader-table" role="list"></div>
+      </section>
+      <section class="leader-section leader-performance" aria-labelledby="leaderPerformanceTitle">
+        <h2 id="leaderPerformanceTitle">Website performance</h2>
+        <p class="leader-note">Measured in this browser only. These timings are not server-wide measurements.</p>
+        <dl id="leaderPerformance" class="leader-performance-data"></dl>
+        <p class="leader-note">No Python runtime or Python service is configured in this website repository.</p>
+      </section>
+      <section class="leader-section leader-engagement" aria-labelledby="leaderEngagementTitle">
+        <div class="leader-section-heading">
+          <h2 id="leaderEngagementTitle">User engagement · 7 days</h2>
+          <span id="leaderEngagementState" class="leader-note">Waiting for analytics data</span>
+        </div>
+        <p class="leader-note">Approximate aggregate counts; collected only when a signed-in visitor opts into Analytics. No message text, wallet, email, or user-level history is included.</p>
+        <svg id="leaderEngagementChart" viewBox="0 0 700 190" role="img" aria-label="Seven-day page views and assistant interactions"></svg>
+        <div class="leader-chart-legend"><span>Page views</span><span>Assistant messages</span></div>
+        <div id="leaderEngagementTable" class="leader-table" role="list" aria-label="Daily engagement totals"></div>
+      </section>
+      <section class="leader-section leader-bots" aria-labelledby="leaderBotsTitle">
+        <h2 id="leaderBotsTitle">Bot operations</h2>
+        <p id="leaderPaperState" class="leader-bot-state">This browser’s paper bot is stopped.</p>
+        <div class="leader-actions">
+          <button id="leaderPausePaper" type="button" disabled>Pause paper bot</button>
+          <button id="leaderStopPaper" type="button" disabled>Stop paper bot</button>
+        </div>
+        <p class="leader-note">These controls affect only the simulated bot in this browser. No site-wide ElizaOS / autonomous bot fleet or live trading control plane is connected. Live-money trading remains off.</p>
+      </section>
+    </div>
+  </section>
     <p id="connectBanner" class="note" hidden><svg viewBox="0 0 64 64" width="36" height="36" aria-hidden="true"><rect x="22" y="8" width="20" height="14" rx="3" fill="#ffb347"/><rect x="16" y="24" width="32" height="22" rx="4" fill="#1a140c" stroke="#ffb347"/><circle cx="26" cy="34" r="3" fill="#7a7468"/><circle cx="38" cy="34" r="3" fill="#7a7468"/></svg> Connect wallet to load your data <button id="connectFromDesk" type="button">Connect wallet</button></p>
     <aside id="debugPanel" hidden>
       <p class="kicker">DEBUG</p>
@@ -199,6 +274,17 @@
           <label>Daily loss limit, SOL <input id="botLoss" type="number" min="0" step="0.01" value="0.5"></label>
           <button id="botReview" type="button">Review settings</button>
         </form>
+        <section id="yoloPanel" class="yolo-panel" aria-labelledby="yoloTitle">
+          <p class="kicker" id="yoloTitle">YOLO · EXPERIMENTAL PAPER MODE</p>
+          <p>High-activity momentum signals using a fixed paper preset. Pro subscribers and the account owner only. Signals only: no positions, fills, P&amp;L, orders, signatures, or live-agent calls are simulated. Past or simulated results do not predict returns.</p>
+          <label><input id="yoloRiskAck" type="checkbox" disabled> I understand this experimental mode is paper-only and is not a recommendation.</label>
+          <p>
+            <button id="yoloEnable" type="button" disabled>Enable YOLO paper mode</button>
+            <button id="yoloDisable" type="button" hidden>Use standard mode</button>
+            <button id="yoloUpgrade" type="button" hidden>View subscription options</button>
+          </p>
+          <p id="yoloAccess" class="note" role="status" aria-live="polite">Checking subscription access…</p>
+        </section>
         <div id="botSummary" hidden></div>
         <label><input id="botRiskAck" type="checkbox"> I understand crypto trading is risky and results aren't guaranteed</label>
         <p><button id="botStart" type="button" disabled>START</button> <button id="botStop" type="button">STOP</button></p>
@@ -249,18 +335,31 @@
         <p id="labStats" class="note"></p>
         <p id="leaderFeed" class="note">Leader offsite paper run is offline until the API is live.</p>
         <h2>Hive</h2>
-        <label><input id="hiveOpt" type="checkbox"> Use this tab as a Hive node</label>
-        <p id="hiveFlag">Hive is off. This tab does no extra work until you opt in.</p>
-        <label>CPU and GPU limit <input id="hiveThrottle" type="range" min="25" max="50" value="25" disabled></label>
+        <label><input id="hiveOpt" type="checkbox"> I agree to allow one simulated paper job at a time in this tab</label>
+        <p id="hiveFlag">Hive is off. Nothing runs until you opt in and click Run one simulated job.</p>
+        <button id="hiveRun" type="button" disabled>Run one simulated job</button>
+        <label>CPU work-slice target <input id="hiveThrottle" type="range" min="25" max="50" value="25" disabled></label>
+        <p class="note">Each job requires a separate click and this tab must stay visible and on power. This demo uses limited CPU for a simulated paper calculation only: no WebGPU, mining, browser-history/data collection, or internet-traffic relaying. On a run, the configured Hive service receives its anti-abuse verification token, a random node/account ID, and the simulated result; the browser contacts only that service for the job/result. Closing the tab or opting out stops work. The slice slider is not a device-wide CPU limit. <a href="/terms/">Terms</a> · <a href="/privacy/">Privacy</a></p>
         <p id="hiveMeter" class="note">Impact: off. Jobs 0. Verified 0. Engine —.</p>
         <p id="hivePoints" class="note">Contribution points: 0. Not transferable. No cash value.</p>
         <p class="note">Rewards are points only for now.</p>
       </div>
     </section>
-    <aside id="leaderPanel" hidden>
-      <div class="ph"><b>09</b><span>ADMIN</span></div>
-      <div class="pb"><p>Leader tools load only after the server confirms the role.</p><button id="hiveFlagBtn" type="button" disabled>Hive feature flag</button><p class="note">The Hive flag stays off until the API confirms a leader. Rewards payouts stay off.</p></div>
-    </aside>
+    <section id="performancePanel" aria-labelledby="performanceTitle">
+      <div class="ph"><span id="performanceTitle">Assistant performance</span><span id="performanceHive" data-state="off">THE HIVE · OFF</span></div>
+      <div class="pb">
+        <p id="performanceSummary" role="status">No model responses measured on this browser profile yet.</p>
+        <svg id="performanceChart" viewBox="0 0 680 200" role="img" aria-label="Recent successful model response times in milliseconds"></svg>
+        <div id="performanceModels" aria-live="polite"></div>
+        <div class="performance-actions">
+          <button id="performanceExport" type="button">Export local timings</button>
+          <button id="performanceClear" type="button">Clear local timings</button>
+        </div>
+        <p id="performanceNote" class="note">Response times are measured in this browser and stay on this device. Prompts and replies are never saved. Model costs, subscription revenue, and Hive payouts are not connected to this chart.</p>
+        <p class="note">Python SVG report: <code>python scripts/performance_report.py valhalla-performance.json --output performance.svg</code></p>
+        <p class="note">Hourly economics are not yet measurable: the chat service does not return token-usage or cost data, and Hive rewards are non-transferable points with payouts disabled. No hourly earnings are claimed.</p>
+      </div>
+    </section>
   <aside id="settings" class="settings" hidden>
     <div class="panel">
       <div class="ph"><b>06</b><span>SETTINGS</span><button id="closeSettings" type="button">Close</button></div>
@@ -303,8 +402,10 @@
         </label>
         <label><input id="compactPick" type="checkbox"> Compact mode</label>
         <h2>Hive</h2>
-        <label><input id="hiveOptSettings" type="checkbox"> Use this tab as a Hive node</label>
-        <p id="hiveFlagSettings">Hive is off until you opt in. It stops when you close the tab.</p>
+        <label><input id="hiveOptSettings" type="checkbox"> I agree to allow one simulated paper job at a time in this tab</label>
+        <p id="hiveFlagSettings">Hive is off. Nothing runs until you opt in and click Run one simulated job.</p>
+        <button id="hiveRunSettings" type="button" disabled>Run one simulated job</button>
+        <p class="note">Each job starts only after a click. It uses limited CPU for a simulated paper calculation; no WebGPU, mining, browser-history/data collection, or internet-traffic relaying. On a run, the configured Hive service receives an anti-abuse verification token, a random node/account ID, and the simulated result. The browser contacts only that service for the job/result. Closing this tab stops work. <a href="/terms/">Terms</a> · <a href="/privacy/">Privacy</a></p>
         <p class="note">Rewards are points only for now.</p>
         <button id="payoutLink" type="button" disabled>Link a payout address</button>
         <p class="note">A payout address would be a public key confirmed with a sign-in message. Nothing is sent. The rewards treasury is not this site. Payouts stay off.</p>
@@ -315,15 +416,21 @@
       </div>
     </div>
   </aside>
-  <aside id="deskChat" hidden>
-    <div class="ph"><b>ASK</b><span>YOUR BOT</span><button id="chatSpeak" type="button">Voice replies off</button></div>
-    <div id="chatLog" class="term"></div>
-    <form id="chatForm">
-      <input id="chatText" maxlength="500" placeholder="Ask your paper bot">
-      <button type="submit">Send</button>
-      <button id="chatMic" type="button">Mic</button>
-    </form>
-    <p class="note">SIMULATED answers are not promises. The bot cannot move funds.</p>
+  <aside id="deskChat" hidden aria-label="Thales assistant">
+    <div class="ph">
+      <b>ASK</b><span>THALES</span>
+      <button id="chatToggle" type="button" aria-controls="chatBody" aria-expanded="false">Open chat</button>
+    </div>
+    <div id="chatBody" hidden>
+      <div id="chatLog" class="term"></div>
+      <form id="chatForm">
+        <input id="chatText" maxlength="500" placeholder="Ask Thales about markets, strategy, or risk">
+        <button type="submit">Send</button>
+        <button id="chatMic" type="button">Mic</button>
+        <button id="chatSpeak" type="button">Voice replies off</button>
+      </form>
+      <p class="note">Thales is informational, not a financial adviser. It cannot move funds. Chat text is processed by the active OpenAI model; do not include sensitive client details.</p>
+    </div>
   </aside>
   <footer class="foot">
     <span>Valhalla™ and the Valhalla mech logo are trademarks of TokenJunction LLC.</span>
@@ -340,7 +447,9 @@
 <script src="/nacl.min.js"></script>
 <script src="/connect-core.js"></script>
 <script src="/site-wallet.js"></script>
+<script src="engagement.js"></script>
 <script src="gate.js"></script>
+<script src="yolo-logic.js"></script>
 <script src="bot.js"></script>
 <script src="desk-chat.js"></script>
 <script src="ledger.js"></script>
@@ -364,7 +473,9 @@
 <script src="upgrade.js"></script>
 <script src="security.js"></script>
 <script src="hive.js"></script>
+<script src="performance.js"></script>
 <script src="debug.js"></script>
 <script src="/app/ask.js"></script>
+<script src="leadership.js"></script>
 </body>
 </html>
