@@ -1,0 +1,11 @@
+{
+  "name": "valhalla-site",
+  "private": true,
+  "scripts": {
+    "build": "python scripts/build-site.py",
+    "test": "node --test workers/*.test.mjs app/performance.test.cjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
