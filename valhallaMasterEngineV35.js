@@ -2,6 +2,11 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const integrations = require('./lib/integrations');
+const {
+  createValhallaQueueEngine,
+  isAuthorizedDispatch,
+  validateDispatch,
+} = require('./valhallaQueueEngine');
 
 const root = fs.existsSync(path.join(__dirname, 'site-build', 'index.html'))
   ? path.join(__dirname, 'site-build')
@@ -30,6 +35,8 @@ function resolve(urlPath) {
 
 const elizaBase = (process.env.ELIZA_URL || '').replace(/\/+$/, '');
 const MAX_PROXY_BODY = 64 * 1024;
+const MAX_DISPATCH_BODY = 8 * 1024;
+let queueEngine = null;
 
 function sendJson(res, status, body, extra = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...extra });
@@ -78,7 +85,50 @@ async function handleHealth(req, res) {
   sendJson(res, health.status === 'degraded' ? 503 : 200, { ...health, origin: publicOrigin });
 }
 
-http.createServer(async (req, res) => {
+async function handleDispatch(req, res) {
+  if (process.env.VALHALLA_QUEUE_ENABLED !== 'true') {
+    return sendJson(res, 503, { error: 'queue_disabled' });
+  }
+  const expectedToken = process.env.VALHALLA_DISPATCH_TOKEN;
+  if (!expectedToken) return sendJson(res, 503, { error: 'dispatch_not_configured' });
+  if (!isAuthorizedDispatch(req.headers.authorization, expectedToken)) {
+    return sendJson(res, 401, { error: 'unauthorized' }, { 'WWW-Authenticate': 'Bearer' });
+  }
+  if (!queueEngine) return sendJson(res, 503, { error: 'queue_unavailable' });
+
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_DISPATCH_BODY) {
+      return sendJson(res, 413, { error: 'payload_too_large' });
+    }
+    chunks.push(chunk);
+  }
+
+  let dispatch;
+  try {
+    dispatch = validateDispatch(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+  } catch (error) {
+    const invalidRequest = error instanceof SyntaxError || error instanceof TypeError;
+    return sendJson(res, invalidRequest ? 400 : 500, {
+      error: invalidRequest ? String(error.message || 'invalid_request') : 'dispatch_failed',
+    });
+  }
+
+  try {
+    const job = await queueEngine.enqueue(dispatch);
+    return sendJson(res, 202, {
+      accepted: true,
+      queue: dispatch.targetEngine,
+      jobId: job.id,
+    });
+  } catch {
+    return sendJson(res, 503, { error: 'queue_unavailable' });
+  }
+}
+
+const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -93,8 +143,17 @@ http.createServer(async (req, res) => {
       redis: Boolean(integrations.upstashConfig()),
       supabase: Boolean(integrations.supabaseConfig()),
       eliza: Boolean(elizaBase),
+      queueWorkers: queueEngine !== null,
       adminConfigured: Boolean(process.env.LEADER_EMAIL),
     });
+  }
+  if (pathname === '/api/valhalla/dispatch') {
+    if (req.method !== 'POST') {
+      return sendJson(res, 405, { error: 'method_not_allowed' }, { Allow: 'POST' });
+    }
+    return handleDispatch(req, res).catch(() =>
+      sendJson(res, 500, { error: 'dispatch_failed' }),
+    );
   }
   if (pathname === '/api/health' && (req.method === 'GET' || req.method === 'HEAD')) {
     return handleHealth(req, res).catch(() => sendJson(res, 500, { error: 'health_failed' }));
@@ -115,4 +174,42 @@ http.createServer(async (req, res) => {
   });
   if (req.method === 'HEAD') return res.end();
   fs.createReadStream(file).pipe(res);
-}).listen(port, '0.0.0.0', () => console.log(`Valhalla serving ${root} on :${port}`));
+});
+
+async function start() {
+  if (process.env.VALHALLA_QUEUE_ENABLED === 'true') {
+    if (!process.env.VALHALLA_DISPATCH_TOKEN) {
+      throw new Error('VALHALLA_DISPATCH_TOKEN is required when the queue runtime is enabled');
+    }
+    if (Buffer.byteLength(process.env.VALHALLA_DISPATCH_TOKEN) < 32) {
+      throw new Error('VALHALLA_DISPATCH_TOKEN must be at least 32 bytes');
+    }
+    queueEngine = await createValhallaQueueEngine();
+  }
+  server.listen(port, '0.0.0.0', () =>
+    console.log(`Valhalla serving ${root} on :${port}`),
+  );
+}
+
+start().catch((error) => {
+  console.error('[Valhalla startup] Queue runtime could not start:', error.message);
+  process.exitCode = 1;
+});
+
+async function shutdown() {
+  server.close();
+  if (queueEngine) await queueEngine.close();
+}
+
+process.once('SIGINT', () => {
+  void shutdown().catch(() => {
+    console.error('[Valhalla shutdown] Queue cleanup failed');
+    process.exitCode = 1;
+  });
+});
+process.once('SIGTERM', () => {
+  void shutdown().catch(() => {
+    console.error('[Valhalla shutdown] Queue cleanup failed');
+    process.exitCode = 1;
+  });
+});

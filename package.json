@@ -4,9 +4,13 @@
   "scripts": {
     "start": "node valhallaMasterEngineV35.js",
     "build": "python3 scripts/build-site.py || python scripts/build-site.py || echo build-skipped-serving-source",
-    "test": "node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs"
+    "test": "node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs valhallaQueueEngine.test.cjs"
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "bullmq": "^6.7.0",
+    "ioredis": "^6.0.0"
   }
 }

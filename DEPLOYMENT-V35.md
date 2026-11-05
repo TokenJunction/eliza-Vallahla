@@ -9,7 +9,7 @@ The ElizaOS runtime is for health reporting and simulated/paper workflows only. 
 ## Local setup
 
 1. Use Node.js 23.3 or newer and Bun, as required by the current ElizaOS CLI.
-2. Run `./setup.sh` on macOS/Linux or `.\setup.ps1` on Windows. The scripts use `npm ci --legacy-peer-deps` with the root lockfile, then `bun install --frozen-lockfile` and the ElizaOS TypeScript check. Install Node.js and Bun before running them; they do not make system-wide runtime changes.
+2. Run `bash setup.sh` on macOS/Linux or `.\setup.ps1` on Windows. The scripts use `npm ci --legacy-peer-deps` with the root lockfile, then `bun install --frozen-lockfile` and the ElizaOS TypeScript check. Install Node.js and Bun before running them; they do not make system-wide runtime changes.
 3. Copy `.env.production.example` into the deployment provider's secret manager. Never commit populated environment files.
 4. Run `npm run build` and `npm test` from the repository root.
 5. Apply `supabase/migrations/20261105000000_valhalla_v35_foundation.sql` only after linking the intended Supabase project and reviewing the migration.
@@ -22,6 +22,7 @@ The database policies use Supabase's authenticated `auth.uid()` claim, not an em
 
 - **GitHub Pages:** `.github/workflows/pages.yml` publishes the static website from `docs/site`. It does not deploy Workers or the ElizaOS runtime.
 - **Render:** `render.yaml` describes a separate Docker service with auto-deploy disabled and the ElizaOS `/health` check. Its free plan may sleep when idle and is not suitable for an always-on production service. The runtime exposes read-only Zeus and Gorgo agent definitions; these are not authenticated admin access or per-user sandboxes.
+- **Queue:** the root service includes an opt-in BullMQ worker for allow-listed health and paper-simulation jobs. It is disabled by default and requires a TLS `REDIS_URL` plus a server-only `VALHALLA_DISPATCH_TOKEN`; the dispatch endpoint does not accept an email header as identity. Treasury, signing, trading, arbitrary execution, and social jobs are rejected or blocked. This does not authenticate a browser user as the owner; owner authentication remains in the verified Google-plus-code Worker flow.
 - **Model providers:** the ElizaOS runtime loads the OpenAI and Google GenAI plugins only when their corresponding API keys are set. No social plugins, wallet integrations, or transaction executors are installed.
 - **Supabase:** provision and link the intended project before applying the migration.
 - **Upstash and model providers:** credentials in `.env.production.example` are blank. Add only the provider credentials the configured agent actually uses.
@@ -32,4 +33,4 @@ The owner address is configured only as a server-side `LEADER_EMAIL` secret. Own
 
 No Supabase, Render, Vercel, or Upstash resources are provisioned by this repository. No production API keys, OAuth redirect changes, signing keys, transaction executor, X/Twitter dispatcher, or automated social-posting credentials are configured. Financial chart views must use real, labeled source data; placeholder or simulated values must not be presented as live P&L.
 
-The Render service is not production-ready until its required secrets and model credentials are supplied, a deployment is explicitly initiated, and its health endpoint is verified. The current runtime reports capabilities as disabled; it does not implement trading, key storage, social dispatch, per-user sandbox provisioning, or Zeus idle jobs.
+The Render service is not production-ready until its required secrets and model credentials are supplied, a deployment is explicitly initiated, and its health endpoint is verified. No periodic pinger is used to defeat host idle behavior; continuous operation requires an appropriate always-on Render plan and separately provisioned Redis. The runtime reports capabilities as disabled; it does not implement trading, key storage, social dispatch, per-user sandbox provisioning, or Zeus idle jobs.
