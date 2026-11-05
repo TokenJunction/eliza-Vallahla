@@ -86,7 +86,7 @@ http.createServer(async (req, res) => {
   }
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const pathname = req.url.split('?')[0];
-  if (pathname === '/healthz') {
+  if (pathname === '/healthz' || pathname === '/health') {
     return sendJson(res, 200, {
       ok: true,
       origin: publicOrigin,
