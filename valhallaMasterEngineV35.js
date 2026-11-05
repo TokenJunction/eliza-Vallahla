@@ -177,17 +177,22 @@ const server = http.createServer(async (req, res) => {
 });
 
 async function start() {
-  if (process.env.VALHALLA_QUEUE_ENABLED === 'true') {
-    if (!process.env.VALHALLA_DISPATCH_TOKEN) {
-      throw new Error('VALHALLA_DISPATCH_TOKEN is required when the queue runtime is enabled');
+  // Queues are on by default; set VALHALLA_QUEUE_ENABLED=false to opt out.
+  if (process.env.VALHALLA_QUEUE_ENABLED !== 'false') {
+    const token = process.env.VALHALLA_DISPATCH_TOKEN || '';
+    if (!process.env.REDIS_URL || Buffer.byteLength(token) < 32) {
+      // Misconfiguration must not take the site down; dispatch stays closed until fixed.
+      console.error('[Valhalla queues] Not started: set REDIS_URL (rediss://) and a VALHALLA_DISPATCH_TOKEN of 32+ bytes.');
+    } else {
+      try {
+        queueEngine = await createValhallaQueueEngine();
+      } catch (error) {
+        console.error('[Valhalla queues] Not started:', error.message);
+      }
     }
-    if (Buffer.byteLength(process.env.VALHALLA_DISPATCH_TOKEN) < 32) {
-      throw new Error('VALHALLA_DISPATCH_TOKEN must be at least 32 bytes');
-    }
-    queueEngine = await createValhallaQueueEngine();
   }
   server.listen(port, '0.0.0.0', () =>
-    console.log(`Valhalla serving ${root} on :${port}`),
+    console.log(`Valhalla serving ${root} on :${port} (queues ${queueEngine ? 'active' : 'inactive'})`),
   );
 }
 
