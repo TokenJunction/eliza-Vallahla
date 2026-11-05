@@ -49,8 +49,8 @@ services:
     runtime: node
     plan: free
     branch: docs/site
-    buildCommand: python3 scripts/build-site.py
-    startCommand: node valhallaMasterEngineV35.js
+    buildCommand: npm ci --legacy-peer-deps && python3 scripts/build-site.py
+    startCommand: npm start
     healthCheckPath: /healthz
     autoDeploy: false
     envVars:
@@ -66,7 +66,13 @@ services:
         value: "false"
       - key: VALHALLA_KEY_STORAGE_ENABLED
         value: "false"
+      - key: VALHALLA_QUEUE_ENABLED
+        value: "false"
       - key: ELIZA_URL
+        sync: false
+      - key: VALHALLA_DISPATCH_TOKEN
+        sync: false
+      - key: REDIS_URL
         sync: false
       - key: LEADER_EMAIL
         sync: false

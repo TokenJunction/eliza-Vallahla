@@ -46,6 +46,29 @@ test('validates integration URL protocols', () => {
   );
 });
 
+test('requires encrypted Supabase and Redis URLs in production', () => {
+  assert.throws(
+    () =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        OPENAI_API_KEY: 'configured',
+        SUPABASE_URL: 'http://db.example.test',
+        SUPABASE_ANON_KEY: 'configured',
+        REDIS_URL: 'redis://cache.example.test',
+      }),
+    /SUPABASE_URL must be a valid URL using https:/,
+  );
+  assert.throws(
+    () =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        OPENAI_API_KEY: 'configured',
+        REDIS_URL: 'redis://cache.example.test',
+      }),
+    /REDIS_URL must be a valid URL using rediss:/,
+  );
+});
+
 test('refuses to enable execution capabilities that are not implemented', () => {
   assert.throws(
     () => validateEnvironment({ VALHALLA_TRADING_ENABLED: 'true' }),

@@ -1,3 +1,6 @@
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 const PRODUCTION_MODEL_KEYS = ['OPENAI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'];
 const REQUIRED_PAIRS = [
   ['SUPABASE_URL', 'SUPABASE_ANON_KEY'],
@@ -38,13 +41,23 @@ export function validateEnvironment(env = process.env) {
   }
 
   for (const [first, second] of REQUIRED_PAIRS) {
-    if (isSet(env[first]) !== isSet(env[second])) {
+    if (isSet(env, first) !== isSet(env, second)) {
       errors.push(`${first} and ${second} must be configured together.`);
     }
   }
 
-  validateUrl(env, 'SUPABASE_URL', ['https:', 'http:'], errors);
-  validateUrl(env, 'REDIS_URL', ['redis:', 'rediss:'], errors);
+  validateUrl(
+    env,
+    'SUPABASE_URL',
+    env.NODE_ENV === 'production' ? ['https:'] : ['https:', 'http:'],
+    errors,
+  );
+  validateUrl(
+    env,
+    'REDIS_URL',
+    env.NODE_ENV === 'production' ? ['rediss:'] : ['redis:', 'rediss:'],
+    errors,
+  );
   validateUrl(env, 'UPSTASH_REDIS_REST_URL', ['https:'], errors);
 
   for (const key of DISABLED_CAPABILITIES) {
@@ -60,7 +73,7 @@ export function validateEnvironment(env = process.env) {
   return true;
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   validateEnvironment();
   console.info('Environment configuration validated.');
 }
