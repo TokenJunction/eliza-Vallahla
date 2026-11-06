@@ -1,0 +1,27 @@
+name: Valhalla V35 CI
+
+on:
+  push:
+    branches: ["docs/site", "develop", "feat/**"]
+  pull_request:
+    branches: ["docs/site", "develop"]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Syntax check
+        run: |
+          for f in start_native_engine.js unified_idle_orchestrator.js valhallaQueueEngine.js shifting_staircase_router.js agentCrossTalkBus.js; do
+            node --check "$f"
+          done
+          sh -n scripts/build_static_mesh.sh
+          sh -n v35-mesh-bootstrap.sh
+      - name: Tests
+        run: npm test

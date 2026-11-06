@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://valhalla-app.xyz/api/$1" },
+    { "source": "/health", "destination": "https://valhalla-elizaos.onrender.com/health" }
+  ]
+}
