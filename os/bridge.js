@@ -271,8 +271,14 @@
     listenStatus.textContent = 'Speech recognition is not supported.';
   } else {
     recognition = new SpeechRec();
+    listenStatus.textContent = 'Speech recognition is available. Nothing is listening.';
     recognition.continuous = false;
     recognition.interimResults = false;
+    recognition.onstart = function () {
+      listening = true;
+      listenButton.textContent = 'Stop listening';
+      listenStatus.textContent = 'Listening. This does not send the form.';
+    };
     recognition.onresult = function (event) {
       var said = event.results && event.results[0] && event.results[0][0]
         ? event.results[0][0].transcript
@@ -289,16 +295,28 @@
       listening = false;
       listenButton.textContent = 'Start listening';
     };
+    function releaseMic() {
+      try { recognition.abort(); } catch (error) { listening = false; }
+      try { recognition.stop(); } catch (error) { listening = false; }
+      listening = false;
+      listenButton.textContent = 'Start listening';
+    }
     listenButton.addEventListener('click', function () {
       if (listening) {
-        recognition.stop();
+        releaseMic();
+        listenStatus.textContent = 'Listening stopped. Nothing was sent.';
         return;
       }
-      listening = true;
-      listenButton.textContent = 'Stop listening';
-      listenStatus.textContent = 'Listening. This does not send the form.';
-      recognition.start();
+      listenStatus.textContent = 'Starting speech recognition.';
+      try {
+        recognition.start();
+      } catch (error) {
+        listening = false;
+        listenButton.textContent = 'Start listening';
+        listenStatus.textContent = 'Speech recognition failed. Nothing was sent.';
+      }
     });
+    window.addEventListener('pagehide', releaseMic);
   }
   document.getElementById('use-transcript').addEventListener('click', function () {
     input.value = transcript.value;

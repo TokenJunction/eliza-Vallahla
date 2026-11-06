@@ -6,11 +6,14 @@
   <meta name="theme-color" content="#080a0c">
   <meta name="description" content="ValhallaOS command desk for wallet connections and assistant chat.">
   <title>ValhallaOS · Command Desk</title>
+  <!-- Visible names, provisional until design review: Valhalla Guide, Halls, Sagas, Valhalla Browser. -->
   <link rel="stylesheet" href="/os/os.css">
   <script src="/site-config.js" defer></script>
   <script src="/os/app.js" defer></script>
   <script src="/os/bridge.js" defer></script>
   <script type="module" src="/valhalla/gate.js"></script>
+  <script type="module" src="/valhalla/theme.js"></script>
+  <script type="module" src="/valhalla/browser.js"></script>
 </head>
 <body>
   <section id="session-gate" class="session-gate" role="status" aria-labelledby="session-gate-title">
@@ -18,6 +21,15 @@
     <h1 id="session-gate-title">Sign-in</h1>
     <p id="session-gate-status">Checking the existing sign-in.</p>
     <p id="session-note"></p>
+  </section>
+  <section id="ascent" class="ascent" hidden aria-labelledby="ascent-title">
+    <p class="session-kicker">ValhallaOS</p>
+    <h1 id="ascent-title">Ascent</h1>
+    <p id="ascent-banner" hidden>Preview fixture, no provider</p>
+    <label for="ascent-name">Display name</label>
+    <input id="ascent-name" type="text" maxlength="40" autocomplete="nickname">
+    <p id="ascent-ready" role="status">Checking configured services.</p>
+    <button type="button" class="classic-button" id="ascent-skip">Skip</button>
   </section>
   <svg class="icon-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
     <symbol id="icon-computer" viewBox="0 0 32 32">
@@ -48,6 +60,12 @@
       <img src="/assets/mark.svg" alt="" width="40" height="40">
       <div><h1>VALHALLA<span>OS</span></h1>
       <p>COMMAND DESK / PAPER-FIRST</p></div>
+      <fieldset id="theme-choice">
+        <legend>Theme</legend>
+        <label><input type="radio" name="desk-theme" value="dark" checked> Dark</label>
+        <label><input type="radio" name="desk-theme" value="light"> Light</label>
+        <label><input type="radio" name="desk-theme" value="colorblind"> Colorblind</label>
+      </fieldset>
       <div class="header-state"><span class="state-dot"></span> PUBLIC DESK <span class="paper-badge">LIVE TRADING OFF</span></div>
     </header>
 
@@ -56,13 +74,13 @@
         <svg aria-hidden="true"><use href="#icon-computer"></use></svg><span>System Status</span>
       </button>
       <button class="desktop-icon" type="button" data-open="swarm">
-        <svg aria-hidden="true"><use href="#icon-network"></use></svg><span>A2A Monitor</span>
+        <svg aria-hidden="true"><use href="#icon-network"></use></svg><span>Halls</span>
       </button>
       <button class="desktop-icon" type="button" data-open="memory">
-        <svg aria-hidden="true"><use href="#icon-notepad"></use></svg><span>Memory Inspector</span>
+        <svg aria-hidden="true"><use href="#icon-notepad"></use></svg><span>Sagas</span>
       </button>
       <button class="desktop-icon" type="button" data-open="browser">
-        <svg aria-hidden="true"><use href="#icon-browser"></use></svg><span>Web Shell</span>
+        <svg aria-hidden="true"><use href="#icon-browser"></use></svg><span>Valhalla Browser</span>
       </button>
       <button class="desktop-icon" type="button" data-open="wallet">
         <svg aria-hidden="true"><use href="#icon-wallet"></use></svg><span>Wallet Bridge</span>
@@ -70,6 +88,7 @@
     </nav>
 
     <div class="workspace">
+      <p id="preview-banner" class="preview-banner" hidden>Preview fixture, no provider</p>
       <section class="workspace-panel overview-panel" aria-labelledby="overview-title">
         <div class="panel-heading"><h2 id="overview-title">Wallet / overview</h2><span>NON-CUSTODIAL</span></div>
         <div class="overview-body">
@@ -80,31 +99,9 @@
             <button type="button" class="classic-button accent-button" data-open="wallet">Connect wallet</button>
             <p class="safety-note">Your keys stay in your wallet. No transaction is requested.</p>
           </div>
-          <img class="overview-mech" src="/assets/mech.jpg" alt="" loading="lazy">
+          <img class="overview-mark" src="/assets/mark.svg" alt="" width="72" height="72">
         </div>
         <div class="overview-footer"><span>EXECUTION <b>DISABLED</b></span><span>MODE <b>PAPER-FIRST</b></span></div>
-      </section>
-
-      <section class="workspace-panel chat-panel" aria-labelledby="chat-title">
-        <div class="panel-heading"><h2 id="chat-title">Command</h2><span>SAME SIGN-IN</span></div>
-        <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Assistant conversation">
-          <p class="chat-intro"><strong>VALHALLA ASSISTANT</strong><br>Ask about the desk, market concepts, or paper trading. Chat cannot place trades or access your wallet.</p>
-        </div>
-        <form id="chat-form" class="chat-form">
-          <label class="sr-only" for="chat-input">Message the assistant</label>
-          <textarea id="chat-input" maxlength="500" rows="2" placeholder="Ask the assistant…" required></textarea>
-          <button type="submit" class="classic-button accent-button">Send</button>
-          <button type="button" class="classic-button" id="chat-stop">Stop</button>
-        </form>
-        <div id="transcript-group">
-          <label for="chat-transcript">Transcript</label>
-          <textarea id="chat-transcript" rows="2"></textarea>
-          <button type="button" class="classic-button" id="use-transcript">Use transcript</button>
-          <button type="button" class="classic-button" id="chat-listen">Start listening</button>
-          <p id="listen-status" role="status">Speech recognition has not been checked.</p>
-        </div>
-        <div class="chat-voice"><button type="button" class="classic-button" id="chat-voice" aria-pressed="false">Voice replies off</button><span>Browser speech only. Nothing plays until you turn this on.</span></div>
-        <p id="chat-status" class="chat-status" role="status">Never share a seed phrase or private key. Not financial advice.</p>
       </section>
 
       <section class="workspace-panel positions-panel" aria-labelledby="positions-title">
@@ -117,8 +114,8 @@
         <div class="tool-row">
           <a class="classic-button accent-button" href="/app/#botPanel">Paper bot controls</a>
           <button type="button" class="classic-button" data-open="status">Service status</button>
-          <button type="button" class="classic-button" data-open="swarm">Swarm monitor</button>
-          <button type="button" class="classic-button" data-open="memory">Memory inspector</button>
+          <button type="button" class="classic-button" data-open="swarm">Halls</button>
+          <button type="button" class="classic-button" data-open="memory">Sagas</button>
         </div>
       </section>
     </div>
@@ -128,6 +125,7 @@
       <header class="title-bar" data-drag-handle>
         <h2 id="title-status">System Status</h2>
         <div class="window-controls">
+          <button type="button" data-action="maximize" aria-label="Maximize System Status">□</button>
           <button type="button" data-action="minimize" aria-label="Minimize System Status">_</button>
           <button type="button" data-action="close" aria-label="Close System Status">×</button>
         </div>
@@ -147,10 +145,11 @@
     <section class="window" id="window-swarm" data-window="swarm" aria-labelledby="title-swarm" hidden
       style="left:clamp(190px, 34vw, 440px);top:128px;width:min(420px, calc(100vw - 32px));">
       <header class="title-bar" data-drag-handle>
-        <h2 id="title-swarm">A2A Swarm Monitor</h2>
+        <h2 id="title-swarm">Halls</h2>
         <div class="window-controls">
-          <button type="button" data-action="minimize" aria-label="Minimize A2A Swarm Monitor">_</button>
-          <button type="button" data-action="close" aria-label="Close A2A Swarm Monitor">×</button>
+          <button type="button" data-action="maximize" aria-label="Maximize Halls">□</button>
+          <button type="button" data-action="minimize" aria-label="Minimize Halls">_</button>
+          <button type="button" data-action="close" aria-label="Close Halls">×</button>
         </div>
       </header>
       <div class="window-body">
@@ -163,10 +162,11 @@
     <section class="window" id="window-memory" data-window="memory" aria-labelledby="title-memory" hidden
       style="left:clamp(220px, 40vw, 520px);top:178px;width:min(420px, calc(100vw - 32px));">
       <header class="title-bar" data-drag-handle>
-        <h2 id="title-memory">Reflexion Memory Inspector</h2>
+        <h2 id="title-memory">Sagas</h2>
         <div class="window-controls">
-          <button type="button" data-action="minimize" aria-label="Minimize Reflexion Memory Inspector">_</button>
-          <button type="button" data-action="close" aria-label="Close Reflexion Memory Inspector">×</button>
+          <button type="button" data-action="maximize" aria-label="Maximize Sagas">□</button>
+          <button type="button" data-action="minimize" aria-label="Minimize Sagas">_</button>
+          <button type="button" data-action="close" aria-label="Close Sagas">×</button>
         </div>
       </header>
       <div class="window-body">
@@ -179,23 +179,23 @@
     <section class="window browser-window" id="window-browser" data-window="browser" aria-labelledby="title-browser" hidden
       style="left:clamp(32px, 12vw, 170px);top:76px;width:min(760px, calc(100vw - 32px));">
       <header class="title-bar" data-drag-handle>
-        <h2 id="title-browser">Valhalla Web Shell</h2>
+        <h2 id="title-browser">Valhalla Browser</h2>
         <div class="window-controls">
-          <button type="button" data-action="minimize" aria-label="Minimize Valhalla Web Shell">_</button>
-          <button type="button" data-action="close" aria-label="Close Valhalla Web Shell">×</button>
+          <button type="button" data-action="maximize" aria-label="Maximize Valhalla Browser">□</button>
+          <button type="button" data-action="minimize" aria-label="Minimize Valhalla Browser">_</button>
+          <button type="button" data-action="close" aria-label="Close Valhalla Browser">×</button>
         </div>
       </header>
       <div class="window-body browser-body">
         <div class="address-row">
-          <label for="browser-page">Address</label>
-          <select id="browser-page">
-            <option value="/">Valhalla home</option>
-            <option value="/status/">Service status</option>
-          </select>
-          <a class="classic-button" href="/" target="_blank" rel="noopener noreferrer">Open separately</a>
+          <label for="browser-address">Public https address</label>
+          <input id="browser-address" type="text" autocomplete="off" spellcheck="false">
+          <button type="button" class="classic-button" id="browser-open">Open in new tab</button>
+          <select id="browser-page" hidden aria-hidden="true"><option value="">Unused</option></select>
         </div>
-        <iframe title="Valhalla site preview" src="/" loading="lazy"
-          sandbox="allow-forms allow-scripts" referrerpolicy="no-referrer"></iframe>
+        <p id="browser-note" role="status">This is not a full browser. Chrome extensions are not available here. A site that blocks frames is opened in a new tab instead.</p>
+        <ul id="browser-history"></ul>
+        <iframe id="browser-frame" title="Embedded page" src="about:blank" sandbox="" referrerpolicy="no-referrer"></iframe>
       </div>
     </section>
 
@@ -204,6 +204,7 @@
       <header class="title-bar" data-drag-handle>
         <h2 id="title-wallet">Web3 Wallet Bridge</h2>
         <div class="window-controls">
+          <button type="button" data-action="maximize" aria-label="Maximize Web3 Wallet Bridge">□</button>
           <button type="button" data-action="minimize" aria-label="Minimize Web3 Wallet Bridge">_</button>
           <button type="button" data-action="close" aria-label="Close Web3 Wallet Bridge">×</button>
         </div>
@@ -225,14 +226,35 @@
     <div class="start-menu" id="start-menu" hidden>
       <strong>ValhallaOS</strong>
       <button type="button" data-open="status">System Status</button>
-      <button type="button" data-open="swarm">A2A Monitor</button>
-      <button type="button" data-open="memory">Memory Inspector</button>
-      <button type="button" data-open="browser">Web Shell</button>
+      <button type="button" data-open="swarm">Halls</button>
+      <button type="button" data-open="memory">Sagas</button>
+      <button type="button" data-open="browser">Valhalla Browser</button>
       <button type="button" data-open="wallet">Wallet Bridge</button>
       <hr>
       <p>Administrative controls require a verified server session and are not available here.</p>
     </div>
 
+    <section class="global-command chat-panel" aria-labelledby="chat-title">
+      <div class="panel-heading"><h2 id="chat-title">Command</h2><span>SAME SIGN-IN</span></div>
+      <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Assistant conversation">
+        <p class="chat-intro"><strong>Valhalla Guide</strong><br>Ask about the desk or paper trading. Chat cannot place trades or access your wallet.</p>
+      </div>
+      <form id="chat-form" class="chat-form">
+        <label class="sr-only" for="chat-input">Message the assistant</label>
+        <textarea id="chat-input" maxlength="500" rows="2" placeholder="Ask the assistant…" required></textarea>
+        <button type="submit" class="classic-button accent-button">Send</button>
+        <button type="button" class="classic-button" id="chat-stop">Stop</button>
+      </form>
+      <div id="transcript-group">
+        <label for="chat-transcript">Transcript</label>
+        <textarea id="chat-transcript" rows="2"></textarea>
+        <button type="button" class="classic-button" id="use-transcript">Use transcript</button>
+        <button type="button" class="classic-button" id="chat-listen">Start listening</button>
+        <p id="listen-status" role="status">Speech recognition has not been checked.</p>
+      </div>
+      <div class="chat-voice"><button type="button" class="classic-button" id="chat-voice" aria-pressed="false">Voice replies off</button><span>Browser speech only. Nothing plays until you turn this on.</span></div>
+      <p id="chat-status" class="chat-status" role="status">Never share a seed phrase or private key. Not financial advice.</p>
+    </section>
     <footer class="taskbar">
       <button class="start-button" id="start-button" type="button" aria-expanded="false" aria-controls="start-menu">
         Tools

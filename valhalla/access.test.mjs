@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { accessRequest, commandPayload, LIVE_TASK_CAPABILITIES, normalizeAccess, replyText, serializeTaskBody, taskContractBlock, tasksRequest } from "./access.js";
+import { accessRequest, commandPayload, healthReady, LIVE_TASK_CAPABILITIES, normalizeAccess, publicWebUrl, replyText, serializeTaskBody, taskContractBlock, tasksRequest } from "./access.js";
 
 test("the sign-in check uses the configured worker and omits cookies", () => {
   assert.equal(accessRequest({ AUTH_URL: "https://auth.example" }, ""), null);
@@ -49,4 +49,25 @@ test("a command is chat and does not invent a conversation id", () => {
   assert.equal(replyText({ ok: true, status: "unavailable", text: null }), null);
   assert.equal(replyText({ ok: true, status: "completed", text: "  " }), null);
   assert.equal(replyText({ ok: true, status: "completed", text: "done" }), "done");
+});
+
+test("health is ready only from ready or component evidence", () => {
+  assert.equal(healthReady({ status: "ok" }), false);
+  assert.equal(healthReady({ ready: true }), true);
+  assert.equal(healthReady({ components: {} }), false);
+  assert.equal(healthReady({ components: { api: "ok", db: true } }), true);
+  assert.equal(healthReady({ components: { api: "down" } }), false);
+});
+
+test("the browser address rejects scripts, local nets, and keys", () => {
+  assert.equal(publicWebUrl("javascript:alert(1)").ok, false);
+  assert.equal(publicWebUrl("data:text/html,hi").ok, false);
+  assert.equal(publicWebUrl("https://user:pass@example.com/").ok, false);
+  assert.equal(publicWebUrl("https://127.0.0.1/admin").ok, false);
+  assert.equal(publicWebUrl("https://10.0.0.4/").ok, false);
+  assert.equal(publicWebUrl("https://example.com/?token=abc").ok, false);
+  assert.equal(publicWebUrl("http://example.com/page").http, true);
+  var safe = publicWebUrl("https://example.com/guide");
+  assert.equal(safe.ok, true);
+  assert.equal(safe.display, "https://example.com/guide");
 });
