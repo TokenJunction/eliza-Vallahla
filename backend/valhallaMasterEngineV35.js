@@ -10,6 +10,7 @@ import { claimAdmin, cleanDisplayName, issueBoundSession, openStore, revokeBound
 import { runElizaTask } from "./eliza-route.js";
 import { admit, finish, history, loadTasks, readTask, saveTasks, serverPolicy, stopTask } from "./task-invocation.js";
 import { assertPublicTarget } from "./ssrf.js";
+import { jupiterBuildUrl, parseBuild, rpcStatusRequest } from "./jupiter-v2.js";
 import { ADAPTER_VERSION, PROVIDER_CATALOG, blankProvider, testProvider } from "./adapters.js";
 import { NOT_CONFIGURED_APPS, builtinManifests, canLaunch, editionAllows, scopeKey } from "./apps.js";
 import { connectorRequest, listConnectors } from "./connectors.js";
@@ -26,7 +27,6 @@ import { createReflexion } from "./valhallaReflexionEngine.js";
 const APPS = builtinManifests();
 const MAX_BODY = 64 * 1024;
 const TERMS_VERSION = "2026-11-03";
-const JUPITER_QUOTE = "https://quote-api.jup.ag/v6/quote";
 
 function allowRate(buckets, ip) {
   const now = Date.now();
@@ -198,7 +198,7 @@ export function createServer(options = {}) {
             store: state.store.durable ? "ready" : "memory",
             auth: "live-session",
             model: modelUp ? "available" : "unconfigured",
-            jupiter: "quote-only",
+            jupiter: "v2-build-unsigned",
             execution: "absent",
             liveTrading: "disabled",
           },
@@ -678,20 +678,50 @@ export function createServer(options = {}) {
         return json(res, stopped.status, stopped, origin);
       }
       if (req.method === "GET" && url.pathname === "/api/jupiter/quote") {
-        const inputMint = url.searchParams.get("inputMint") || "";
-        const outputMint = url.searchParams.get("outputMint") || "";
-        const amount = url.searchParams.get("amount") || "";
-        if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(inputMint) || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(outputMint) || !/^[1-9]\d{0,17}$/.test(amount)) {
-          return json(res, 400, { ok: false, error: "quote-params", code: "V-QUOTE" }, origin);
+        const planned = jupiterBuildUrl({
+          inputMint: url.searchParams.get("inputMint") || "",
+          outputMint: url.searchParams.get("outputMint") || "",
+          amount: url.searchParams.get("amount") || "",
+          taker: url.searchParams.get("taker") || "",
+          slippageBps: url.searchParams.get("slippageBps"),
+          url: url.searchParams.get("url"),
+          host: url.searchParams.get("host"),
+        });
+        if (!planned.ok) return json(res, 400, { ok: false, error: planned.reason, executed: false, signed: false, code: "V-QUOTE" }, origin);
+        const target = await assertPublicTarget(planned.href, options.resolveImpl);
+        if (!target.ok || target.host !== "api.jup.ag" || new URL(planned.href).pathname !== "/swap/v2/build") {
+          return json(res, 403, { ok: false, error: "quote-host", executed: false, signed: false, code: "V-QUOTE" }, origin);
         }
-        const target = await assertPublicTarget(`${JUPITER_QUOTE}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}`, options.resolveImpl);
-        if (!target.ok || target.host !== "quote-api.jup.ag") {
-          return json(res, 403, { ok: false, error: "quote-host", code: "V-QUOTE" }, origin);
+        const headers = {};
+        if (env.JUPITER_API_KEY) headers["x-api-key"] = env.JUPITER_API_KEY;
+        const response = await fetchImpl(target.href, { method: "GET", redirect: "error", headers, signal: AbortSignal.timeout(8000) });
+        if (!response.ok) return json(res, 502, { ok: false, error: "quote-unavailable", executed: false, signed: false, code: "V-QUOTE" }, origin);
+        const prepared = parseBuild(await response.json());
+        if (!prepared.ok) return json(res, 502, { ok: false, error: prepared.reason, executed: false, signed: false, code: "V-QUOTE" }, origin);
+        return json(res, 200, prepared, origin);
+      }
+      if (req.method === "GET" && url.pathname === "/api/solana/rpc-status") {
+        const planned = rpcStatusRequest(env.SOLANA_RPC_URL);
+        if (!planned.ok) return json(res, planned.configured ? 403 : 503, { ok: false, configured: planned.configured, reason: planned.reason, sendTransaction: false }, origin);
+        const target = await assertPublicTarget(planned.href, options.resolveImpl);
+        if (!target.ok || target.host !== planned.host) {
+          return json(res, 403, { ok: false, configured: true, reason: "rpc-host", sendTransaction: false }, origin);
         }
-        const response = await fetchImpl(target.href, { method: "GET", redirect: "error", signal: AbortSignal.timeout(8000) });
-        if (!response.ok) return json(res, 502, { ok: false, error: "quote-unavailable", executed: false, code: "V-QUOTE" }, origin);
-        const quote = await response.json();
-        return json(res, 200, { ok: true, quote, executed: false, mode: "paper", signature: null }, origin);
+        const response = await fetchImpl(target.href, {
+          method: "POST",
+          redirect: "error",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),
+          signal: AbortSignal.timeout(8000),
+        });
+        const payload = response.ok ? await response.json() : null;
+        return json(res, response.ok ? 200 : 502, {
+          ok: Boolean(payload && payload.result === "ok"),
+          configured: true,
+          method: "getHealth",
+          sendTransaction: false,
+          signed: false,
+        }, origin);
       }
       if (req.method === "POST" && url.pathname === "/api/jupiter/paper") {
         const { json: body } = await readJson(req);
