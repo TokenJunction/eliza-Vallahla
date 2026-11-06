@@ -16,8 +16,6 @@
     <header class="topbar" data-nav="locked">
       <a class="brand" href="/"><svg id="brand-mark" class="brand-mark" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><path fill="none" stroke="#E8B65A" stroke-width="1.6" d="M5 23c4.2-11 17.8-11 22 0"/><path fill="none" stroke="#C9963E" stroke-width="1.2" d="M9 23c2.8-7 11.2-7 14 0"/><path fill="#E8B65A" d="M15 13h2v10h-2z"/></svg><span>VALHALLAOS</span></a>
       <nav aria-label="Main navigation">
-        <a href="#discover">Overview</a>
-        <a href="/faq/">Help</a>
         <a href="#access">Client access</a>
       </nav>
     </header>
@@ -45,22 +43,13 @@
       <section class="intro-note" id="discover" aria-labelledby="discover-title">
         <h1 id="discover-title">ValhallaOS</h1>
         <p class="tagline">Trade Solana. Work with AI. Keep control.</p>
-        <p>Jupiter trading, with an AI workspace.</p>
-        <p>The ValhallaOS flagship is a Jupiter trading terminal inside an extensible AI workspace.</p>
-        <p>The release will connect the customer's own Solana wallet, show routes, quotes, slippage, and fees, and wait for an explicit approval before any trade.</p>
-        <p>Designed for customer-controlled Jupiter trades with optional ElizaOS assistance. Powered by Jupiter. This is not an official Jupiter product.</p>
-        <p>The preview does not execute swaps or take payment; live service access starts after independent review.</p>
-        <p>The planned preview includes sign-in and quote review when connected; this page does not complete sign-in.</p>
-        <p><a href="#access">Preview the terminal</a></p>
-        <p>Planned hosted plan: $5 a month for a hosted workspace, terminal, and optional ElizaOS help. You bring your own provider, RPC, and Solana funds. There is no checkout and no billing connection. Joining the waitlist does not reserve a quote and does not promise a reply time.</p>
-        <p><button type="button" id="join-waitlist">Join waitlist</button></p>
-        <p><a href="https://github.com/TokenJunction/eliza-valhalla">Repository</a></p>
+        <p>The flagship is a Jupiter trading terminal inside an AI workspace. Designed for customer-controlled trades, with optional ElizaOS assistance. Not an official Jupiter product.</p>
+        <p>The preview does not execute swaps or take payment. Sign-in and quote review are planned for when the service is connected. This page does not complete sign-in.</p>
       </section>
 
       <section class="access" id="access" aria-labelledby="access-title">
         <div class="access-body">
-          <h2 id="access-title">Access ValhallaOS</h2>
-          <p>Optional. Preview the terminal opens the existing sign-in check. This page does not connect a wallet, does not collect a key, and does not complete sign-in.</p>
+          <h2 id="access-title">Client access</h2>
           <form id="home-email" action="/app/" method="get">
             <label for="home-email-address">Email address</label>
             <input id="home-email-address" type="email" autocomplete="email" placeholder="you@example.com" required>
@@ -68,8 +57,7 @@
           </form>
           <div class="divider"><span>or</span></div>
           <a class="google-link" id="home-google" href="/app/">Continue with Google</a>
-          <p class="access-help">New here? Choose <strong>Create account</strong> on the next screen. Returning or recovering access? Use your email to receive a sign-in code.</p>
-          <p class="security-note">Never share a seed phrase or private key. Valhalla will not ask for one.</p>
+          <p class="security-note">Never share a seed phrase or private key. ValhallaOS will not ask for one.</p>
         </div>
       </section>
     </main>
@@ -77,12 +65,7 @@
     <footer>
       <span>VALHALLAOS</span>
       <nav aria-label="Footer">
-        <a href="/faq/">FAQ</a>
-        <a href="/contact/">Contact</a>
-        <a href="/pay/">Editions</a>
-        <a href="/shop/">Shop</a>
-        <a href="/terms/">Terms</a>
-        <a href="/privacy/">Privacy</a>
+        <a href="https://github.com/TokenJunction/eliza-valhalla">Repository</a>
         <a href="/disclaimer.html">Risk</a>
       </nav>
       <p>A live trade is your own wallet transaction. You keep custody. Results are not guaranteed. This is not financial advice.</p>
@@ -91,12 +74,6 @@
   </div>
   <script src="/site-config.js"></script>
   <script src="/home.js"></script>
-  <dialog id="waitlist-dialog">
-    <h2>Planned hosted plan</h2>
-    <p>$5 a month is the planned price. There is no checkout and no billing connection. This does not reserve a quote and does not promise a reply time.</p>
-    <p><a href="mailto:hello@valhalla-app.xyz?subject=ValhallaOS%20waitlist">Email support to join the waitlist</a></p>
-    <button type="button" id="waitlist-close">Close</button>
-  </dialog>
   <script src="/home-motion.js"></script>
   <script src="/site-chrome.js"></script>
 </body>
