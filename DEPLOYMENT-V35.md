@@ -16,7 +16,49 @@ The ElizaOS runtime is for health reporting and simulated/paper workflows only. 
 
 The ElizaOS `start` command validates its environment before launch. Production requires at least one configured model-provider key; Supabase and Upstash REST URL/token pairs must be complete when used, and unsupported trading, key-storage, social-dispatch, and Zeus idle-job switches must remain disabled. Redis and Supabase are optional integrations and are not represented as connected merely because a URL is configured.
 
-The database policies use Supabase's authenticated `auth.uid()` claim, not an email address supplied by a client. Vault audit records are service-role-only. The service-role key must never be exposed to a browser.
+The database policies on the existing personal tables use Supabase's authenticated `auth.uid()` claim, not an email address supplied by a client. Vault audit records are service-role-only. The service-role key must never be exposed to a browser.
+
+The Valhalla device sign-in does not create a Supabase Auth session. `auth.uid()` stays empty for that sign-in. A row policy that compares `auth.uid()` does not prove the device sign-in. The backend must not treat the device token as a Supabase user id.
+
+## Customer mapping
+
+The isolated backend maps a checked device sign-in to a customer UUID. Use `mapCustomerFromBearer` in `lib/customer-identity.js`. That function calls `GET /auth/access` with the bearer token and then reads or inserts `public.customer_identity` with the service-role key.
+
+Rules for that map:
+
+- Send the bearer token to the auth worker. Do not accept `email`, `user_id`, or a customer id from request headers.
+- Store only the SHA-256 email hash. The table has no email column and no admin column.
+- The customer row is a personal record. `role` stays `customer`. It does not grant leader access and it does not receive `LEADER_EMAIL`, `DEVICE_COOKIE_SECRET`, or the service-role key.
+- `leader` is true only when the auth worker reports Google, the email code, and the configured leader mailbox for that live session. Do not copy that flag onto the customer row.
+- Apply `supabase/migrations/20261106000000_customer_identity_mapping.sql` only on the intended project. The migration grants select and insert to `service_role` and revokes the browser roles. It does not link `customer_id` to `auth.users`.
+
+## Sign-in session deploy order
+
+This change does not rotate `DEVICE_COOKIE_SECRET` and it does not change the live secret value. Deploy the website and the `valhalla-auth` worker together. Deploy the website first if you must split the work. Do not deploy the worker first: the new worker requires a one-time nonce, and the previous website does not send one.
+
+After the worker is deployed, old bearer tokens stop working because they have no live `sess:` record. Users sign in again. That is expected.
+
+A recognized, unrevoked device can skip the extra email code when "Always ask" is off. A device that is new, revoked, or expired still needs the code. The account owner still needs Google plus the email code. A display name does not grant owner access. Sign-in responses return a masked mailbox hint. They do not return the full name or the profile photo.
+
+The member id is `customer_id` in tenant `valhalla`. The mapper ignores a user id, email, name, or photo supplied by the browser. It does not set Supabase `auth.uid()`.
+
+This pull request does not change the Cerberus public caller. Authenticated rate limits for those workspace endpoints remain a separate priority.
+
+Turnstile stays off for this worker until you set `TURNSTILE_SECRET` on `valhalla-auth`. Use the same secret as `valhalla-turnstile-verify`. Do not commit it. Set it only after the website that calls `/auth/human` is live:
+
+`npx wrangler secret put TURNSTILE_SECRET --config workers/auth.toml`
+
+When the secret is set, `/auth/human` checks the token with Cloudflare. The widget action must be `valhalla-signin` and the hostname must be `valhalla-app.xyz` or `www.valhalla-app.xyz`. A missing token, a reused token, the wrong action, the wrong host, or a siteverify error is rejected. When the secret is unset, those routes do not ask for the pass.
+
+No new key is created by this change. `AUTH_KV` is the existing namespace. New keys use the prefixes `sess:`, `nonce:`, `human:`, and `gcred:`. Each of those keys has a TTL. They do not store the mailbox address or the signing secret.
+
+If `DEVICE_COOKIE_SECRET` is exposed, replace it and delete the live session keys. This change does not do that replacement. Generate a new random value outside the repository, then run:
+
+`npx wrangler secret put DEVICE_COOKIE_SECRET --config workers/auth.toml`
+
+Then delete keys that start with `sess:`, `nonce:`, `human:`, and `gcred:` in KV namespace `9f0316ce34f84f53bf3ffa5ef31cbe72`. Users sign in again. A person who knows only the signing secret cannot mint a working plan token after this deploy, because the token also needs a live `sess:` row. A person who can both sign and write KV can still create a row until you rotate the secret and delete those keys.
+
+KV does not provide a compare-and-swap. Two identical sign-in requests that arrive at the same moment can both pass the one-time check once. The mailbox code is still removed after a successful check, and a later request with the same nonce fails.
 
 ## Hosting setup
 

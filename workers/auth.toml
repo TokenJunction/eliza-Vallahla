@@ -4,7 +4,15 @@
 #   RESEND_API_KEY            only if Cloudflare Email Sending is not onboarded yet
 #   LEADER_EMAIL              Google-authenticated account authorized for manager access
 #   AUTH_KV                   KV namespace id
+#   TURNSTILE_SECRET          optional. Same secret as valhalla-turnstile-verify.
+#                             When set, /auth/human checks the token and the
+#                             Google and email routes require that pass.
+#                             A failed or missing check is rejected.
+#                             When unset, those routes do not ask for it.
 # Configure LEADER_EMAIL as a Worker secret; an unset value disables owner access.
+# Do not put TURNSTILE_SECRET or DEVICE_COOKIE_SECRET in git.
+# Set the human-check secret only after the website that calls /auth/human is live:
+#   npx wrangler secret put TURNSTILE_SECRET --config workers/auth.toml
 # Set it with: npx wrangler secret put LEADER_EMAIL --config workers/auth.toml
 # Email Sending on the valhalla-app.xyz zone can send to any inbox after the
 # domain is onboarded (Workers Paid). Before that, the EMAIL binding can send
