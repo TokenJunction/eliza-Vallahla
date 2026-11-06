@@ -63,7 +63,7 @@ async function runLocalQwen(env = {}, deps = {}) {
   const token = usableSecret(env.VALHALLA_LOCAL_GATEWAY_TOKEN);
   const model = typeof env.VALHALLA_LOCAL_MODEL === 'string' && env.VALHALLA_LOCAL_MODEL.trim()
     ? env.VALHALLA_LOCAL_MODEL.trim()
-    : 'qwen2.5';
+    : 'qwen2.5-coder:14b';
   if (!baseUrl) {
     return fail('gateway_not_configured', 'Set VALHALLA_LOCAL_GATEWAY_URL to the loopback gateway. This script does not open a tunnel.');
   }

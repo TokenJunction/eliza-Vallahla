@@ -26,7 +26,7 @@ const types = {
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml',
   '.mp4': 'video/mp4', '.md': 'text/markdown; charset=utf-8',
 };
-const hidden = /(^|[\\/])(\.[^\\/]*|(node_modules|workers|supabase|scripts|lib|customer|valhalla-elizaos)([\\/]|$))/;
+const hidden = /(^|[\\/])(\.[^\\/]*|(node_modules|workers|supabase|scripts|lib|customer|provider-harness|valhalla-elizaos)([\\/]|$))/;
 
 function resolve(urlPath) {
   const rel = path.normalize(decodeURIComponent(urlPath.split('?')[0])).replace(/^([\\/]|\.\.)+/, '');

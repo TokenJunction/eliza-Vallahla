@@ -14,7 +14,7 @@ function env(overrides = {}) {
   return {
     VALHALLA_LOCAL_GATEWAY_URL: 'http://127.0.0.1:8787',
     VALHALLA_LOCAL_GATEWAY_TOKEN: TOKEN,
-    VALHALLA_LOCAL_MODEL: 'qwen2.5',
+    VALHALLA_LOCAL_MODEL: 'qwen2.5-coder:14b',
     VALHALLA_PROVIDER_BUDGET_USD: '1',
     ...overrides,
   };
@@ -68,14 +68,20 @@ test('a local qwen reply stays on the loopback gateway and redacts the token', a
   assert.equal(result.healthy, true);
   assert.equal(result.assumed, false);
   assert.equal(result.route, 'local-gateway');
-  assert.equal(result.model, 'qwen2.5');
+  assert.equal(result.model, 'qwen2.5-coder:14b');
+  const fallback = { ...env() };
+  delete fallback.VALHALLA_LOCAL_MODEL;
+  const defaulted = await relay.runLocalQwen(fallback, {
+    fetchImpl: async () => answer('pong'),
+  });
+  assert.equal(defaulted.model, 'qwen2.5-coder:14b');
   assert.equal(result.liveExecution, false);
   assert.equal(result.offline, true);
   assert.equal(result.cloudCalled, false);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'http://127.0.0.1:8787/v1/generate');
   assert.equal(calls[0].options.headers.authorization, `Bearer ${TOKEN}`);
-  assert.equal(JSON.parse(calls[0].options.body).model, 'qwen2.5');
+  assert.equal(JSON.parse(calls[0].options.body).model, 'qwen2.5-coder:14b');
   assert.equal(result.content.includes(TOKEN), false);
   assert.equal(JSON.stringify(result).includes(TOKEN), false);
 });
