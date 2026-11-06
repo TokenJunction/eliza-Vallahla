@@ -111,3 +111,39 @@ test("engagement collection requires analytics consent and stores aggregate even
   assert.equal(body.approximate, true);
   assert.equal(body.days[6].page_view, 1);
 });
+
+test("a typed email is not a Google session, and a Supabase Google user gets a session without leader", async () => {
+  var state = setup();
+  state.env.SUPABASE_URL = "https://girltjnrrwlyeufrcors.supabase.co";
+  state.env.SUPABASE_ANON_KEY = "sb_publishable_example_public_key_000";
+  var incomplete = await worker.fetch(request("/auth/supabase", "POST", {
+    provider: "google",
+    supabaseUrl: state.env.SUPABASE_URL,
+  }), state.env);
+  assert.equal(incomplete.status, 400);
+  assert.equal((await incomplete.json()).error, "incomplete");
+
+  var previous = globalThis.fetch;
+  globalThis.fetch = async function (url, options) {
+    assert.equal(String(url), state.env.SUPABASE_URL + "/auth/v1/user");
+    assert.equal(options.headers.authorization, "Bearer supabase-user-access-token");
+    return new Response(JSON.stringify({
+      email: leaderEmail,
+      app_metadata: { provider: "google" },
+      user_metadata: { full_name: "Ada" },
+    }), { status: 200 });
+  };
+  try {
+    var accepted = await worker.fetch(request("/auth/supabase", "POST", {
+      accessToken: "supabase-user-access-token",
+    }), state.env);
+    var body = await accepted.json();
+    assert.equal(accepted.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(typeof body.session, "string");
+    var role = await worker.fetch(request("/auth/leader", "POST", {}, body.session), state.env);
+    assert.equal((await role.json()).role, "member");
+  } finally {
+    globalThis.fetch = previous;
+  }
+});

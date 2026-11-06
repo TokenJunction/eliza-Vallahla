@@ -227,7 +227,8 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
     knownIp: knownIp,
     alwaysAsk: account.alwaysAsk === true,
     leader: false,
-    codeThisLogin: codeThisLogin === true
+    codeThisLogin: codeThisLogin === true,
+    googleVerified: googleVerified === true
   });
   if (need && !codeThisLogin) return { needCode: true, account: account, ipHash: ipHash };
   var did = knownDevice ? existing.did : crypto.randomUUID();
@@ -299,6 +300,37 @@ export default {
     }
     var url = new URL(request.url);
     var body = request.method === "POST" ? await request.json().catch(function () { return {}; }) : {};
+    if (url.pathname === "/auth/supabase" && request.method === "POST") {
+      if (body.email && !body.accessToken) return json({ ok: false, error: "incomplete" }, 400, request);
+      if (body.provider === "google" && !body.accessToken) return json({ ok: false, error: "incomplete" }, 400, request);
+      var accessToken = String(body.accessToken || "");
+      if (!accessToken || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+        return json({ ok: false, error: "auth-not-configured" }, 503, request);
+      }
+      var supabaseUrl = String(env.SUPABASE_URL).replace(/\/$/, "");
+      var userResponse = await fetch(supabaseUrl + "/auth/v1/user", {
+        headers: { apikey: env.SUPABASE_ANON_KEY, authorization: "Bearer " + accessToken }
+      });
+      if (!userResponse.ok) return json({ ok: false, error: "google" }, 401, request);
+      var user = await userResponse.json();
+      var provider = user && user.app_metadata && user.app_metadata.provider;
+      if (provider !== "google" || !validEmail(user.email)) return json({ ok: false, error: "google" }, 401, request);
+      var supabaseEmail = String(user.email).toLowerCase();
+      var supabaseHash = await sha256(supabaseEmail);
+      var supabaseAccount = await accountOf(env, supabaseHash);
+      await saveAccount(env, supabaseHash, supabaseAccount);
+      var supabaseNext = await sessionFor(env, supabaseHash, request, false, true);
+      if (supabaseNext.needCode) return json({ ok: false, error: "incomplete" }, 409, request);
+      return json({
+        ok: true,
+        needCode: false,
+        email: supabaseEmail,
+        name: String((user.user_metadata && user.user_metadata.full_name) || ""),
+        picture: String((user.user_metadata && user.user_metadata.avatar_url) || ""),
+        session: supabaseNext.session,
+        redirect: await loginRedirect(env, supabaseHash, false)
+      }, 200, request, { "set-cookie": supabaseNext.cookie });
+    }
     if (url.pathname === "/auth/google" && request.method === "POST") {
       var info = await googleInfo(env, String(body.credential || ""));
       if (!info) return json({ ok: false, error: "google" }, 401, request);

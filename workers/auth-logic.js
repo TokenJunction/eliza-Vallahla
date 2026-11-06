@@ -1,6 +1,7 @@
 /** Pure sign-in rules. No secrets and no codes. */
 
 export function needSecondFactor(input) {
+  if (input.googleVerified === true) return false;
   return input.codeThisLogin !== true;
 }
 

@@ -59,14 +59,20 @@
     });
   }
 
-  function openWindow(name) {
+  function openWindow(name, opener) {
     var node = getWindow(name);
     if (!node) return;
     node.hidden = false;
     node.dataset.minimized = 'false';
+    if (opener) node._returnFocus = opener;
     updateTaskbar();
     focusWindow(node);
     setMenu(false);
+    var title = node.querySelector('.title-bar h2');
+    if (title) {
+      title.tabIndex = -1;
+      title.focus();
+    }
     announce(node.querySelector('.title-bar h2').textContent + ' opened.');
     if (name === 'status') checkHealth();
   }
@@ -76,6 +82,30 @@
     node.dataset.minimized = 'false';
     updateTaskbar();
     announce(node.querySelector('.title-bar h2').textContent + ' closed.');
+    if (node._returnFocus && document.contains(node._returnFocus)) node._returnFocus.focus();
+  }
+
+  function maximizeWindow(node) {
+    if (node.dataset.maximized === 'true') {
+      node.style.left = node.dataset.restoreLeft || '';
+      node.style.top = node.dataset.restoreTop || '';
+      node.style.width = node.dataset.restoreWidth || '';
+      node.style.height = node.dataset.restoreHeight || '';
+      node.dataset.maximized = 'false';
+      announce(node.querySelector('.title-bar h2').textContent + ' restored.');
+      return;
+    }
+    node.dataset.restoreLeft = node.style.left;
+    node.dataset.restoreTop = node.style.top;
+    node.dataset.restoreWidth = node.style.width;
+    node.dataset.restoreHeight = node.style.height;
+    node.dataset.maximized = 'true';
+    node.style.left = '8px';
+    node.style.top = '8px';
+    node.style.width = 'calc(100vw - 16px)';
+    node.style.height = 'calc(100vh - 148px)';
+    focusWindow(node);
+    announce(node.querySelector('.title-bar h2').textContent + ' maximized.');
   }
 
   function minimizeWindow(node) {
@@ -94,26 +124,35 @@
   }
 
   async function checkHealth() {
-    var output = document.getElementById('backend-status');
-    if (output.textContent === 'Checking…') setHealth('Checking…', 'loading');
     var checkedAt = document.getElementById('checked-at');
+    var site = window.VALHALLA_SITE || {};
+    var base = String(site.AGENT_API_URL || '').replace(/\/$/, '');
+    if (base.indexOf('https://') !== 0) {
+      setHealth('Not configured. No service was called.', 'idle');
+      checkedAt.textContent = 'Not checked';
+      return;
+    }
+    setHealth('Checking…', 'loading');
     var controller = new AbortController();
     var timeout = window.setTimeout(function () { controller.abort(); }, 6000);
     try {
-      var response = await fetch('/health', {
+      var response = await fetch(base + '/ready', {
         method: 'GET',
         headers: { Accept: 'application/json' },
         cache: 'no-store',
-        credentials: 'same-origin',
+        credentials: 'omit',
         signal: controller.signal
       });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
       var result = await response.json();
-      if (!result || typeof result.status !== 'string') throw new Error('Unexpected health response');
-      setHealth(result.status + (result.engine ? ' · ' + result.engine : ''), 'ok');
+      var access = await import('/valhalla/access.js');
+      if (response.ok && access.healthReady(result)) {
+        setHealth('Operational.', 'ok');
+      } else {
+        setHealth('Not operational.', 'error');
+      }
       checkedAt.textContent = new Date().toLocaleTimeString();
     } catch (error) {
-      setHealth('Unavailable · ' + (error.name === 'AbortError' ? 'timed out' : 'probe failed'), 'error');
+      setHealth(error.name === 'AbortError' ? 'Not operational. Timed out.' : 'Not operational. The check failed.', 'error');
       checkedAt.textContent = new Date().toLocaleTimeString();
     } finally {
       window.clearTimeout(timeout);
@@ -157,7 +196,7 @@
   desktop.addEventListener('click', function (event) {
     var launcher = event.target.closest('[data-open]');
     if (launcher) {
-      openWindow(launcher.dataset.open);
+      openWindow(launcher.dataset.open, launcher);
       return;
     }
     var action = event.target.closest('[data-action]');
@@ -165,6 +204,7 @@
       var node = action.closest('[data-window]');
       if (action.dataset.action === 'close') closeWindow(node);
       if (action.dataset.action === 'minimize') minimizeWindow(node);
+      if (action.dataset.action === 'maximize') maximizeWindow(node);
       return;
     }
     if (event.target.closest('[data-refresh]')) checkHealth();
@@ -181,15 +221,20 @@
     }
   });
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' && !menu.hidden) {
+    if (event.key !== 'Escape' || desktop.hidden) return;
+    if (!menu.hidden) {
       setMenu(false);
       startButton.focus();
+      return;
     }
-  });
-  document.getElementById('browser-page').addEventListener('change', function (event) {
-    var iframe = document.querySelector('#window-browser iframe');
-    iframe.src = event.target.value;
-    document.querySelector('#window-browser .address-row a').href = event.target.value;
+    var active = document.activeElement;
+    if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT') && !active.closest('[data-window]')) return;
+    var front = windows.filter(function (node) { return !node.hidden; }).sort(function (a, b) {
+      return Number(b.style.zIndex || 0) - Number(a.style.zIndex || 0);
+    })[0];
+    if (!front) return;
+    event.preventDefault();
+    closeWindow(front);
   });
 
   function updateClock() {

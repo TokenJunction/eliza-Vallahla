@@ -121,7 +121,8 @@
   }
 
   async function remote(text) {
-    var base = String(cfg().CHAT_URL || cfg().AGENT_API_URL || "");
+    var base = String(cfg().CHAT_URL || "");
+    if (base.indexOf("https://") !== 0) return "";
     if (!base) return "";
     var started = clock();
     var provider = "unknown";

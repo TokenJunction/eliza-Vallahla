@@ -52,7 +52,7 @@
 
   async function connect(name) {
     if (busy) return;
-    var provider = name === 'solflare' ? window.solflare : ethereumProvider();
+    var provider = name === 'solflare' ? window.solflare : (ethereumProvider() && ethereumProvider().solana ? ethereumProvider() : null);
     if (!provider) {
       status.textContent = (name === 'solflare' ? 'Solflare' : 'MetaMask') + ' was not detected. Install or enable its browser extension, then try again.';
       return;
@@ -66,8 +66,14 @@
         var result = await provider.connect();
         address = String(result && result.publicKey || provider.publicKey || '');
       } else {
-        var accounts = await provider.request({ method: 'eth_requestAccounts' });
-        address = Array.isArray(accounts) ? String(accounts[0] || '') : '';
+        var solana = provider.solana;
+        if (!solana || typeof solana.connect !== 'function') {
+          status.textContent = 'MetaMask Solana was not detected. Nothing was signed.';
+          return;
+        }
+        var solanaResult = await solana.connect();
+        var key = solanaResult && solanaResult.publicKey || solana.publicKey;
+        address = key && typeof key.toString === 'function' ? key.toString() : String(key || '');
       }
       if (!address) throw new Error('The wallet returned no account.');
       removeListeners();
@@ -115,6 +121,10 @@
   var history = [];
   var submitting = false;
   var voiceEnabled = false;
+  var taskId = "";
+  var taskConversation = "";
+  var listening = false;
+  var recognition = null;
 
   if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') {
     voiceButton.disabled = true;
@@ -154,35 +164,70 @@
       chatStatus.textContent = 'Do not share a seed phrase or private key. Your message was not sent.';
       return;
     }
-    var base = String((window.VALHALLA_SITE || {}).CHAT_URL || '').replace(/\/+$/, '');
-    if (!base) {
-      chatStatus.textContent = 'Chat service is not configured.';
-      return;
-    }
     submitting = true;
     form.querySelector('button').disabled = true;
-    input.disabled = true;
-    message('YOU', text);
-    input.value = '';
-    chatStatus.textContent = 'Waiting for the chat service…';
+    chatStatus.textContent = 'Waiting for the command service…';
     var controller = new AbortController();
     var timeout = window.setTimeout(function () { controller.abort(); }, 145000);
     try {
-      var response = await fetch(base + '/chat', {
+      var access = await import('/valhalla/access.js');
+      var sessionToken = '';
+      try { sessionToken = sessionStorage.getItem('valhalla-auth-token') || ''; } catch (error) { sessionToken = ''; }
+      var payload = access.commandPayload(text, taskConversation);
+      var blocked = access.taskContractBlock(payload);
+      if (blocked) {
+        chatStatus.textContent = blocked;
+        return;
+      }
+      var taskCall = access.tasksRequest(window.VALHALLA_SITE || {}, sessionToken, payload);
+      if (!taskCall) {
+        chatStatus.textContent = 'Command service is not configured.';
+        return;
+      }
+      var response = await fetch(taskCall.url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: text, history: history.slice(-8), stream: false }),
+        credentials: taskCall.credentials,
+        headers: taskCall.headers,
+        body: taskCall.body,
         signal: controller.signal
       });
-      var body = await response.json();
-      if (!response.ok) throw new Error(body.error || 'Chat request failed.');
-      if (typeof body.reply !== 'string' || !body.reply.trim()) throw new Error('The chat service returned an empty reply.');
-      message('ASSISTANT', body.reply);
+      var body = await response.json().catch(function () { return {}; });
+      var outcome = access.taskState(response.status, body);
+      var started = Date.now();
+      while (outcome.state === 'pending' && outcome.taskId && Date.now() - started < access.TASK_POLL_MAX_MS) {
+        taskId = outcome.taskId;
+        chatStatus.textContent = 'Pending. This command is not finished.';
+        await new Promise(function (resolve) { window.setTimeout(resolve, access.TASK_POLL_MS); });
+        var readCall = access.taskReadRequest(window.VALHALLA_SITE || {}, sessionToken, outcome.taskId, location.hostname);
+        if (!readCall) break;
+        var readResponse = await fetch(readCall.url, {
+          method: 'GET',
+          credentials: readCall.credentials,
+          headers: readCall.headers,
+          signal: controller.signal
+        });
+        var readBody = await readResponse.json().catch(function () { return {}; });
+        outcome = access.taskState(readResponse.status, readBody);
+      }
+      taskId = outcome.taskId || taskId;
+      if (typeof body.conversationId === 'string' && body.conversationId && body.conversationId !== '0') {
+        taskConversation = body.conversationId;
+      }
+      if (outcome.state !== 'done' || payload.app !== 'ai-workspace') {
+        chatStatus.textContent = outcome.state === 'pending'
+          ? 'Still pending. Retry with a new request. Nothing was marked finished.'
+          : 'Command failed. HTTP ' + outcome.code + '.';
+        return;
+      }
+      var reply = outcome.text;
+      message('YOU', text);
+      message('COMMAND', reply);
+      input.value = '';
       var speechFailed = false;
       if (voiceEnabled) {
         try {
           window.speechSynthesis.cancel();
-          window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(body.reply));
+          window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(reply));
         } catch (error) {
           speechFailed = true;
           voiceEnabled = false;
@@ -191,7 +236,7 @@
           chatStatus.textContent = 'Reply received, but browser speech failed. Try voice again.';
         }
       }
-      history.push({ role: 'user', content: text }, { role: 'assistant', content: body.reply.slice(0, 500) });
+      history.push({ role: 'user', content: text }, { role: 'assistant', content: reply.slice(0, 500) });
       history = history.slice(-8);
       if (!speechFailed) chatStatus.textContent = 'Never share a seed phrase or private key. Not financial advice.';
     } catch (error) {
@@ -203,5 +248,107 @@
       input.disabled = false;
       input.focus();
     }
+  });
+
+  document.getElementById('chat-stop').addEventListener('click', async function () {
+    if (!taskId) {
+      chatStatus.textContent = 'No task to stop.';
+      return;
+    }
+    if (!window.confirm('Stop this command?')) return;
+    chatStatus.textContent = 'Stop requested';
+    try {
+      var access = await import('/valhalla/access.js');
+      var sessionToken = '';
+      try { sessionToken = sessionStorage.getItem('valhalla-auth-token') || ''; } catch (error) { sessionToken = ''; }
+      var taskCall = access.tasksRequest(window.VALHALLA_SITE || {}, sessionToken, { taskId: taskId });
+      if (!taskCall) {
+        chatStatus.textContent = 'Stop was not confirmed.';
+        return;
+      }
+      var response = await fetch(taskCall.url.replace(/\/api\/v1\/tasks$/, '/api/v1/tasks/stop'), {
+        method: 'POST',
+        credentials: taskCall.credentials,
+        headers: taskCall.headers,
+        body: access.serializeTaskBody({ taskId: taskId })
+      });
+      var body = await response.json().catch(function () { return {}; });
+      var stopped = access.stopState(response.status, body);
+      if (stopped.taskId) taskId = stopped.taskId;
+      chatStatus.textContent = stopped.state === 'cancel_requested'
+        ? 'Stop requested. The server cancelled this task.'
+        : 'Stop was not confirmed. HTTP ' + stopped.code + '.';
+    } catch {
+      chatStatus.textContent = 'Stop was not confirmed.';
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (document.getElementById('desktop').hidden) return;
+      event.preventDefault();
+      input.focus();
+    }
+  });
+
+  var transcript = document.getElementById('chat-transcript');
+  var listenButton = document.getElementById('chat-listen');
+  var listenStatus = document.getElementById('listen-status');
+  var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    listenButton.disabled = true;
+    listenStatus.textContent = 'Speech recognition is not supported.';
+  } else {
+    recognition = new SpeechRec();
+    listenStatus.textContent = 'Speech recognition is available. Nothing is listening.';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onstart = function () {
+      listening = true;
+      listenButton.textContent = 'Stop listening';
+      listenStatus.textContent = 'Listening. This does not send the form.';
+    };
+    recognition.onresult = function (event) {
+      var said = event.results && event.results[0] && event.results[0][0]
+        ? event.results[0][0].transcript
+        : '';
+      transcript.value = said;
+      listenStatus.textContent = 'Transcript ready. Edit it, then use it. Nothing was sent.';
+    };
+    recognition.onerror = function () {
+      listening = false;
+      listenButton.textContent = 'Start listening';
+      listenStatus.textContent = 'Speech recognition failed. Nothing was sent.';
+    };
+    recognition.onend = function () {
+      listening = false;
+      listenButton.textContent = 'Start listening';
+    };
+    function releaseMic() {
+      try { recognition.abort(); } catch (error) { listening = false; }
+      try { recognition.stop(); } catch (error) { listening = false; }
+      listening = false;
+      listenButton.textContent = 'Start listening';
+    }
+    listenButton.addEventListener('click', function () {
+      if (listening) {
+        releaseMic();
+        listenStatus.textContent = 'Listening stopped. Nothing was sent.';
+        return;
+      }
+      listenStatus.textContent = 'Starting speech recognition.';
+      try {
+        recognition.start();
+      } catch (error) {
+        listening = false;
+        listenButton.textContent = 'Start listening';
+        listenStatus.textContent = 'Speech recognition failed. Nothing was sent.';
+      }
+    });
+    window.addEventListener('pagehide', releaseMic);
+  }
+  document.getElementById('use-transcript').addEventListener('click', function () {
+    input.value = transcript.value;
+    input.focus();
   });
 })();
