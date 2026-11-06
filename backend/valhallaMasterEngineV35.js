@@ -12,7 +12,9 @@ import { admit, finish, history, loadTasks, readTask, saveTasks, serverPolicy, s
 import { assertPublicTarget } from "./ssrf.js";
 import { jupiterBuildUrl, parseBuild, rpcStatusRequest } from "./jupiter-v2.js";
 import { ADAPTER_VERSION, PROVIDER_CATALOG, blankProvider, testProvider } from "./adapters.js";
-import { NOT_CONFIGURED_APPS, builtinManifests, canLaunch, editionAllows, scopeKey } from "./apps.js";
+import { FIRST_APPS, NOT_CONFIGURED_APPS, builtinManifests, canLaunch, editionAllows, scopeKey } from "./apps.js";
+import { identityMode } from "./identity-mode.js";
+import { createPlanStore, setCapacity, viewCapacity } from "./plans.js";
 import { connectorRequest, listConnectors } from "./connectors.js";
 import { deskOpenApi } from "./desk-openapi.js";
 import { modelRoute } from "./model-route.js";
@@ -134,6 +136,7 @@ export function createServer(options = {}) {
   const state = options.state || createState(env);
   state.store = options.store || openStore(options.dataDir);
   state.tasks = loadTasks(state.store);
+  state.plans = createPlanStore();
   const rateBuckets = new Map();
   const fetchImpl = options.fetchImpl || fetch;
   const bus = createBus({
@@ -554,12 +557,29 @@ export function createServer(options = {}) {
           hiddenJobs: false,
         }, origin);
       }
+      if (req.method === "GET" && url.pathname === "/api/identity-mode") {
+        if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        const mode = identityMode(env);
+        return json(res, 200, { ok: true, ...mode }, origin);
+      }
+      if (req.method === "GET" && url.pathname === "/api/plans/personal") {
+        if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        return json(res, 200, { ok: true, ...viewCapacity(state.plans, env) }, origin);
+      }
+      if (req.method === "POST" && url.pathname === "/api/capacity/set") {
+        if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        if (!isRoot(req.session.email, env, state.setup)) return json(res, 403, { ok: false, reason: "owner" }, origin);
+        const { json: body } = await readJson(req);
+        const set = setCapacity(state.plans, { owner: true }, Number(body.cap));
+        return json(res, set.ok ? 200 : 400, { ...set, email: undefined }, origin);
+      }
       if (req.method === "GET" && url.pathname === "/api/apps/catalog") {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
         return json(res, 200, {
           ok: true,
           mvp: state.apps.map((app) => ({ id: app.id, network: app.networkScopes.length === 0, liveTrading: false })),
           notConfigured: NOT_CONFIGURED_APPS,
+          firstApps: FIRST_APPS,
         }, origin);
       }
       if (req.method === "POST" && url.pathname === "/api/apps/thalos/analysis") {

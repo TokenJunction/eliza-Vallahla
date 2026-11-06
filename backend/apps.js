@@ -60,6 +60,22 @@ export function builtinManifests() {
   ];
 }
 
+export const FIRST_APPS = [
+  { id: "daily-brief", connectors: ["calendar"], capabilities: ["schedule"], enabled: false, executes: false, consent: "opt-in-schedule" },
+  { id: "inbox-drafts", connectors: ["email"], capabilities: ["draft"], enabled: false, executes: false, consent: "opt-in-schedule" },
+  { id: "website-watch", connectors: ["http-allowlist"], capabilities: ["fetch"], enabled: false, executes: false, consent: "opt-in-schedule" },
+  { id: "receipt-tracker", connectors: ["billing"], capabilities: ["read"], enabled: false, executes: false, consent: "opt-in-schedule" },
+  { id: "paper-trading", connectors: ["jupiter-v2"], capabilities: ["paper"], enabled: false, executes: false, liveTrading: false, advice: false, consent: "opt-in-schedule" },
+];
+
+export function openFirstApp(appId, entitlement) {
+  const app = FIRST_APPS.find((item) => item.id === appId);
+  if (!app) return { ok: false, reason: "unknown", executes: false };
+  const allowed = entitlement && (entitlement.apps || []).includes(appId);
+  if (!allowed) return { ok: false, reason: "entitlement", executes: false, app: app.id };
+  return { ok: true, app, executes: false, background: false };
+}
+
 export const NOT_CONFIGURED_APPS = [
   { id: "code-assistant", name: "Code assistant", status: "not-configured", network: false },
   { id: "research", name: "Research", status: "not-configured", network: false },
