@@ -13,9 +13,13 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:desk": "vite --host 0.0.0.0 --port 5176 --config vite.desk.config.ts",
     "build": "vite build",
+    "build:desk": "vite build --config vite.desk.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
+    "typecheck:desk": "tsc --noEmit -p ../../app/src/valhalla-desk/tsconfig.json",
     "test": "vitest run --config ./vitest.config.ts",
+    "test:desk": "vitest run --config ../../app/src/valhalla-desk/vitest.config.ts",
     "lint": "bunx @biomejs/biome check --write --unsafe src vite.config.ts vitest.config.ts",
     "package:mac": "electrobun build --env=stable --platform darwin",
     "package:linux": "electrobun build --env=stable --platform linux",

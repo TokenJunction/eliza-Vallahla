@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vite/client"],
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../../../os/setup/src/valhalla-desk/main.tsx"
+  ],
+  "exclude": ["./**/*.test.ts", "./**/*.test.tsx", "./vitest.config.ts"]
+}
