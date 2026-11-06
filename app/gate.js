@@ -189,6 +189,7 @@
     if (error === "rate") return "Please wait a moment, then ask for a new code.";
     if (error === "locked") return "That code was tried too many times. Ask for a new one.";
     if (error === "expired" || error === "code" || error === "missing") return "That code was not accepted.";
+    if (error === "email-sender-rejected") return "The sign-in email was rejected by the mail service. Try again shortly.";
     return "";
   }
 
@@ -248,7 +249,13 @@
       fail(note, "V-AUTH", "empty supabase session", function () { location.reload(); });
       return;
     }
-    postAuth("/auth/supabase", { accessToken: accessToken }).then(function (body) {
+    var nonce = sessionStorage.getItem("valhalla-auth-nonce") || "";
+    var callback = sessionStorage.getItem("valhalla-auth-callback") || "";
+    postAuth("/auth/supabase", { accessToken: accessToken, nonce: nonce, callback: callback }).then(function (body) {
+      if (body.ok && body.needCode) {
+        acceptAccount(body);
+        return;
+      }
       if (!body.ok || !body.session) {
         var friendly = authNote(body.error);
         if (body.error === "incomplete") note.textContent = "Google sign-in did not return a session.";
@@ -263,19 +270,59 @@
     });
   }
 
+  function mountDemo(note) {
+    var form = document.getElementById("demoForm");
+    if (!form) return;
+    if (cfg.DEMO_AUTH_PREVIEW !== true) {
+      form.hidden = true;
+      return;
+    }
+    form.hidden = false;
+    if (form.dataset.bound) return;
+    form.dataset.bound = "1";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var userBox = document.getElementById("demoUsername");
+      var passBox = document.getElementById("demoPassword");
+      var username = userBox ? userBox.value : "";
+      var password = passBox ? passBox.value : "";
+      if (passBox) passBox.value = "";
+      postAuth("/auth/demo", { username: username, password: password }).then(function (body) {
+        if (!body.ok || body.role !== "demo" || !body.session || body.redirect === "/admin/master-control/") {
+          if (note) note.textContent = "That preview sign-in was not accepted.";
+          return;
+        }
+        sessionStorage.setItem("valhalla-auth-token", body.session);
+        sessionStorage.setItem("valhalla-auth", "1");
+        if (body.redirect === "/dashboard/analytics/") window.location.assign(body.redirect);
+      }).catch(function () {
+        if (note) note.textContent = "That preview sign-in was not accepted.";
+      });
+    });
+  }
+
   function startGoogle(note) {
     if (!termsOk()) return;
     import("/valhalla/google-auth.js").then(function (mod) {
       var verifier = mod.createVerifier();
       sessionStorage.setItem("valhalla-pkce-verifier", verifier);
       return mod.codeChallenge(verifier).then(function (challenge) {
-        var redirectTo = location.origin + "/app/";
-        var start = mod.authorizeRequest(cfg, redirectTo, challenge);
-        if (!start) {
-          fail(note, "V-AUTH", "supabase public key missing", function () { location.reload(); });
-          return;
-        }
-        location.assign(start.url);
+        return fetch(authBase() + "/auth/supabase", { method: "GET", credentials: "include" }).then(function (res) {
+          return res.json().catch(function () { return { ok: false }; });
+        }).then(function (issued) {
+          if (!issued || issued.ok !== true || !issued.callback || !issued.nonce || issued.stateSupported !== false) {
+            fail(note, "V-AUTH", "auth callback missing", function () { location.reload(); });
+            return;
+          }
+          sessionStorage.setItem("valhalla-auth-nonce", issued.nonce);
+          sessionStorage.setItem("valhalla-auth-callback", issued.callback);
+          var start = mod.authorizeRequest(cfg, issued.callback, challenge);
+          if (!start || start.stateSupported !== false) {
+            fail(note, "V-AUTH", "supabase public key missing", function () { location.reload(); });
+            return;
+          }
+          location.assign(start.url);
+        });
       });
     }).catch(function (err) {
       fail(note, "V-AUTH", String(err && err.message || err), function () { location.reload(); });
@@ -376,6 +423,7 @@
       });
     }
     resumeGoogle(note);
+    mountDemo(note);
     if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
       google.hidden = false;
       google.onclick = function () { startGoogle(note); };

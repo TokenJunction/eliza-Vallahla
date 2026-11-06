@@ -15,11 +15,21 @@ export async function codeChallenge(verifier) {
   return base64url(new Uint8Array(digest));
 }
 
+var SUPABASE_ORIGIN = "https://girltjnrrwlyeufrcors.supabase.co";
+var CALLBACKS = ["https://valhalla-app.xyz/app/", "https://www.valhalla-app.xyz/app/"];
+
+export function oauthStateSupport() {
+  return {
+    supported: false,
+    reason: "Supabase GoTrue reserves state as the flow-state id. A client state on /authorize breaks the callback. The PKCE verifier stays required. The worker also checks a one-time nonce."
+  };
+}
+
 export function authorizeRequest(site, redirectTo, challenge) {
   var url = String(site && site.SUPABASE_URL || "").replace(/\/$/, "");
   var key = String(site && site.SUPABASE_ANON_KEY || "");
-  if (!/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(url) || key.length < 20) return null;
-  if (!redirectTo || !/^https?:\/\//.test(redirectTo)) return null;
+  if (url !== SUPABASE_ORIGIN || key.length < 20) return null;
+  if (CALLBACKS.indexOf(String(redirectTo || "")) < 0) return null;
   if (!challenge) return null;
   var query = new URLSearchParams({
     provider: "google",
@@ -28,7 +38,8 @@ export function authorizeRequest(site, redirectTo, challenge) {
     code_challenge_method: "s256",
     scopes: "openid email profile",
   });
-  return { url: url + "/auth/v1/authorize?" + query.toString() };
+  if (query.has("state")) return null;
+  return { url: url + "/auth/v1/authorize?" + query.toString(), stateSupported: false };
 }
 
 export function callbackCode(search) {
@@ -43,7 +54,7 @@ export function callbackCode(search) {
 export function tokenExchange(site, code, verifier) {
   var url = String(site && site.SUPABASE_URL || "").replace(/\/$/, "");
   var key = String(site && site.SUPABASE_ANON_KEY || "");
-  if (!url || !key || !code || !verifier) return null;
+  if (url !== "https://girltjnrrwlyeufrcors.supabase.co" || !key || !code || !verifier) return null;
   return {
     url: url + "/auth/v1/token?grant_type=pkce",
     method: "POST",

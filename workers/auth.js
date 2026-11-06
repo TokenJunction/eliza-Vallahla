@@ -1,12 +1,24 @@
 /**
- * Google ID-token check and email codes.
- * Secrets stay in the Worker: GOOGLE_CLIENT_ID, DEVICE_COOKIE_SECRET,
- * RESEND_API_KEY and the AUTH_KV id.
- * The code is emailed and stored only as a hash. It is not logged.
+ * Sign-in worker.
+ * AUTH_KV stays. Chat configuration, engagement counts, and rate limits use it.
+ * Do not remove AUTH_KV from the current deployment.
+ * Sessions, login codes, nonces, and the account record use AUTH_DO.
+ * Call env.AUTH_DO.get(id), then call the method on that stub.
+ * The class has no fetch route.
  */
-import { browserName, codeDecision, needSecondFactor, validEmail } from "./auth-logic.js";
+import { browserName, needSecondFactor, validEmail } from "./auth-logic.js";
+import { AuthDurableObject } from "./auth-durable-object.mjs";
+import { demoConfigured, demoIdentity, demoMailbox, normalizeUsername, verifyPassword } from "./demo-auth.mjs";
+
+export { AuthDurableObject };
 
 var ALLOWED = ["https://valhalla-app.xyz", "https://www.valhalla-app.xyz"];
+var CALLBACKS = {
+  "https://valhalla-app.xyz": "https://valhalla-app.xyz/app/",
+  "https://www.valhalla-app.xyz": "https://www.valhalla-app.xyz/app/"
+};
+var SUPABASE_ORIGIN = "https://girltjnrrwlyeufrcors.supabase.co";
+var USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 var TEXT = new TextEncoder();
 var CHAT_MODELS = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1-nano"];
 var ENGAGEMENT_EVENTS = [
@@ -14,6 +26,13 @@ var ENGAGEMENT_EVENTS = [
   "settings_open", "upgrade_open", "load_under_1s", "load_1_3s",
   "load_3_5s", "load_over_5s"
 ];
+var SENDER_CODES = {
+  E_SENDER_NOT_VERIFIED: true,
+  E_SENDER_DOMAIN_NOT_AVAILABLE: true,
+  E_RECIPIENT_NOT_ALLOWED: true,
+  E_VALIDATION_ERROR: true,
+  E_HEADER_VALUE_INVALID: true
+};
 
 function cors(request) {
   var origin = request.headers.get("Origin") || "";
@@ -73,7 +92,15 @@ async function issue(secret, payload) {
   return body + "." + await hmac(secret, body);
 }
 
-async function readToken(secret, token) {
+function randomHex(bytes) {
+  var buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  var out = "";
+  for (var i = 0; i < buf.length; i += 1) out += buf[i].toString(16).padStart(2, "0");
+  return out;
+}
+
+async function readClaims(secret, token) {
   var parts = String(token || "").split(".");
   if (!secret || parts.length !== 2) return null;
   var expected = await hmac(secret, parts[0]);
@@ -97,15 +124,13 @@ function deviceCookie(token) {
   return "vh_device=" + token + "; HttpOnly; Secure; SameSite=None; Partitioned; Path=/; Max-Age=2592000";
 }
 
-async function accountOf(env, emailHash) {
-  return JSON.parse((await env.AUTH_KV.get("acct:" + emailHash)) || "null") || { devices: [], ips: [], signins: [], alwaysAsk: false };
+function storeReady(env) {
+  return Boolean(env && env.AUTH_DO && typeof env.AUTH_DO.get === "function" && typeof env.AUTH_DO.idFromName === "function");
 }
 
-async function saveAccount(env, emailHash, account) {
-  account.devices = (account.devices || []).slice(0, 20);
-  account.ips = (account.ips || []).slice(0, 10);
-  account.signins = (account.signins || []).slice(0, 20);
-  await env.AUTH_KV.put("acct:" + emailHash, JSON.stringify(account));
+function accountStub(env, name) {
+  if (!storeReady(env) || !name) return null;
+  return env.AUTH_DO.get(env.AUTH_DO.idFromName(String(name)));
 }
 
 function place(request) {
@@ -127,6 +152,22 @@ function six() {
   return String(buf[0] % 1000000).padStart(6, "0");
 }
 
+function mailer(env) {
+  if (env.AUTH_EMAIL && typeof env.AUTH_EMAIL.send === "function") return env.AUTH_EMAIL;
+  if (env.EMAIL && typeof env.EMAIL.send === "function") return env.EMAIL;
+  return null;
+}
+
+function senderCode(err, result) {
+  var code = String((err && err.code) || (result && result.code) || "");
+  if (SENDER_CODES[code]) return code;
+  var status = String((result && result.status) || "");
+  if (status === "rejected") return "rejected";
+  var message = String((err && err.message) || (result && result.error) || "");
+  if (/sender|domain|not verified|not allowed/i.test(message)) return code || "rejected";
+  return "";
+}
+
 async function sendMail(env, to, code, request) {
   var text = [
     "Your Valhalla sign-in code is " + code + ".",
@@ -138,32 +179,43 @@ async function sendMail(env, to, code, request) {
     "",
     "If this was not you, secure your account. Valhalla will not ask for a seed phrase."
   ].join("\n");
-  if (env.EMAIL && typeof env.EMAIL.send === "function") {
+  var binding = mailer(env);
+  if (binding) {
     try {
-      await env.EMAIL.send({
+      var result = await binding.send({
         to: to,
         from: { email: "noreply@valhalla-app.xyz", name: "Valhalla" },
         subject: "Your Valhalla sign-in code",
         text: text
       });
-      return "cloudflare";
+      var rejected = senderCode(null, result);
+      if (rejected) return { ok: false, error: "email-sender-rejected", reason: rejected };
+      if (result && result.messageId) return { ok: true, via: "cloudflare" };
+      if (result == null) return { ok: true, via: "cloudflare" };
+      return { ok: false, error: "email-sender-rejected", reason: "empty" };
     } catch (err) {
-      if (!env.RESEND_API_KEY) throw err;
+      var reason = senderCode(err, null);
+      if (reason) return { ok: false, error: "email-sender-rejected", reason: reason };
+      if (!env.RESEND_API_KEY) return { ok: false, error: "email", reason: "send" };
     }
   }
-  if (!env.RESEND_API_KEY) return "";
-  var response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { authorization: "Bearer " + env.RESEND_API_KEY, "content-type": "application/json" },
-    body: JSON.stringify({
-      from: "Valhalla <noreply@valhalla-app.xyz>",
-      to: [to],
-      subject: "Your Valhalla sign-in code",
-      text: text
-    })
-  });
-  if (!response.ok) throw new Error("resend");
-  return "resend";
+  if (!env.RESEND_API_KEY) return { ok: false, error: "email-not-configured" };
+  try {
+    var response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: "Bearer " + env.RESEND_API_KEY, "content-type": "application/json" },
+      body: JSON.stringify({
+        from: "Valhalla <noreply@valhalla-app.xyz>",
+        to: [to],
+        subject: "Your Valhalla sign-in code",
+        text: text
+      })
+    });
+    if (!response.ok) return { ok: false, error: "email" };
+    return { ok: true, via: "resend" };
+  } catch (err) {
+    return { ok: false, error: "email" };
+  }
 }
 
 async function limited(env, key, max) {
@@ -173,86 +225,169 @@ async function limited(env, key, max) {
   return true;
 }
 
-async function startCode(env, email, request, googleVerified) {
+async function bindGoogleUser(env, uid, emailHash) {
+  var lock = accountStub(env, "uid:" + uid);
+  if (!lock) return false;
+  return (await lock.bindHuman(uid, { eh: emailHash, provider: "google" })) === true;
+}
+
+async function startCode(env, email, request, googleVerified, uid) {
   var emailHash = await sha256(email);
-  var ip = request.headers.get("CF-Connecting-IP") || "";
-  var ipHash = await sha256(ip || "none");
+  var ipHash = await sha256(request.headers.get("CF-Connecting-IP") || "none");
   var hour = new Date().toISOString().slice(0, 13);
   if (!(await limited(env, "rl:e:" + emailHash + ":" + hour, 5))) return { ok: false, error: "rate" };
   if (!(await limited(env, "rl:i:" + ipHash + ":" + hour, 20))) return { ok: false, error: "rate" };
+  var stub = accountStub(env, emailHash);
+  if (!stub) return { ok: false, error: "auth-store-disabled" };
+  if (googleVerified === true && !(await bindGoogleUser(env, uid, emailHash))) return { ok: false, error: "google" };
   var code = six();
   var salt = crypto.randomUUID();
-  var sent = "";
-  try {
-    sent = await sendMail(env, email, code, request);
-  } catch (err) {
-    return { ok: false, error: "email" };
-  }
-  if (!sent) return { ok: false, error: "email-not-configured" };
-  await env.AUTH_KV.put("code:" + emailHash, JSON.stringify({
-    salt: salt,
+  var saved = await stub.putCode({
+    eh: emailHash,
     hash: await sha256(code + ":" + salt + ":" + email),
-    attempts: 0,
+    salt: salt,
+    exp: Date.now() + 10 * 60 * 1000,
     googleVerified: googleVerified === true,
-    exp: Date.now() + 10 * 60 * 1000
-  }), { expirationTtl: 600 });
+    uid: uid || "",
+    hint: ""
+  });
+  if (!saved || saved.ok !== true) return { ok: false, error: (saved && saved.error) || "auth-store-disabled" };
+  var mailed = await sendMail(env, email, code, request);
+  if (!mailed.ok) {
+    await stub.consumeCode({ eh: emailHash, drop: true });
+    return mailed;
+  }
   return { ok: true };
 }
 
-async function checkCode(env, email, code) {
-  var emailHash = await sha256(email);
-  var key = "code:" + emailHash;
-  var record = JSON.parse((await env.AUTH_KV.get(key)) || "null");
-  var state = codeDecision(record, Date.now());
-  if (state !== "ok") return { ok: false, error: state };
-  record.attempts += 1;
-  var expected = await sha256(String(code || "") + ":" + record.salt + ":" + email);
-  if (!safeEqual(expected, record.hash)) {
-    if (record.attempts >= 5) await env.AUTH_KV.delete(key);
-    else await env.AUTH_KV.put(key, JSON.stringify(record), { expirationTtl: 600 });
-    return { ok: false, error: record.attempts >= 5 ? "locked" : "code" };
-  }
-  await env.AUTH_KV.delete(key);
-  return { ok: true, emailHash: emailHash, googleVerified: record.googleVerified === true };
+async function checkCode(env, email, presented) {
+  var emailHash = await sha256(String(email || "").toLowerCase().trim());
+  var stub = accountStub(env, emailHash);
+  if (!stub) return { ok: false, error: "auth-store-disabled" };
+  var result = await stub.consumeCode({ eh: emailHash, email: email, presented: presented });
+  if (result === false) return { ok: false, error: "eh" };
+  return result || { ok: false, error: "missing" };
 }
 
-async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified) {
-  var account = await accountOf(env, emailHash);
-  var ipHash = await sha256(request.headers.get("CF-Connecting-IP") || "none");
-  var existing = await readToken(env.DEVICE_COOKIE_SECRET, cookieHeader(request));
-  var knownDevice = Boolean(existing && existing.eh === emailHash && (account.devices || []).some(function (row) { return row.id === existing.did; }));
-  var knownIp = (account.ips || []).indexOf(ipHash) >= 0;
+async function storedSession(env, claims) {
+  if (!claims || !claims.eh) return null;
+  var stub = accountStub(env, claims.eh);
+  if (!stub) return null;
+  try {
+    var row = await stub.readSession(claims);
+    if (!row || row.eh !== claims.eh) return null;
+    return row;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function accessSession(env, request) {
+  var claims = await readClaims(env.DEVICE_COOKIE_SECRET, bearer(request));
+  var row = await storedSession(env, claims);
+  if (!row || row.use !== "access") return null;
+  return row;
+}
+
+async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified, uid) {
+  var stub = accountStub(env, emailHash);
+  if (!stub) return { disabled: true, error: "auth-store-disabled" };
+  var account = await stub.getAccount(emailHash);
+  if (!account || account.eh !== emailHash) return { disabled: true, error: "eh" };
+  var deviceClaims = await readClaims(env.DEVICE_COOKIE_SECRET, cookieHeader(request));
+  var deviceRow = deviceClaims && deviceClaims.eh === emailHash ? await storedSession(env, deviceClaims) : null;
+  var known = null;
+  var revoked = false;
+  (account.devices || []).forEach(function (device) {
+    if (!deviceClaims || device.id !== deviceClaims.did) return;
+    if (device.revoked === true) revoked = true;
+    else known = device;
+  });
+  var knownDevice = Boolean(known && deviceRow && deviceRow.use === "device" && deviceRow.did === known.id);
+  var configured = leaderEmail(env);
+  var leader = Boolean(configured) && safeEqual(emailHash, await sha256(configured));
   var need = needSecondFactor({
     knownDevice: knownDevice,
-    knownIp: knownIp,
     alwaysAsk: account.alwaysAsk === true,
-    leader: false,
-    codeThisLogin: codeThisLogin === true,
-    googleVerified: googleVerified === true
+    leader: leader,
+    revoked: revoked,
+    baseVerified: googleVerified === true || codeThisLogin === true,
+    codeThisLogin: codeThisLogin === true
   });
-  if (need && !codeThisLogin) return { needCode: true, account: account, ipHash: ipHash };
-  var did = knownDevice ? existing.did : crypto.randomUUID();
+  if (need && codeThisLogin !== true) return { needCode: true };
+  if (googleVerified === true && !USER_ID.test(String(uid || ""))) return { disabled: true, error: "uid" };
+  if (googleVerified === true && !(await bindGoogleUser(env, uid, emailHash))) return { disabled: true, error: "google" };
+  var did = knownDevice ? known.id : crypto.randomUUID();
   var now = Date.now();
-  var device = (account.devices || []).find(function (row) { return row.id === did; }) || {
+  var device = known || {
     id: did,
     created: now,
     city: place(request),
-    browser: browserName(request.headers.get("User-Agent"))
+    browser: browserName(request.headers.get("User-Agent")),
+    revoked: false
   };
   device.last = now;
+  device.revoked = false;
+  device.accessSid = crypto.randomUUID();
+  device.cookieSid = crypto.randomUUID();
   account.devices = [device].concat((account.devices || []).filter(function (row) { return row.id !== did; }));
-  if (account.ips.indexOf(ipHash) < 0) account.ips.unshift(ipHash);
+  var ipHash = await sha256(request.headers.get("CF-Connecting-IP") || "none");
+  if ((account.ips || []).indexOf(ipHash) < 0) account.ips.unshift(ipHash);
   account.signins.unshift({ at: now, city: place(request), browser: device.browser, ok: true });
-  await saveAccount(env, emailHash, account);
-  var exp = now + 12 * 60 * 60 * 1000;
+  var accessExp = now + 12 * 60 * 60 * 1000;
+  var cookieExp = now + 30 * 24 * 60 * 60 * 1000;
+  var accessUid = googleVerified === true ? uid : "";
+  var saved = await stub.putSession({
+    eh: emailHash,
+    account: account,
+    sessions: [
+      {
+        sid: device.accessSid,
+        eh: emailHash,
+        uid: accessUid,
+        did: did,
+        exp: accessExp,
+        v: 1,
+        code: codeThisLogin === true,
+        google: googleVerified === true,
+        use: "access"
+      },
+      {
+        sid: device.cookieSid,
+        eh: emailHash,
+        uid: "",
+        did: did,
+        exp: cookieExp,
+        v: 1,
+        code: false,
+        google: false,
+        use: "device"
+      }
+    ]
+  });
+  if (!saved || saved.ok !== true) return { disabled: true, error: (saved && saved.error) || "auth-store-disabled" };
   var session = await issue(env.DEVICE_COOKIE_SECRET, {
     eh: emailHash,
+    uid: accessUid,
     did: did,
-    exp: exp,
+    exp: accessExp,
     code: codeThisLogin === true,
-    google: googleVerified === true
+    google: googleVerified === true,
+    sid: device.accessSid,
+    sv: 1,
+    use: "access"
   });
-  var cookie = await issue(env.DEVICE_COOKIE_SECRET, { eh: emailHash, did: did, exp: now + 30 * 24 * 60 * 60 * 1000 });
+  var cookie = await issue(env.DEVICE_COOKIE_SECRET, {
+    eh: emailHash,
+    uid: "",
+    did: did,
+    exp: cookieExp,
+    code: false,
+    google: false,
+    sid: device.cookieSid,
+    sv: 1,
+    use: "device"
+  });
   return { needCode: false, session: session, cookie: deviceCookie(cookie) };
 }
 
@@ -261,14 +396,15 @@ function leaderEmail(env) {
 }
 
 async function isLeader(env, session) {
+  if (!session || session.role === "demo") return false;
   var email = leaderEmail(env);
-  if (!email || !session || session.code !== true || session.google !== true) return false;
+  if (!email || session.code !== true || session.google !== true) return false;
   var expected = await sha256(email);
   return safeEqual(String(session.eh || ""), expected);
 }
 
-async function loginRedirect(env, emailHash, googleVerified) {
-  var leader = await isLeader(env, { eh: emailHash, code: true, google: googleVerified === true });
+async function loginRedirect(env, emailHash, googleVerified, codeVerified) {
+  var leader = await isLeader(env, { eh: emailHash, code: codeVerified === true, google: googleVerified === true });
   return leader ? "/admin/master-control/" : "/dashboard/analytics/";
 }
 
@@ -277,19 +413,150 @@ function bearer(request) {
   return header.toLowerCase().indexOf("bearer ") === 0 ? header.slice(7).trim() : "";
 }
 
-async function googleInfo(env, credential) {
-  var response = await fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(credential));
-  if (!response.ok) return null;
-  var info = await response.json();
-  var iss = String(info.iss || "");
-  var verified = info.email_verified === true || info.email_verified === "true";
-  var scope = String(info.scope || "");
-  if (info.aud !== env.GOOGLE_CLIENT_ID) return null;
-  if (iss !== "https://accounts.google.com" && iss !== "accounts.google.com") return null;
-  if (Number(info.exp) * 1000 < Date.now()) return null;
-  if (!verified || !validEmail(info.email)) return null;
-  if (/gmail|drive/i.test(scope)) return null;
-  return { email: String(info.email).toLowerCase(), name: String(info.name || ""), picture: String(info.picture || "") };
+function callbackFor(request) {
+  return CALLBACKS[request.headers.get("Origin") || ""] || "";
+}
+
+function supabaseOrigin(env) {
+  var configured = String(env && env.SUPABASE_URL || "").replace(/\/$/, "");
+  if (configured !== SUPABASE_ORIGIN) return "";
+  return SUPABASE_ORIGIN;
+}
+
+function googleAccount(user) {
+  if (!user || typeof user !== "object") return null;
+  var id = String(user.id || "");
+  if (!USER_ID.test(id)) return null;
+  var email = String(user.email || "").toLowerCase().trim();
+  if (!validEmail(email)) return null;
+  var meta = user.app_metadata || {};
+  var identities = Array.isArray(user.identities) ? user.identities : [];
+  var googleIdentity = identities.find(function (row) { return row && row.provider === "google"; });
+  var providers = Array.isArray(meta.providers) ? meta.providers : [];
+  var google = meta.provider === "google" || providers.indexOf("google") >= 0 || Boolean(googleIdentity);
+  if (!google) return null;
+  if (identities.length && !googleIdentity) return null;
+  if (googleIdentity && googleIdentity.identity_data && googleIdentity.identity_data.email_verified === false) return null;
+  var profile = user.user_metadata || {};
+  return {
+    id: id,
+    email: email,
+    name: String(profile.full_name || profile.name || ""),
+    picture: String(profile.avatar_url || profile.picture || "")
+  };
+}
+
+async function supabaseUser(env, accessToken) {
+  var origin = supabaseOrigin(env);
+  if (!origin || !env.SUPABASE_ANON_KEY || !accessToken) return { ok: false, error: "auth-not-configured", status: 503 };
+  var timeout = Number(env.SUPABASE_TIMEOUT_MS);
+  if (!Number.isFinite(timeout) || timeout < 50 || timeout > 5000) timeout = 4000;
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, timeout);
+  try {
+    var response = await fetch(origin + "/auth/v1/user", {
+      headers: { apikey: env.SUPABASE_ANON_KEY, authorization: "Bearer " + accessToken },
+      signal: controller.signal
+    });
+    if (!response.ok) return { ok: false, error: "google", status: 401 };
+    var account = googleAccount(await response.json());
+    if (!account) return { ok: false, error: "google", status: 401 };
+    return { ok: true, user: account };
+  } catch (err) {
+    return { ok: false, error: "supabase", status: 503 };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function issueNonce(env) {
+  var nonce = randomHex(32);
+  var stub = accountStub(env, "nonce:" + nonce);
+  if (!stub) return "";
+  var saved = await stub.putCode(nonce);
+  return saved === true ? nonce : "";
+}
+
+async function takeNonce(env, nonce) {
+  var value = String(nonce || "");
+  if (!/^[0-9a-f]{64}$/.test(value)) return false;
+  var stub = accountStub(env, "nonce:" + value);
+  if (!stub) return false;
+  return (await stub.consumeCode(value)) === true;
+}
+
+function mailStatus(error) {
+  if (error === "rate") return 429;
+  return 503;
+}
+
+async function demoLogin(request, env, body) {
+  var username = normalizeUsername(body && body.username);
+  var password = String(body && body.password || "");
+  var configured = normalizeUsername(env.DEMO_USERNAME);
+  var now = Date.now();
+  var ip = request.headers.get("CF-Connecting-IP") || "none";
+  var ipStub = accountStub(env, "demo-ip:" + await sha256(ip));
+  var userStub = accountStub(env, "demo-user:" + await sha256(username || "invalid"));
+  if (!ipStub || !userStub) return json({ ok: false, error: "denied" }, 401, request);
+  var ipState = await ipStub.demoStrike("check", now);
+  var userState = await userStub.demoStrike("check", now);
+  var passwordOk = false;
+  try {
+    passwordOk = await verifyPassword(password, env.DEMO_VERIFIER);
+  } catch (err) {
+    passwordOk = false;
+  }
+  var nameOk = Boolean(username) && username.length === configured.length && safeEqual(username, configured);
+  if (!passwordOk || !nameOk || ipState.locked || userState.locked) {
+    if (!ipState.locked) await ipStub.demoStrike("fail", now);
+    if (!userState.locked) await userStub.demoStrike("fail", now);
+    return json({ ok: false, error: "denied" }, 401, request);
+  }
+  await ipStub.demoStrike("clear", now);
+  await userStub.demoStrike("clear", now);
+  var eh = await sha256(demoMailbox(configured));
+  var stub = accountStub(env, eh);
+  if (!stub) return json({ ok: false, error: "denied" }, 401, request);
+  var did = crypto.randomUUID();
+  var accessSid = crypto.randomUUID();
+  var cookieSid = crypto.randomUUID();
+  var browser = browserName(request.headers.get("User-Agent"));
+  var city = place(request);
+  var accessExp = now + 12 * 60 * 60 * 1000;
+  var cookieExp = now + 30 * 24 * 60 * 60 * 1000;
+  var saved = await stub.putSession({
+    eh: eh,
+    single: true,
+    account: {
+      devices: [{ id: did, created: now, last: now, city: city, browser: browser, revoked: false }],
+      ips: [],
+      signins: [{ at: now, city: city, browser: browser, ok: true }],
+      alwaysAsk: false,
+      role: "demo",
+      demoId: demoIdentity(eh),
+      plan: "pro"
+    },
+    sessions: [
+      { sid: accessSid, eh: eh, uid: "", did: did, exp: accessExp, v: 1, code: false, google: false, use: "access" },
+      { sid: cookieSid, eh: eh, uid: "", did: did, exp: cookieExp, v: 1, code: false, google: false, use: "device" }
+    ]
+  });
+  if (!saved || saved.ok !== true) return json({ ok: false, error: "denied" }, 401, request);
+  var session = await issue(env.DEVICE_COOKIE_SECRET, {
+    eh: eh, uid: "", did: did, exp: accessExp, code: false, google: false, sid: accessSid, sv: 1, use: "access", role: "demo"
+  });
+  var cookie = await issue(env.DEVICE_COOKIE_SECRET, {
+    eh: eh, uid: "", did: did, exp: cookieExp, code: false, google: false, sid: cookieSid, sv: 1, use: "device", role: "demo"
+  });
+  return json({
+    ok: true,
+    needCode: false,
+    role: "demo",
+    username: configured,
+    session: session,
+    redirect: "/dashboard/analytics/"
+  }, 200, request, { "set-cookie": deviceCookie(cookie) });
 }
 
 export default {
@@ -300,83 +567,88 @@ export default {
     }
     var url = new URL(request.url);
     var body = request.method === "POST" ? await request.json().catch(function () { return {}; }) : {};
+    if (url.pathname === "/auth/supabase" && request.method === "GET") {
+      if (!storeReady(env)) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
+      var callback = callbackFor(request);
+      if (!callback) return json({ ok: false, error: "callback" }, 403, request);
+      var ipHash = await sha256(request.headers.get("CF-Connecting-IP") || "none");
+      var hour = new Date().toISOString().slice(0, 13);
+      if (!(await limited(env, "rl:n:" + ipHash + ":" + hour, 30))) return json({ ok: false, error: "rate" }, 429, request);
+      var nonce = await issueNonce(env);
+      if (!nonce) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
+      return json({ ok: true, callback: callback, nonce: nonce, stateSupported: false }, 200, request);
+    }
     if (url.pathname === "/auth/supabase" && request.method === "POST") {
+      if (!storeReady(env)) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       if (body.email && !body.accessToken) return json({ ok: false, error: "incomplete" }, 400, request);
       if (body.provider === "google" && !body.accessToken) return json({ ok: false, error: "incomplete" }, 400, request);
-      var accessToken = String(body.accessToken || "");
-      if (!accessToken || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-        return json({ ok: false, error: "auth-not-configured" }, 503, request);
+      var postedCallback = callbackFor(request);
+      if (!postedCallback || body.callback !== postedCallback) return json({ ok: false, error: "callback" }, 400, request);
+      if (!(await takeNonce(env, body.nonce))) return json({ ok: false, error: "nonce" }, 401, request);
+      var looked = await supabaseUser(env, String(body.accessToken || ""));
+      if (!looked.ok) return json({ ok: false, error: looked.error }, looked.status || 401, request);
+      var user = looked.user;
+      var supabaseHash = await sha256(user.email);
+      var supabaseNext = await sessionFor(env, supabaseHash, request, false, true, user.id);
+      if (supabaseNext.disabled) return json({ ok: false, error: supabaseNext.error || "auth-store-disabled" }, 503, request);
+      if (supabaseNext.needCode) {
+        var mailed = await startCode(env, user.email, request, true, user.id);
+        if (!mailed.ok) return json(mailed, mailStatus(mailed.error), request);
+        return json({
+          ok: true,
+          needCode: true,
+          email: user.email,
+          name: user.name,
+          picture: user.picture
+        }, 200, request);
       }
-      var supabaseUrl = String(env.SUPABASE_URL).replace(/\/$/, "");
-      var userResponse = await fetch(supabaseUrl + "/auth/v1/user", {
-        headers: { apikey: env.SUPABASE_ANON_KEY, authorization: "Bearer " + accessToken }
-      });
-      if (!userResponse.ok) return json({ ok: false, error: "google" }, 401, request);
-      var user = await userResponse.json();
-      var provider = user && user.app_metadata && user.app_metadata.provider;
-      if (provider !== "google" || !validEmail(user.email)) return json({ ok: false, error: "google" }, 401, request);
-      var supabaseEmail = String(user.email).toLowerCase();
-      var supabaseHash = await sha256(supabaseEmail);
-      var supabaseAccount = await accountOf(env, supabaseHash);
-      await saveAccount(env, supabaseHash, supabaseAccount);
-      var supabaseNext = await sessionFor(env, supabaseHash, request, false, true);
-      if (supabaseNext.needCode) return json({ ok: false, error: "incomplete" }, 409, request);
       return json({
         ok: true,
         needCode: false,
-        email: supabaseEmail,
-        name: String((user.user_metadata && user.user_metadata.full_name) || ""),
-        picture: String((user.user_metadata && user.user_metadata.avatar_url) || ""),
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
         session: supabaseNext.session,
-        redirect: await loginRedirect(env, supabaseHash, false)
+        redirect: await loginRedirect(env, supabaseHash, true, false)
       }, 200, request, { "set-cookie": supabaseNext.cookie });
     }
     if (url.pathname === "/auth/google" && request.method === "POST") {
-      var info = await googleInfo(env, String(body.credential || ""));
-      if (!info) return json({ ok: false, error: "google" }, 401, request);
-      var emailHash = await sha256(info.email);
-      var account = await accountOf(env, emailHash);
-      if (body.alwaysAsk === true) account.alwaysAsk = true;
-      await saveAccount(env, emailHash, account);
-      var next = await sessionFor(env, emailHash, request, false, true);
-      if (next.needCode) {
-        var sent = await startCode(env, info.email, request, true);
-        if (!sent.ok) return json(sent, sent.error === "rate" ? 429 : 503, request);
-        return json({ ok: true, needCode: true, email: info.email, name: info.name, picture: info.picture }, 200, request);
-      }
-      return json({
-        ok: true,
-        needCode: false,
-        email: info.email,
-        name: info.name,
-        picture: info.picture,
-        session: next.session,
-        redirect: await loginRedirect(env, emailHash, true)
-      }, 200, request, { "set-cookie": next.cookie });
+      return json({ ok: false, error: "incomplete" }, 400, request);
+    }
+    if (url.pathname === "/auth/demo" && request.method === "POST") {
+      if (!demoConfigured(env) || !storeReady(env)) return json({ ok: false, error: "not-found" }, 404, request);
+      return demoLogin(request, env, body);
     }
     if (url.pathname === "/auth/email/start" && request.method === "POST") {
+      if (!storeReady(env)) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       var email = String(body.email || "").toLowerCase().trim();
       if (!validEmail(email)) return json({ ok: false, error: "email" }, 400, request);
       if (body.alwaysAsk === true) {
         var hash = await sha256(email);
-        var existing = await accountOf(env, hash);
+        var stub = accountStub(env, hash);
+        var existing = stub ? await stub.getAccount(hash) : null;
+        if (!existing) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
         existing.alwaysAsk = true;
-        await saveAccount(env, hash, existing);
+        var kept = await stub.saveAccount(hash, existing);
+        if (!kept || kept.ok !== true) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       }
-      var started = await startCode(env, email, request, false);
-      return json(started.ok ? { ok: true } : started, started.ok ? 200 : started.error === "rate" ? 429 : 503, request);
+      var started = await startCode(env, email, request, false, "");
+      return json(started.ok ? { ok: true } : started, started.ok ? 200 : mailStatus(started.error), request);
     }
     if (url.pathname === "/auth/email/verify" && request.method === "POST") {
+      if (!storeReady(env)) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       var checkEmail = String(body.email || "").toLowerCase().trim();
       var checked = await checkCode(env, checkEmail, String(body.code || ""));
       if (!checked.ok) return json({ ok: false, error: checked.error }, 401, request);
-      var ready = await sessionFor(env, checked.emailHash, request, true, checked.googleVerified);
+      var ready = await sessionFor(env, checked.eh, request, true, checked.googleVerified === true, checked.uid || "");
+      if (ready.disabled) return json({ ok: false, error: ready.error || "auth-store-disabled" }, 503, request);
+      if (ready.needCode) return json({ ok: false, error: "incomplete" }, 409, request);
       return json({
         ok: true,
         needCode: false,
         email: checkEmail,
         session: ready.session,
-        redirect: await loginRedirect(env, checked.emailHash, checked.googleVerified)
+        redirect: await loginRedirect(env, checked.eh, checked.googleVerified === true, true)
       }, 200, request, { "set-cookie": ready.cookie });
     }
     if (url.pathname === "/auth/chat-config" && request.method === "GET") {
@@ -384,17 +656,20 @@ export default {
       var model = CHAT_MODELS.indexOf(config.model) >= 0 ? config.model : CHAT_MODELS[0];
       return json({ provider: "openai", model: model, models: CHAT_MODELS }, 200, request);
     }
-    var session = await readToken(env.DEVICE_COOKIE_SECRET, bearer(request));
+    var session = await accessSession(env, request);
     if (!session) return json({ ok: false, error: "session" }, 401, request);
     if (url.pathname === "/auth/access" && request.method === "GET") {
-      var account = await accountOf(env, session.eh);
-      var subscriber = account.plan === "pro";
-      var leader = await isLeader(env, session);
+      var accessStub = accountStub(env, session.eh);
+      var accessAccount = accessStub ? await accessStub.getAccount(session.eh) : null;
+      if (!accessAccount || accessAccount.eh !== session.eh) return json({ ok: false, error: "session" }, 401, request);
+      var demoAccount = session.role === "demo" || accessAccount.role === "demo";
+      var subscriber = demoAccount ? false : accessAccount.plan === "pro";
+      var accessLeader = demoAccount ? false : await isLeader(env, session);
       return json({
         ok: true,
         plan: subscriber ? "pro" : "free",
         subscriber: subscriber,
-        leader: leader
+        leader: accessLeader
       }, 200, request);
     }
     if (url.pathname === "/auth/leader" && request.method === "POST") {
@@ -403,14 +678,14 @@ export default {
     }
     if (url.pathname === "/auth/chat-config" && request.method === "POST") {
       if (!(await isLeader(env, session))) return json({ ok: false, error: "leader-required" }, 403, request);
-      var model = String(body.model || "");
-      if (CHAT_MODELS.indexOf(model) < 0) return json({ ok: false, error: "unsupported-model" }, 400, request);
+      var chosen = String(body.model || "");
+      if (CHAT_MODELS.indexOf(chosen) < 0) return json({ ok: false, error: "unsupported-model" }, 400, request);
       await env.AUTH_KV.put("manager:chat-config", JSON.stringify({
         provider: "openai",
-        model: model,
+        model: chosen,
         updatedAt: new Date().toISOString()
       }));
-      return json({ ok: true, provider: "openai", model: model }, 200, request);
+      return json({ ok: true, provider: "openai", model: chosen }, 200, request);
     }
     if (url.pathname === "/auth/engagement" && request.method === "POST") {
       if (session.code !== true || body.analyticsConsent !== true) {
@@ -433,36 +708,41 @@ export default {
         var date = new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10);
         var row = { date: date };
         for (var i = 0; i < ENGAGEMENT_EVENTS.length; i += 1) {
-          var eventName = ENGAGEMENT_EVENTS[i];
-          row[eventName] = Number(await env.AUTH_KV.get("engagement:" + date + ":" + eventName)) || 0;
+          var name = ENGAGEMENT_EVENTS[i];
+          row[name] = Number(await env.AUTH_KV.get("engagement:" + date + ":" + name)) || 0;
         }
         days.push(row);
       }
       return json({ days: days, approximate: true }, 200, request);
     }
     if (url.pathname === "/auth/devices" && request.method === "GET") {
-      var account = await accountOf(env, session.eh);
+      var deviceStub = accountStub(env, session.eh);
+      var deviceAccount = deviceStub ? await deviceStub.getAccount(session.eh) : null;
+      if (!deviceAccount || deviceAccount.eh !== session.eh) return json({ ok: false, error: "session" }, 401, request);
       return json({
         ok: true,
-        alwaysAsk: account.alwaysAsk === true,
-        devices: (account.devices || []).map(function (row) {
+        alwaysAsk: deviceAccount.alwaysAsk === true,
+        devices: (deviceAccount.devices || []).filter(function (row) { return row.revoked !== true; }).map(function (row) {
           return { id: row.id, city: row.city, browser: row.browser, created: row.created, last: row.last, current: row.id === session.did };
         }),
-        signins: account.signins || []
+        signins: deviceAccount.signins || []
       }, 200, request);
     }
     if (url.pathname === "/auth/devices/revoke" && request.method === "POST") {
-      var account = await accountOf(env, session.eh);
-      account.devices = (account.devices || []).filter(function (row) { return row.id !== String(body.id || ""); });
-      await saveAccount(env, session.eh, account);
-      await env.AUTH_KV.delete("device:" + String(body.id || ""));
+      var revokeStub = accountStub(env, session.eh);
+      if (!revokeStub) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
+      var revoked = await revokeStub.revokeDevice(session.eh, String(body.id || ""));
+      if (!revoked || revoked.ok !== true || revoked.eh !== session.eh) return json({ ok: false, error: "eh" }, 403, request);
       return json({ ok: true }, 200, request);
     }
     if (url.pathname === "/auth/security" && request.method === "POST") {
-      var account = await accountOf(env, session.eh);
-      account.alwaysAsk = body.alwaysAsk === true;
-      await saveAccount(env, session.eh, account);
-      return json({ ok: true, alwaysAsk: account.alwaysAsk }, 200, request);
+      var securityStub = accountStub(env, session.eh);
+      var securityAccount = securityStub ? await securityStub.getAccount(session.eh) : null;
+      if (!securityAccount || securityAccount.eh !== session.eh) return json({ ok: false, error: "session" }, 401, request);
+      securityAccount.alwaysAsk = body.alwaysAsk === true;
+      var stored = await securityStub.saveAccount(session.eh, securityAccount);
+      if (!stored || stored.ok !== true) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
+      return json({ ok: true, alwaysAsk: securityAccount.alwaysAsk === true }, 200, request);
     }
     return json({ ok: false, error: "not-found" }, 404, request);
   }

@@ -36,6 +36,8 @@ window.VALHALLA_SITE = {
   MAGIC_LINK_URL: "",
   /* Live sign-in Worker valhalla-auth: Google token check and the emailed 6-digit code. */
   AUTH_URL: "https://valhalla-auth.valhalla-app.workers.dev",
+  /* Leave false. The preview family sign-in stays hidden until that preview worker is configured. */
+  DEMO_AUTH_PREVIEW: false,
   /* Paste the live Spring store URL before any buy button is enabled. */
   SPRING_STORE_URL: "",
   /* Merch card. Leave enabled false until shop.url is a live https store. */

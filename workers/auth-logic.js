@@ -1,8 +1,11 @@
 /** Pure sign-in rules. No secrets and no codes. */
 
 export function needSecondFactor(input) {
-  if (input.googleVerified === true) return false;
-  return input.codeThisLogin !== true;
+  var source = input || {};
+  if (source.codeThisLogin === true) return false;
+  if (source.baseVerified !== true) return true;
+  if (source.alwaysAsk === true || source.leader === true || source.revoked === true) return true;
+  return source.knownDevice !== true;
 }
 
 export function codeDecision(record, now) {
