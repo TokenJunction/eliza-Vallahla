@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { accessRequest, commandPayload, normalizeAccess, replyText, tasksRequest } from "./access.js";
+import { accessRequest, commandPayload, LIVE_TASK_CAPABILITIES, normalizeAccess, replyText, serializeTaskBody, taskContractBlock, tasksRequest } from "./access.js";
 
 test("the sign-in check uses the configured worker and omits cookies", () => {
   assert.equal(accessRequest({ AUTH_URL: "https://auth.example" }, ""), null);
@@ -17,6 +17,28 @@ test("access is signed in only when the server says ok", () => {
   assert.equal(normalizeAccess({ ok: true, id: "admin", role: "admin" }).leader, false);
   assert.equal(normalizeAccess({ ok: true, leader: true }).leader, true);
   assert.equal(normalizeAccess({ ok: true, leader: true }).admin, undefined);
+});
+
+test("a task request body is JSON, not an object string", async () => {
+  var payload = commandPayload("hello", "server-1");
+  payload.capability = "view";
+  var call = tasksRequest({ AGENT_API_URL: "https://api.example" }, "token", payload);
+  var request = new Request(call.url, {
+    method: "POST",
+    headers: call.headers,
+    body: call.body,
+  });
+  var raw = await request.text();
+  assert.equal(raw.includes("[object Object]"), false);
+  assert.deepEqual(JSON.parse(raw), payload);
+  assert.equal(call.body, serializeTaskBody(payload));
+});
+
+test("chat is not sent as view or reasoning, and a missing conversation id is not posted", () => {
+  assert.equal(LIVE_TASK_CAPABILITIES.includes("chat"), false);
+  assert.equal(taskContractBlock(commandPayload("hello")), "The server has not issued a conversation id. The command was not sent.");
+  assert.match(taskContractBlock(commandPayload("hello", "server-1")), /not sent as view or reasoning/);
+  assert.equal(tasksRequest({ AGENT_API_URL: "https://api.example" }, "token", commandPayload("hello", "server-1")), null);
 });
 
 test("a command is chat and does not invent a conversation id", () => {

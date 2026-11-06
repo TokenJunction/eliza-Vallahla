@@ -167,7 +167,13 @@
       var access = await import('/valhalla/access.js');
       var sessionToken = '';
       try { sessionToken = sessionStorage.getItem('valhalla-auth-token') || ''; } catch (error) { sessionToken = ''; }
-      var taskCall = access.tasksRequest(window.VALHALLA_SITE || {}, sessionToken, access.commandPayload(text, taskConversation));
+      var payload = access.commandPayload(text, taskConversation);
+      var blocked = access.taskContractBlock(payload);
+      if (blocked) {
+        chatStatus.textContent = blocked;
+        return;
+      }
+      var taskCall = access.tasksRequest(window.VALHALLA_SITE || {}, sessionToken, payload);
       if (!taskCall) {
         chatStatus.textContent = 'Command service is not configured.';
         return;
@@ -176,7 +182,7 @@
         method: 'POST',
         credentials: taskCall.credentials,
         headers: taskCall.headers,
-        body: JSON.stringify(taskCall.body),
+        body: taskCall.body,
         signal: controller.signal
       });
       var body = await response.json();
@@ -237,7 +243,7 @@
         method: 'POST',
         credentials: taskCall.credentials,
         headers: taskCall.headers,
-        body: JSON.stringify({ taskId: taskId })
+        body: access.serializeTaskBody({ taskId: taskId })
       });
       var body = await response.json();
       chatStatus.textContent = response.ok && body && body.ok === true
