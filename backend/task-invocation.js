@@ -17,7 +17,7 @@ const CAPS = new Set(CAPABILITIES);
 const TOOL_SET = new Set(TOOLS);
 
 export function createTaskCache() {
-  return { byKey: new Map(), byId: new Map(), reserved: 0 };
+  return { byKey: new Map(), byId: new Map(), tenants: new Map(), conversations: {} };
 }
 
 export function serverPolicy(session, env = {}) {
@@ -32,16 +32,56 @@ export function serverPolicy(session, env = {}) {
     allowCloud: cloudKey && cloudModel && remaining > 0,
     remainingUsd: Number.isFinite(remaining) && remaining > 0 ? remaining : 0,
     cloudEstimateUsd: CLOUD_ESTIMATE_USD,
+    production: env.NODE_ENV === "production",
+    durable: env.VALHALLA_STORE_DURABLE === "1",
+    models: [
+      env.VALHALLA_LOCAL_RELAY === "1" ? (env.OLLAMA_MODEL || "qwen2.5-coder:14b") : "",
+      env.DEEPSEEK_MODEL || "",
+      env.GEMINI_MODEL || "",
+    ].filter(Boolean),
   };
 }
 
-function bodyHash(body) {
-  return createHash("sha256").update(JSON.stringify({
-    text: String(body.text || "").slice(0, 8000),
-    capability: body.capability || "",
+const KNOWN_FIELDS = new Set([
+  "capability", "app", "text", "source", "conversationId", "provider", "model",
+  "tool", "query", "taskId", "parentTaskId", "role", "callUsd", "allowCloud", "localPcAwake",
+]);
+const QUERY_FIELDS = new Set(["inputMint", "outputMint", "amount"]);
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const key of Object.keys(value).sort()) out[key] = canonical(value[key]);
+    return out;
+  }
+  return value;
+}
+
+function toolQuery(body) {
+  if (body.tool !== "paper-quote") return {};
+  const query = body.query && typeof body.query === "object" ? body.query : {};
+  return {
+    inputMint: String(query.inputMint || ""),
+    outputMint: String(query.outputMint || ""),
+    amount: String(query.amount || ""),
+  };
+}
+
+function bodyHash(session, body) {
+  return createHash("sha256").update(JSON.stringify(canonical({
+    tenantId: session.userId,
+    subject: session.userId,
     app: body.app || "",
     conversationId: String(body.conversationId || ""),
-  })).digest("hex");
+    capability: body.capability || "",
+    model: body.model || "",
+    provider: body.provider || "",
+    tool: body.tool || "none",
+    query: toolQuery(body),
+    text: String(body.text || "").slice(0, 8000),
+    source: String(body.source || ""),
+  }))).digest("hex");
 }
 
 function bindingKey(session, app, hash) {
@@ -58,22 +98,34 @@ function freshId() {
   return randomBytes(16).toString("hex");
 }
 
-export function reserve(cache, amount) {
+function bucket(cache, tenantId, capUsd) {
+  if (!cache.tenants) cache.tenants = new Map();
+  if (!cache.tenants.has(tenantId)) cache.tenants.set(tenantId, { capUsd, reserved: 0 });
+  const row = cache.tenants.get(tenantId);
+  row.capUsd = capUsd;
+  return row;
+}
+
+export function reserve(cache, tenantId, amount, capUsd) {
   if (!(amount > 0)) return { ok: true, reserved: 0 };
-  if (cache.reserved + amount > cache.capUsd) return { ok: false, reserved: 0 };
-  cache.reserved += amount;
+  const row = bucket(cache, tenantId, capUsd);
+  if (row.reserved + amount > row.capUsd) return { ok: false, reserved: 0 };
+  row.reserved += amount;
   return { ok: true, reserved: amount };
 }
 
-export function release(cache, amount) {
-  if (!(amount > 0)) return;
-  cache.reserved = Math.max(0, cache.reserved - amount);
+export function release(cache, tenantId, amount) {
+  if (!(amount > 0) || !cache.tenants) return;
+  const row = cache.tenants.get(tenantId);
+  if (!row) return;
+  row.reserved = Math.max(0, row.reserved - amount);
 }
 
 function publicRecord(record) {
   return {
     ok: record.ok,
-    status: record.completed ? "completed" : "unavailable",
+    state: record.state,
+    status: record.state,
     taskId: record.taskId,
     parentTaskId: record.parentTaskId || null,
     sessionRole: record.sessionRole,
@@ -83,21 +135,59 @@ function publicRecord(record) {
     chargeUsd: record.chargeUsd,
     chargeLabel: "server-usage-cap",
     replay: record.replay === true,
+    reason: record.reason || null,
+    trace: record.trace || null,
+    sync: true,
   };
 }
 
-export function admit(cache, session, body, policy, now = Date.now()) {
-  cache.capUsd = policy.remainingUsd;
+function unknownField(body) {
+  for (const key of Object.keys(body || {})) {
+    if (!KNOWN_FIELDS.has(key)) return key;
+  }
+  if (body.query && typeof body.query === "object") {
+    for (const key of Object.keys(body.query)) {
+      if (!QUERY_FIELDS.has(key)) return key;
+    }
+  }
+  return "";
+}
+
+export function admit(cache, session, body, policy, membership = { installed: [], role: "member" }, now = Date.now()) {
+  if (policy && policy.production === true && policy.durable !== true) {
+    return { ok: false, status: 503, reason: "durable_store_required" };
+  }
   if (!session || !session.userId) return { ok: false, status: 401, reason: "auth" };
+  const extra = unknownField(body);
+  if (extra) return { ok: false, status: 400, reason: "unknown_field" };
+  if (body.model && !(policy.models || []).includes(body.model)) {
+    return { ok: false, status: 400, reason: "model_rejected" };
+  }
+  const roleNow = membership.role === "owner" ? "owner" : "member";
   if (!CAPS.has(body.capability)) return { ok: false, status: 400, reason: "capability_rejected" };
   if (!APPS.has(body.app)) return { ok: false, status: 400, reason: "app_rejected" };
+  if (!Array.isArray(membership.installed) || !membership.installed.includes(body.app)) {
+    return { ok: false, status: 403, reason: "effective_entitlement" };
+  }
+  if (body.tool === "paper-quote" && roleNow !== "owner") {
+    return { ok: false, status: 403, reason: "role" };
+  }
   if (body.tool != null && body.tool !== "" && !TOOL_SET.has(body.tool)) {
     return { ok: false, status: 400, reason: "tool_rejected" };
   }
-  const hash = bodyHash(body);
+  if (!cache.conversations) cache.conversations = {};
+  const conversationId = String(body.conversationId || "");
+  if (conversationId) {
+    const bound = cache.conversations[conversationId];
+    if (bound && bound.tenantId !== session.userId) return { ok: false, status: 403, reason: "tenant" };
+  }
+  const hash = bodyHash(session, body);
   const key = bindingKey({ ...session, conversationId: body.conversationId }, body.app, hash);
   const prior = cache.byKey.get(key);
-  if (prior && prior.exp >= now && !prior.stopped && prior.bodyHash === hash) {
+  if (prior && prior.tenantId === session.userId && prior.bodyHash === hash) {
+    if (prior.stopped || prior.state === "cancelled") {
+      return { ok: false, status: 409, reason: "stopped", taskId: prior.taskId, response: publicRecord(prior) };
+    }
     return { ok: true, status: 200, replay: true, response: publicRecord({ ...prior, replay: true }) };
   }
   if (body.taskId && cache.byId.has(body.taskId)) {
@@ -119,8 +209,17 @@ export function admit(cache, session, body, policy, now = Date.now()) {
   if (!local && !policy.allowCloud) {
     return { ok: false, status: 503, reason: "unavailable", text: null, chargeUsd: 0 };
   }
-  const held = reserve(cache, chargeUsd);
-  if (!held.ok) return { ok: false, status: 503, reason: "budget", text: null, chargeUsd: 0 };
+  const held = reserve(cache, session.userId, chargeUsd, policy.remainingUsd);
+  if (!held.ok) {
+    return {
+      ok: false,
+      status: 503,
+      reason: "quota",
+      text: null,
+      chargeUsd: 0,
+      error: { code: "quota", timeoutMs: 8000, guaranteed: false },
+    };
+  }
   const taskId = freshId();
   const record = {
     ok: true,
@@ -129,34 +228,116 @@ export function admit(cache, session, body, policy, now = Date.now()) {
     key,
     tenantId: session.userId,
     bodyHash: hash,
-    sessionRole: policy.sessionRole,
+    sessionRole: roleNow,
     capability: body.capability,
     app: body.app,
+    tool: body.tool || "none",
+    provider: body.provider || "",
     chargeUsd,
     text: null,
     completed: false,
     stopped: false,
+    state: "running",
+    reason: null,
+    trace: null,
     exp: now + TASK_TTL_MS,
     replay: false,
   };
   cache.byId.set(taskId, record);
   cache.byKey.set(key, record);
+  if (conversationId) {
+    const bound = cache.conversations[conversationId] || { tenantId: session.userId, taskIds: [] };
+    bound.taskIds.push(taskId);
+    cache.conversations[conversationId] = bound;
+  }
   return { ok: true, status: 200, replay: false, record, chargeUsd };
 }
 
 export function finish(cache, record, generated) {
-  const text = generated && generated.completed ? String(generated.text || "") : null;
-  record.completed = Boolean(text);
-  record.ok = record.completed;
-  record.text = text;
-  record.reason = record.completed ? null : (generated && generated.reason) || "unavailable";
-  if (!record.completed) release(cache, record.chargeUsd);
+  const quoteOk = record.tool !== "paper-quote" || generated?.toolAuthorized === true;
+  const text = quoteOk && generated && generated.completed ? String(generated.text || "") : null;
+  if (record.stopped && text) {
+    record.state = "done";
+    record.completed = true;
+    record.ok = true;
+    record.text = text;
+    record.reason = "provider_finished_before_cancel";
+  } else if (record.stopped) {
+    record.state = "cancelled";
+    record.completed = false;
+    record.ok = false;
+    record.text = null;
+    record.reason = "cancelled";
+    release(cache, record.tenantId, record.chargeUsd);
+  } else if (text) {
+    record.state = "done";
+    record.completed = true;
+    record.ok = true;
+    record.text = text;
+    record.reason = null;
+  } else {
+    record.state = "failed";
+    record.completed = false;
+    record.ok = false;
+    record.text = null;
+    record.reason = record.tool === "paper-quote" && !quoteOk
+      ? "tool_unauthorized"
+      : (generated && generated.reason) || "unavailable";
+    release(cache, record.tenantId, record.chargeUsd);
+  }
+  if (generated && (generated.provider || generated.model)) {
+    record.trace = {
+      route: generated.provider || null,
+      provider: generated.provider || null,
+      model: generated.model || null,
+    };
+  }
   return publicRecord(record);
 }
 
 export function stopTask(cache, session, taskId) {
   const record = cache.byId.get(taskId);
   if (!record || record.tenantId !== session.userId) return { ok: false, status: 404, reason: "missing" };
+  if (record.state === "done") {
+    return { ok: true, status: 200, taskId, reason: "provider_finished_before_cancel", state: "done" };
+  }
   record.stopped = true;
-  return { ok: true, status: 200, taskId };
+  record.state = "cancelled";
+  record.reason = "cancelled";
+  record.ok = false;
+  return { ok: true, status: 200, taskId, reason: "cancelled", state: "cancelled" };
+}
+
+export function readTask(cache, session, taskId) {
+  if (!/^[0-9a-f]{32}$/.test(String(taskId || ""))) return { ok: false, status: 404, reason: "missing" };
+  const record = cache.byId.get(taskId);
+  if (!record || record.tenantId !== session.userId) return { ok: false, status: 404, reason: "missing" };
+  return { ok: true, status: 200, task: publicRecord(record) };
+}
+
+export function history(cache, session, conversationId) {
+  const bound = cache.conversations && cache.conversations[conversationId];
+  if (!bound || bound.tenantId !== session.userId) return { ok: false, status: 403, reason: "tenant" };
+  return {
+    ok: true,
+    status: 200,
+    tasks: bound.taskIds.map((id) => cache.byId.get(id)).filter(Boolean).map(publicRecord),
+  };
+}
+
+export function saveTasks(store, cache) {
+  store.data.tasks = {};
+  for (const record of cache.byId.values()) store.data.tasks[record.taskId] = record;
+  store.data.conversations = cache.conversations || {};
+  store.flush();
+}
+
+export function loadTasks(store) {
+  const cache = createTaskCache();
+  cache.conversations = store.data.conversations || {};
+  for (const record of Object.values(store.data.tasks || {})) {
+    cache.byId.set(record.taskId, record);
+    if (record.key) cache.byKey.set(record.key, record);
+  }
+  return cache;
 }

@@ -95,7 +95,7 @@ test("keeps free accounts locked and requires Google plus a verified code for ow
   });
 });
 
-test("a verified master admin alias is a leader only with Google and a code", async () => {
+test("a master alias is not a second owner; only the policy email is the leader", async () => {
   var alias = "alias@example.test";
   var emailHash = await hash(alias);
   var locked = {};
@@ -106,8 +106,11 @@ test("a verified master admin alias is a leader only with Google and a code", as
   var open = {};
   var allowed = env(open);
   allowed.MASTER_ADMIN_EMAIL = alias;
-  var response = await worker.fetch(await request({ eh: emailHash, code: true, google: true }, open), allowed);
-  assert.equal((await response.json()).leader, true);
+  var aliasOnly = await worker.fetch(await request({ eh: emailHash, code: true, google: true }, open), allowed);
+  assert.equal((await aliasOnly.json()).leader, false);
+  allowed.LEADER_EMAIL = alias;
+  var policy = await worker.fetch(await request({ eh: emailHash, code: true, google: true, sid: "sid-policy" }, open), allowed);
+  assert.equal((await policy.json()).leader, true);
 });
 
 test("rejects missing or invalid sessions", async () => {

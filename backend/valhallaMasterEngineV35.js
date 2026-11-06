@@ -4,10 +4,11 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 const require = createRequire(import.meta.url);
 const { generateForRequest } = require("./provider/channel.cjs");
+const { mapCustomerFromBearer } = require("../lib/customer-identity.js");
 import { bearer, isRoot, normalizeEmail, resolveRoot } from "./authz.js";
 import { claimAdmin, cleanDisplayName, issueBoundSession, openStore, revokeBoundSession, tenantFor, verifyBoundSession } from "./sessions.js";
 import { runElizaTask } from "./eliza-route.js";
-import { admit, createTaskCache, finish, serverPolicy, stopTask } from "./task-invocation.js";
+import { admit, finish, history, loadTasks, readTask, saveTasks, serverPolicy, stopTask } from "./task-invocation.js";
 import { assertPublicTarget } from "./ssrf.js";
 import { ADAPTER_VERSION, PROVIDER_CATALOG, blankProvider, testProvider } from "./adapters.js";
 import { NOT_CONFIGURED_APPS, builtinManifests, canLaunch, editionAllows, scopeKey } from "./apps.js";
@@ -132,7 +133,7 @@ export function createServer(options = {}) {
   const env = options.env || process.env;
   const state = options.state || createState(env);
   state.store = options.store || openStore(options.dataDir);
-  state.tasks = createTaskCache();
+  state.tasks = loadTasks(state.store);
   const rateBuckets = new Map();
   const fetchImpl = options.fetchImpl || fetch;
   const bus = createBus({
@@ -205,9 +206,25 @@ export function createServer(options = {}) {
       }
       const openApi = url.pathname === "/api/bootstrap" || url.pathname.startsWith("/api/billing/webhook/");
       if (url.pathname.startsWith("/api/") && !openApi) {
-        const session = verifyBoundSession(state.store, bearer(req));
-        if (!session) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
-        req.session = session;
+        const token = bearer(req);
+        const local = verifyBoundSession(state.store, token);
+        if (local) {
+          req.session = local;
+        } else if (env.AUTH_URL) {
+          const mapped = await mapCustomerFromBearer({
+            authBase: env.AUTH_URL,
+            bearer: token,
+            headers: req.headers,
+            env,
+            fetchImpl,
+          });
+          if (!mapped.ok || mapped.supabaseAuthUid != null || mapped.role !== "customer" || !mapped.memberId) {
+            return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+          }
+          req.session = { userId: mapped.memberId, email: "", owner: false, leader: mapped.leader === true };
+        } else {
+          return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        }
       }
       if (req.method === "POST" && url.pathname === "/api/bootstrap") {
         const { json: body } = await readJson(req);
@@ -617,7 +634,10 @@ export function createServer(options = {}) {
           owner: isRoot(req.session.email, env, state.setup),
         };
         const policy = serverPolicy(session, env);
-        const gate = admit(state.tasks, session, body, policy);
+        policy.durable = state.store.durable === true;
+        policy.production = env.NODE_ENV === "production";
+        const membership = state.store.data.membership?.[session.userId] || { installed: [], role: "member" };
+        const gate = admit(state.tasks, session, body, policy, membership);
         if (!gate.ok) {
           return json(res, gate.status, { ok: false, reason: gate.reason, text: null, code: "V-TASK" }, origin);
         }
@@ -637,11 +657,22 @@ export function createServer(options = {}) {
           }, env, { fetchImpl });
         }
         const payload = finish(state.tasks, gate.record, generated);
+        saveTasks(state.store, state.tasks);
         return json(res, payload.ok ? 200 : 503, payload, origin);
+      }
+      if (req.method === "GET" && url.pathname === "/api/v1/tasks") {
+        const conversationId = url.searchParams.get("conversationId") || "";
+        const found = history(state.tasks, { userId: req.session.userId }, conversationId);
+        return json(res, found.status, found, origin);
+      }
+      if (req.method === "GET" && /^\/api\/v1\/tasks\/[0-9a-f]{32}$/.test(url.pathname)) {
+        const found = readTask(state.tasks, { userId: req.session.userId }, url.pathname.split("/").pop());
+        return json(res, found.status, found, origin);
       }
       if (req.method === "POST" && url.pathname === "/api/v1/tasks/stop") {
         const { json: body } = await readJson(req);
         const stopped = stopTask(state.tasks, { userId: req.session.userId }, String(body.taskId || ""));
+        saveTasks(state.store, state.tasks);
         return json(res, stopped.status, stopped, origin);
       }
       if (req.method === "GET" && url.pathname === "/api/jupiter/quote") {

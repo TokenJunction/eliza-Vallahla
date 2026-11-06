@@ -74,15 +74,30 @@ async function issue(secret, payload) {
   return body + "." + await hmac(secret, body);
 }
 
+var TURNSTILE_ACTION = "valhalla-signin";
+var TURNSTILE_HOSTS = ["valhalla-app.xyz", "www.valhalla-app.xyz"];
+
 async function turnstileOk(env, token) {
   if (!env.TURNSTILE_SECRET) return true;
-  if (!token) return false;
+  var value = String(token || "");
+  if (!value) return false;
+  var seen = "ts:" + value;
+  if (await env.AUTH_KV.get(seen)) return false;
   var form = new URLSearchParams();
   form.set("secret", env.TURNSTILE_SECRET);
-  form.set("response", String(token));
-  var response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
-  var verdict = await response.json().catch(function () { return {}; });
-  return verdict.success === true;
+  form.set("response", value);
+  try {
+    var response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+    if (!response.ok) return false;
+    var verdict = await response.json();
+    if (!verdict || verdict.success !== true) return false;
+    if (verdict.action !== TURNSTILE_ACTION) return false;
+    if (TURNSTILE_HOSTS.indexOf(String(verdict.hostname || "")) < 0) return false;
+  } catch (err) {
+    return false;
+  }
+  await env.AUTH_KV.put(seen, "1", { expirationTtl: 600 });
+  return true;
 }
 
 async function readAccess(env, token) {
@@ -296,17 +311,16 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
   return { needCode: false, session: session, cookie: deviceCookie(cookie) };
 }
 
-function leaderEmails(env) {
-  return [env && env.LEADER_EMAIL, env && env.MASTER_ADMIN_EMAIL]
-    .map(function (email) { return String(email || "").trim().toLowerCase(); })
-    .filter(function (email, index, emails) { return Boolean(email) && emails.indexOf(email) === index; });
+function leaderEmail(env) {
+  // One policy mailbox for a later resend. A master alias is not a second owner.
+  return String(env && env.LEADER_EMAIL ? env.LEADER_EMAIL : "").trim().toLowerCase();
 }
 
 async function isLeader(env, session) {
-  var emails = leaderEmails(env);
-  if (!emails.length || !session || session.code !== true || session.google !== true) return false;
-  var hashes = await Promise.all(emails.map(sha256));
-  return hashes.some(function (expected) { return safeEqual(String(session.eh || ""), expected); });
+  var email = leaderEmail(env);
+  if (!email || !session || session.code !== true || session.google !== true) return false;
+  var expected = await sha256(email);
+  return safeEqual(String(session.eh || ""), expected);
 }
 
 async function loginRedirect(env, emailHash, googleVerified) {

@@ -8,7 +8,7 @@ export function emailHash(email) {
 }
 
 function blank() {
-  return { adminEmail: null, users: {}, sessions: {}, preferences: {}, terms: {}, notes: {} };
+  return { adminEmail: null, users: {}, sessions: {}, preferences: {}, terms: {}, notes: {}, membership: {}, tasks: {}, conversations: {} };
 }
 
 export function openStore(dir) {
@@ -56,6 +56,10 @@ export function claimAdmin(store, email, configured) {
   if (store.data.adminEmail && store.data.adminEmail !== normalized) return null;
   store.data.adminEmail = normalized;
   const tenant = tenantFor(store, normalized);
+  store.data.membership[tenant.userId] = {
+    installed: ["trading", "ai-workspace", "thalos", "data-explorer"],
+    role: "owner",
+  };
   store.flush();
   return tenant;
 }

@@ -124,3 +124,13 @@ test("engagement collection requires analytics consent and stores aggregate even
   assert.equal(body.approximate, true);
   assert.equal(body.days[6].page_view, 1);
 });
+
+test("turnstile stays off until its secret is set, then a missing token is rejected", async () => {
+  var state = setup();
+  var open = await worker.fetch(request("/auth/email/start", "POST", { email: "ada@example.test" }), state.env);
+  assert.notEqual((await open.json()).error, "turnstile");
+  state.env.TURNSTILE_SECRET = "turnstile-secret";
+  var closed = await worker.fetch(request("/auth/email/start", "POST", { email: "ada@example.test" }), state.env);
+  assert.equal(closed.status, 403);
+  assert.equal((await closed.json()).error, "turnstile");
+});
