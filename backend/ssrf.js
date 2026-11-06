@@ -73,7 +73,8 @@ export function classifyUrl(raw) {
   if (/^\d+$/.test(host) || host.startsWith("0x") || dotted || isIP(host) || host.includes(":")) {
     if (isPrivateAddress(dotted || host) || isIP(host) === 0) return { ok: false, reason: "private-address" };
   }
-  if (isPrivateAddress(ipv4FromDecimal(host))) return { ok: false, reason: "private-address" };
+  const decimal = ipv4FromDecimal(host);
+  if (decimal && isPrivateAddress(decimal)) return { ok: false, reason: "private-address" };
   const port = url.port;
   if (port && port !== "443") return { ok: false, reason: "port" };
   return { ok: true, url, host };
