@@ -34,12 +34,6 @@
     toggle.textContent = playing ? "Pause motion" : "Play motion";
   }
 
-  function hideControl() {
-    toggle.hidden = true;
-    video.pause();
-    scene.classList.remove("is-playing");
-  }
-
   function startMotion() {
     attachSources();
     video.muted = true;
@@ -48,11 +42,9 @@
     video.playsInline = true;
     var pending = video.play();
     if (pending && typeof pending.then === "function") {
-      pending.then(function () { setPlaying(true); }).catch(function () { hideControl(); });
-    } else if (video.paused) {
-      hideControl();
+      pending.then(function () { setPlaying(true); }).catch(function () { setPlaying(false); });
     } else {
-      setPlaying(true);
+      setPlaying(!video.paused);
     }
   }
 
@@ -69,13 +61,12 @@
   video.addEventListener("pause", function () { setPlaying(false); });
   video.addEventListener("playing", function () { setPlaying(true); });
 
-  if (reduceQuery.matches) hideControl();
-  else if (autoplayAllowed()) startMotion();
+  if (!reduceQuery.matches && autoplayAllowed()) startMotion();
   else setPlaying(false);
 
   if (typeof reduceQuery.addEventListener === "function") {
     reduceQuery.addEventListener("change", function () {
-      if (reduceQuery.matches) hideControl();
+      if (reduceQuery.matches) stopMotion();
     });
   }
 })();
