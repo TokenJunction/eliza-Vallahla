@@ -119,7 +119,12 @@ test("public preview keeps the site pages and leaves backend out", async () => {
   assert.equal(vercel.installCommand, "");
   assert.equal(vercel.buildCommand, "node scripts/vercel-build.mjs");
   assert.equal(vercel.outputDirectory, "dist/public");
+  assert.equal(vercel.cleanUrls, false);
   assert.equal(vercel.rewrites, undefined);
+  const configText = readFileSync(path.join(root, "vercel.json"), "utf8");
+  assert.doesNotMatch(configText, /rewrite all index/i);
+  assert.doesNotMatch(configText, /"destination"\s*:\s*"\/index\.html"/);
+  assert.equal(manifest.files.some(function (file) { return file.indexOf(".env") >= 0; }), false);
   assert.equal(JSON.stringify(vercel.headers).includes("Access-Control-Allow-Origin"), false);
   assert.match(JSON.stringify(vercel.headers), /nosniff/);
   assert.match(JSON.stringify(vercel.headers), /frame-ancestors 'none'/);
@@ -174,6 +179,7 @@ test("public preview keeps the site pages and leaves backend out", async () => {
     for (const pathname of ["/workers/auth.js", "/package.json", "/render.yaml", "/admin", "/admin/", "/adminsource", "/docs/", "/source/", "/api/health", "/auth/google", "/valhallaMasterEngineV35.js", "/.env"]) {
       const blocked = await status(pathname);
       assert.equal(blocked.status, 404, pathname);
+      assert.notEqual(blocked.text, home.text, pathname);
       assert.doesNotMatch(blocked.text, /id="home-email"/);
       assert.doesNotMatch(blocked.text, /<title>[^<]*ADMIN/i);
       assert.match(blocked.text, /That page is not here/);

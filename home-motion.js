@@ -48,7 +48,9 @@
     scene.classList.toggle("is-playing", playing);
     toggle.hidden = false;
     toggle.setAttribute("aria-pressed", playing ? "true" : "false");
-    toggle.textContent = playing ? "Pause motion" : "Play motion";
+    toggle.setAttribute("aria-label", playing ? "Pause motion" : "Play motion");
+    toggle.title = playing ? "Pause motion" : "Play motion";
+    toggle.textContent = playing ? "Ⅱ" : "▶";
   }
 
   function startMotion() {
@@ -77,6 +79,14 @@
     setPlaying(false);
   }
 
+  var quietTimer;
+  toggle.addEventListener("pointerdown", function () {
+    toggle.classList.add("is-touched");
+    clearTimeout(quietTimer);
+    quietTimer = setTimeout(function () {
+      if (document.activeElement !== toggle) toggle.classList.remove("is-touched");
+    }, 2000);
+  });
   toggle.addEventListener("click", function () {
     if (scene.classList.contains("is-playing")) stopMotion();
     else {
