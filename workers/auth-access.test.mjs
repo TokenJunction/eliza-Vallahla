@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import worker from "./auth.js";
+import { TOKEN_AUD, TOKEN_ISS, TOKEN_PURPOSE, createAuthStore } from "./auth-store.mjs";
 
 var SECRET = "a-test-secret-long-enough-for-hmac";
 var EMAIL = "owner@example.test";
@@ -32,18 +33,28 @@ async function issue(payload) {
 
 async function request(payload, rows) {
   var sid = payload.sid || ("sid-" + String(payload.eh || "none"));
-  var claims = Object.assign({ exp: Date.now() + 60000, ver: 1, sid: sid, did: payload.did || "device" }, payload);
+  var claims = Object.assign({
+    exp: Date.now() + 60000,
+    ver: 1,
+    sv: 1,
+    sid: sid,
+    did: payload.did || "device",
+    iss: TOKEN_ISS,
+    aud: TOKEN_AUD,
+    purpose: TOKEN_PURPOSE
+  }, payload);
   if (rows) {
-    rows["sess:" + sid] = {
+    var store = rows.store || (rows.store = createAuthStore());
+    store.seed({
       sid: sid,
-      ver: 1,
       eh: claims.eh,
       did: claims.did,
       exp: claims.exp,
       code: claims.code === true,
       google: claims.google === true,
-      revoked: false
-    };
+      v: 1,
+      lastSeen: Date.now()
+    });
   }
   var token = await issue(claims);
   return new Request("https://auth.example/auth/access", {
@@ -59,6 +70,7 @@ function env(rows) {
     DEVICE_COOKIE_SECRET: SECRET,
     GOOGLE_CLIENT_ID: "test-client",
     LEADER_EMAIL: EMAIL,
+    AUTH_DO: rows.store || (rows.store = createAuthStore()),
     AUTH_KV: {
       get: async function (key) { return JSON.stringify(rows[key] || null); }
     }

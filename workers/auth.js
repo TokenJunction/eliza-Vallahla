@@ -5,7 +5,8 @@
  * The code is emailed and stored only as a hash. It is not logged.
  */
 import { browserName, codeDecision, maskEmail, needSecondFactor, sessionApiCookies, validEmail } from "./auth-logic.js";
-import { acceptLive, sessionKey } from "./live-session.mjs";
+import { sessionKey } from "./live-session.mjs";
+import { TOKEN_AUD, TOKEN_ISS, TOKEN_PURPOSE } from "./auth-store.mjs";
 
 var ALLOWED = ["https://valhalla-app.xyz", "https://www.valhalla-app.xyz"];
 var TEXT = new TextEncoder();
@@ -90,10 +91,11 @@ async function issue(secret, payload) {
 var TURNSTILE_ACTION = "valhalla-signin";
 var TURNSTILE_HOSTS = ["valhalla-app.xyz", "www.valhalla-app.xyz"];
 
-async function turnstileOk(env, token) {
+async function turnstileOk(env, token, emailHash) {
   if (!env.TURNSTILE_SECRET) return true;
+  if (!env.AUTH_DO) return false;
   var value = String(token || "");
-  if (!value) return false;
+  if (!value || !emailHash) return false;
   var seen = "ts:" + value;
   if (await env.AUTH_KV.get(seen)) return false;
   var form = new URLSearchParams();
@@ -109,17 +111,23 @@ async function turnstileOk(env, token) {
   } catch (err) {
     return false;
   }
-  await env.AUTH_KV.put(seen, "1", { expirationTtl: 600 });
+  var bound = await env.AUTH_DO.bindHuman(value, {
+    emailHash: emailHash,
+    action: TURNSTILE_ACTION,
+    host: "valhalla-app.xyz"
+  });
+  if (!bound) return false;
+  await env.AUTH_KV.put(seen, emailHash, { expirationTtl: 600 });
   return true;
 }
 
 async function readAccess(env, token) {
+  if (!env.AUTH_DO || env.AUTH_DO.consistent === false) return null;
   var claims = await readToken(env.DEVICE_COOKIE_SECRET, token);
   if (!claims || !claims.sid || claims.ver == null) return null;
-  var raw = await env.AUTH_KV.get(sessionKey(claims.sid));
-  var record = null;
-  try { record = raw ? JSON.parse(raw) : null; } catch (err) { record = null; }
-  return acceptLive(record, claims);
+  if (claims.iss !== TOKEN_ISS || claims.aud !== TOKEN_AUD || claims.purpose !== TOKEN_PURPOSE) return null;
+  if (typeof env.AUTH_DO.readSession !== "function") return null;
+  return env.AUTH_DO.readSession(claims);
 }
 
 async function readToken(secret, token) {
@@ -243,6 +251,8 @@ async function startCode(env, email, request, googleVerified) {
     return { ok: false, error: "email" };
   }
   if (!sent) return { ok: false, error: "email-not-configured" };
+  if (!env.AUTH_DO) return { ok: false, error: "auth-store-disabled" };
+  await env.AUTH_DO.putCode("code:" + emailHash + ":" + salt);
   await env.AUTH_KV.put("code:" + emailHash, JSON.stringify({
     id: salt,
     salt: salt,
@@ -260,7 +270,10 @@ async function checkCode(env, email, code) {
   var record = JSON.parse((await env.AUTH_KV.get(key)) || "null");
   var state = codeDecision(record, Date.now());
   if (state !== "ok") return { ok: false, error: state };
-  if (!record.id || (await env.AUTH_KV.get("used-code:" + record.id))) return { ok: false, error: "used" };
+  if (!env.AUTH_DO) return { ok: false, error: "auth-store-disabled" };
+  if (!record.id || !(await env.AUTH_DO.consumeCode("code:" + emailHash + ":" + record.id))) {
+    return { ok: false, error: "used" };
+  }
   record.attempts += 1;
   var expected = await sha256(String(code || "") + ":" + record.salt + ":" + email);
   if (!safeEqual(expected, record.hash)) {
@@ -315,12 +328,27 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
     google: googleVerified === true,
     revoked: false
   };
+  if (!env.AUTH_DO) return { disabled: true };
+  await env.AUTH_DO.putSession({
+    sid: sid,
+    eh: emailHash,
+    did: did,
+    exp: exp,
+    code: live.code,
+    google: live.google,
+    v: 1,
+    lastSeen: now
+  });
   await env.AUTH_KV.put(sessionKey(sid), JSON.stringify(live), { expirationTtl: 12 * 60 * 60 });
   var session = await issue(env.DEVICE_COOKIE_SECRET, {
+    iss: TOKEN_ISS,
+    aud: TOKEN_AUD,
+    purpose: TOKEN_PURPOSE,
     eh: emailHash,
     did: did,
     sid: sid,
     ver: 1,
+    sv: 1,
     exp: exp,
     code: live.code,
     google: live.google
@@ -380,14 +408,14 @@ export default {
     var url = new URL(request.url);
     var body = request.method === "POST" ? await request.json().catch(function () { return {}; }) : {};
     if (url.pathname === "/auth/google" && request.method === "POST") {
-      if (!(await turnstileOk(env, body.turnstile))) return json({ ok: false, error: "turnstile" }, 403, request);
       var info = await googleInfo(env, String(body.credential || ""));
       if (!info) return json({ ok: false, error: "google" }, 401, request);
       var emailHash = await sha256(info.email);
+      if (!(await turnstileOk(env, body.turnstile, emailHash))) return json({ ok: false, error: "turnstile" }, 403, request);
       var account = await accountOf(env, emailHash);
-      if (body.alwaysAsk === true) account.alwaysAsk = true;
       await saveAccount(env, emailHash, account);
       var next = await sessionFor(env, emailHash, request, false, true);
+      if (next.disabled) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       if (next.needCode) {
         var sent = await startCode(env, info.email, request, true);
         if (!sent.ok) return json(sent, sent.error === "rate" ? 429 : 503, request);
@@ -402,24 +430,19 @@ export default {
       }, 200, request, { "set-cookie": [next.cookie].concat(next.apiCookies || []) });
     }
     if (url.pathname === "/auth/email/start" && request.method === "POST") {
-      if (!(await turnstileOk(env, body.turnstile))) return json({ ok: false, error: "turnstile" }, 403, request);
       var email = String(body.email || "").toLowerCase().trim();
       if (!validEmail(email)) return json({ ok: false, error: "email" }, 400, request);
-      if (body.alwaysAsk === true) {
-        var hash = await sha256(email);
-        var existing = await accountOf(env, hash);
-        existing.alwaysAsk = true;
-        await saveAccount(env, hash, existing);
-      }
+      if (!(await turnstileOk(env, body.turnstile, await sha256(email)))) return json({ ok: false, error: "turnstile" }, 403, request);
       var started = await startCode(env, email, request, false);
       return json(started.ok ? { ok: true } : started, started.ok ? 200 : started.error === "rate" ? 429 : 503, request);
     }
     if (url.pathname === "/auth/email/verify" && request.method === "POST") {
-      if (!(await turnstileOk(env, body.turnstile))) return json({ ok: false, error: "turnstile" }, 403, request);
       var checkEmail = String(body.email || "").toLowerCase().trim();
+      if (!(await turnstileOk(env, body.turnstile, await sha256(checkEmail)))) return json({ ok: false, error: "turnstile" }, 403, request);
       var checked = await checkCode(env, checkEmail, String(body.code || ""));
       if (!checked.ok) return json({ ok: false, error: checked.error }, 401, request);
       var ready = await sessionFor(env, checked.emailHash, request, true, checked.googleVerified);
+      if (ready.disabled) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       return json({
         ok: true,
         needCode: false,
@@ -510,12 +533,12 @@ export default {
     if (url.pathname === "/auth/devices/revoke" && request.method === "POST") {
       var account = await accountOf(env, session.eh);
       var doomed = (account.devices || []).filter(function (row) { return row.id === String(body.id || ""); });
+      if (!doomed.length) return json({ ok: false, error: "device" }, 403, request);
+      if (!env.AUTH_DO) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       account.devices = (account.devices || []).filter(function (row) { return row.id !== String(body.id || ""); });
       await saveAccount(env, session.eh, account);
-      for (var i = 0; i < doomed.length; i += 1) {
-        if (doomed[i].sid) await env.AUTH_KV.delete(sessionKey(doomed[i].sid));
-      }
-      await env.AUTH_KV.delete("device:" + String(body.id || ""));
+      var revoked = await env.AUTH_DO.revokeDevice(session.eh, String(body.id || ""));
+      if (!revoked.ok) return json({ ok: false, error: "device" }, 403, request);
       return json({ ok: true }, 200, request);
     }
     if (url.pathname === "/auth/security" && request.method === "POST") {
