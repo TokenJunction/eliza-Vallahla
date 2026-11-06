@@ -7,6 +7,7 @@ const { generateForRequest } = require("./provider/channel.cjs");
 import { bearer, isRoot, normalizeEmail, resolveRoot } from "./authz.js";
 import { claimAdmin, cleanDisplayName, issueBoundSession, openStore, revokeBoundSession, tenantFor, verifyBoundSession } from "./sessions.js";
 import { runElizaTask } from "./eliza-route.js";
+import { admit, createTaskCache, finish, serverPolicy, stopTask } from "./task-invocation.js";
 import { assertPublicTarget } from "./ssrf.js";
 import { ADAPTER_VERSION, PROVIDER_CATALOG, blankProvider, testProvider } from "./adapters.js";
 import { NOT_CONFIGURED_APPS, builtinManifests, canLaunch, editionAllows, scopeKey } from "./apps.js";
@@ -131,7 +132,7 @@ export function createServer(options = {}) {
   const env = options.env || process.env;
   const state = options.state || createState(env);
   state.store = options.store || openStore(options.dataDir);
-  state.tasks = new Map();
+  state.tasks = createTaskCache();
   const rateBuckets = new Map();
   const fetchImpl = options.fetchImpl || fetch;
   const bus = createBus({
@@ -609,43 +610,39 @@ export function createServer(options = {}) {
         if (envelope.error) return json(res, 503, { ok: false, error: envelope.error, code: "V-BUS" }, origin);
         return json(res, 200, { ok: true, envelope }, origin);
       }
-      if (req.method === "POST" && (url.pathname === "/api/eliza" || url.pathname === "/api/tasks")) {
+      if (req.method === "POST" && (url.pathname === "/api/v1/tasks" || url.pathname === "/api/tasks" || url.pathname === "/api/eliza")) {
         const { json: body } = await readJson(req);
-        if (body.provider && body.provider !== "eliza" && url.pathname === "/api/eliza") {
-          return json(res, 503, { ok: false, status: "UNAVAILABLE", text: null, code: "V-ELIZA" }, origin);
-        }
-        if (url.pathname === "/api/tasks" && body.provider !== "eliza") {
-          const generated = await generateForRequest({
-            text: String(body.text || ""),
-            role: body.role,
-            capability: body.capability,
-          }, env, { fetchImpl });
-          if (!generated.completed) {
-            return json(res, 503, { ok: false, status: "UNAVAILABLE", text: null, completed: false, code: "V-AI" }, origin);
-          }
-          return json(res, 200, { ok: true, completed: true, text: generated.text, provider: generated.provider, simulated: false, audioGenerated: false }, origin);
-        }
-        const taskId = String(body.taskId || "");
-        if (taskId && state.tasks.has(taskId)) {
-          return json(res, 200, state.tasks.get(taskId), origin);
-        }
-        const result = await runElizaTask({
-          serviceUrl: env.ELIZA_SERVICE_URL,
-          serviceToken: env.ELIZA_SERVICE_TOKEN,
-          providerToken: env.DEEPSEEK_API_KEY || env.GEMINI_API_KEY || "",
-        }, { fetchImpl, resolveImpl: options.resolveImpl });
-        const payload = {
-          ok: false,
-          status: result.status,
-          text: null,
-          reason: result.reason,
-          calls: result.calls,
-          taskId: taskId || null,
-          app: body.app ? { id: String(body.app.id || ""), version: String(body.app.version || "") } : null,
-          code: "V-ELIZA",
+        const session = {
+          userId: req.session.userId,
+          owner: isRoot(req.session.email, env, state.setup),
         };
-        if (taskId) state.tasks.set(taskId, payload);
-        return json(res, 503, payload, origin);
+        const policy = serverPolicy(session, env);
+        const gate = admit(state.tasks, session, body, policy);
+        if (!gate.ok) {
+          return json(res, gate.status, { ok: false, reason: gate.reason, text: null, code: "V-TASK" }, origin);
+        }
+        if (gate.replay) return json(res, 200, gate.response, origin);
+        let generated = { completed: false, text: null, reason: "unavailable" };
+        if (body.provider === "eliza" || url.pathname === "/api/eliza") {
+          const result = await runElizaTask({
+            serviceUrl: env.ELIZA_SERVICE_URL,
+            serviceToken: env.ELIZA_SERVICE_TOKEN,
+            providerToken: env.DEEPSEEK_API_KEY || env.GEMINI_API_KEY || "",
+          }, { fetchImpl, resolveImpl: options.resolveImpl });
+          generated = { completed: false, text: null, reason: result.reason || "unavailable" };
+        } else {
+          generated = await generateForRequest({
+            text: String(body.text || ""),
+            capability: gate.record.capability,
+          }, env, { fetchImpl });
+        }
+        const payload = finish(state.tasks, gate.record, generated);
+        return json(res, payload.ok ? 200 : 503, payload, origin);
+      }
+      if (req.method === "POST" && url.pathname === "/api/v1/tasks/stop") {
+        const { json: body } = await readJson(req);
+        const stopped = stopTask(state.tasks, { userId: req.session.userId }, String(body.taskId || ""));
+        return json(res, stopped.status, stopped, origin);
       }
       if (req.method === "GET" && url.pathname === "/api/jupiter/quote") {
         const inputMint = url.searchParams.get("inputMint") || "";
