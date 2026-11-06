@@ -57,7 +57,7 @@ export function serverPolicy(session, env = {}) {
 const KNOWN_FIELDS = new Set([
   "capability", "app", "text", "source", "conversationId", "provider", "model",
   "tool", "query", "taskId", "parentTaskId", "role", "callUsd", "allowCloud", "localPcAwake",
-  "effect", "environment",
+  "effect", "environment", "idempotencyKey",
 ]);
 const QUERY_FIELDS = new Set(["inputMint", "outputMint", "amount"]);
 
@@ -189,15 +189,20 @@ export function admit(cache, session, body, policy, membership = { installed: []
   }
   if (!session || !session.userId) return { ok: false, status: 401, reason: "auth" };
   if (Buffer.byteLength(String(body.text || "")) > 8000) return { ok: false, status: 400, reason: "text_too_long" };
-  const conversationId = String(body.conversationId || "");
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(conversationId) || conversationId === session.userId) {
+  let conversationId = body.conversationId;
+  if (conversationId == null) conversationId = randomBytes(16).toString("hex");
+  else conversationId = String(conversationId);
+  if (conversationId === "" || conversationId === "0" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(conversationId) || conversationId === session.userId) {
     return { ok: false, status: 400, reason: "conversation_required" };
+  }
+  const request = { ...body, conversationId };
+  if (body.model && !(policy.models || []).includes(body.model)) request.model = "";
+  const idem = body.idempotencyKey == null || body.idempotencyKey === "" ? "" : String(body.idempotencyKey);
+  if (body.idempotencyKey != null && body.idempotencyKey !== "" && !/^[A-Za-z0-9_-]{8,80}$/.test(idem)) {
+    return { ok: false, status: 400, reason: "idempotency_key" };
   }
   const extra = unknownField(body);
   if (extra) return { ok: false, status: 400, reason: "unknown_field" };
-  if (body.model && !(policy.models || []).includes(body.model)) {
-    return { ok: false, status: 400, reason: "model_rejected" };
-  }
   const roleNow = membership.role === "owner" ? "owner" : "member";
   if (!CAPS.has(body.capability)) return { ok: false, status: 400, reason: "capability_rejected" };
   if (!APPS.has(body.app)) return { ok: false, status: 400, reason: "app_rejected" };
@@ -217,10 +222,12 @@ export function admit(cache, session, body, policy, membership = { installed: []
       return { ok: false, status: 403, reason: "tenant" };
     }
   }
-  const hash = bodyHash(session, body);
-  const key = bindingKey({ ...session, conversationId: body.conversationId }, body.app, hash);
-  const prior = cache.byKey.get(key);
-  if (prior && prior.tenantId === session.userId && prior.bodyHash === hash) {
+  const hash = bodyHash(session, request);
+  const key = bindingKey({ ...session, conversationId }, request.app, hash);
+  if (!cache.byIdem) cache.byIdem = new Map();
+  const prior = idem ? cache.byIdem.get(`${session.userId}\n${idem}`) : null;
+  if (prior && prior.tenantId === session.userId) {
+    if (prior.bodyHash !== hash) return { ok: false, status: 409, reason: "hash_conflict", taskId: prior.taskId };
     if (prior.stopped || prior.state === "cancelled") {
       return { ok: false, status: 409, reason: "stopped", taskId: prior.taskId, response: publicRecord(prior) };
     }
@@ -307,11 +314,15 @@ export function admit(cache, session, body, policy, membership = { installed: []
     trace: null,
     version: 1,
     cancelRequested: false,
+    idempotencyKey: idem || null,
+    conversationId,
+    model: request.model || "",
     exp: now + TASK_TTL_MS,
     replay: false,
   };
   cache.byId.set(taskId, record);
   cache.byKey.set(key, record);
+  if (idem) cache.byIdem.set(`${session.userId}\n${idem}`, record);
   if (conversationId) {
     const bound = cache.conversations[conversationId] || { tenantId: session.userId, taskIds: [] };
     bound.taskIds.push(taskId);
@@ -332,12 +343,6 @@ export function finish(cache, record, generated) {
     record.reason = "cancelled";
     record.version = (record.version || 1) + 1;
     settleSpend(cache, record, 0);
-  } else if (record.stopped && text) {
-    record.state = "done";
-    record.completed = true;
-    record.ok = true;
-    record.text = text;
-    record.reason = "provider_finished_before_cancel";
   } else if (record.stopped) {
     record.state = "cancelled";
     record.completed = false;
@@ -380,7 +385,7 @@ export function stopTask(cache, session, taskId) {
   const record = cache.byId.get(taskId);
   if (!record || record.tenantId !== session.userId) return { ok: false, status: 404, reason: "missing" };
   if (record.state === "done") {
-    return { ok: true, status: 200, taskId, reason: "provider_finished_before_cancel", state: "done" };
+    return { ok: true, status: 200, taskId, reason: "done", state: "done" };
   }
   if (record.state === "cancelled" || record.stopped) {
     return { ok: true, status: 200, taskId, reason: "cancelled", state: "cancelled" };

@@ -49,10 +49,12 @@ async function executeCapability(input = {}, deps = {}) {
       fetchImpl,
       env,
       prompt,
+      signal: input.signal,
+      model: input.model,
       system: input.system || null,
       maxTokens: input.maxTokens,
       timeoutMs: input.timeoutMs,
-      origin: input.ollamaOrigin,
+      origin: 'http://127.0.0.1:11434',
     });
     calls.push({ provider: 'ollama_local', request: local.request, ok: local.ok, reason: local.reason });
     if (local.ok) {
@@ -85,6 +87,8 @@ async function executeCapability(input = {}, deps = {}) {
       fetchImpl,
       env,
       prompt,
+      signal: input.signal,
+      model: input.model,
       system: input.system || null,
       maxTokens: input.maxTokens,
       timeoutMs: input.timeoutMs,
@@ -118,6 +122,8 @@ async function executeCapability(input = {}, deps = {}) {
     fetchImpl,
     env,
     prompt,
+    signal: input.signal,
+    model: input.model,
     system: input.system || null,
     maxTokens: input.maxTokens,
     timeoutMs: input.timeoutMs,

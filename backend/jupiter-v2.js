@@ -69,6 +69,8 @@ export function parseBuild(body) {
   return {
     ok: true,
     mode: "prepare",
+    reviewEligible: false,
+    submission: false,
     executed: false,
     signed: false,
     signature: null,
@@ -94,6 +96,10 @@ export function programLabelAllows() {
   return false;
 }
 
+export function reviewEligible() {
+  return false;
+}
+
 export function quoteAvailability(env = {}) {
   const configured = Boolean(env.JUPITER_API_KEY);
   return {
@@ -103,6 +109,8 @@ export function quoteAvailability(env = {}) {
     simulated: false,
     live: false,
     execute: false,
+    reviewEligible: false,
+    submission: false,
     reason: configured ? "program-map-not-authority" : "key-absent",
   };
 }

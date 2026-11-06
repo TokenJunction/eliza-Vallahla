@@ -20,14 +20,13 @@ function mapTask(body = {}) {
 async function generateForRequest(body, env, deps = {}) {
   if (deps.signal && deps.signal.aborted) return { completed: false, text: null, reason: 'cancelled' };
   const allowed = Array.isArray(deps.allowedModels) ? deps.allowedModels : [];
-  if (body.model && !allowed.includes(body.model)) {
-    return { completed: false, text: null, reason: 'model_rejected' };
-  }
+  const chosen = body.model && allowed.includes(body.model) ? body.model : '';
   const local = String(env.VALHALLA_LOCAL_RELAY) === '1';
   const mapped = mapTask(body);
   if (!mapped.capability) return { completed: false, text: null, reason: 'capability_rejected' };
   const result = await executeCapability({
     signal: deps.signal,
+    model: chosen,
     role: mapped.role,
     capability: mapped.capability,
     prompt: body.text || body.prompt || '',

@@ -26,13 +26,8 @@ function assertLoopbackOrigin(origin) {
   }
   const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
   if (url.protocol !== 'http:') return { ok: false, reason: 'ollama_requires_http_loopback' };
-  if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
-    return { ok: false, reason: 'ollama_not_loopback' };
-  }
-  if (url.port && url.port !== '11434' && url.port !== '') {
-    // allow default 11434 or empty (defaults to 11434 for this origin constant)
-  }
-  return { ok: true, origin: `${url.protocol}//${url.host}` };
+  if (host !== '127.0.0.1' || url.port !== '11434') return { ok: false, reason: 'ollama_not_loopback' };
+  return { ok: true, origin: 'http://127.0.0.1:11434' };
 }
 
 function buildChatRequest({ prompt, model, maxTokens, system }) {
@@ -73,7 +68,7 @@ async function chat(opts = {}) {
     return { ok: false, status: 'unavailable', reason: gate.reason, content: null, request: null };
   }
 
-  const model = readEnvModel(PROVIDERS.ollama_local, env) || LOCAL_OLLAMA_MODEL_DEFAULT;
+  const model = opts.model || readEnvModel(PROVIDERS.ollama_local, env) || LOCAL_OLLAMA_MODEL_DEFAULT;
   const url = `${gate.origin}${OLLAMA_CHAT_PATH}`;
   const body = buildChatRequest({ prompt: prompt.trim(), model, maxTokens, system });
   const request = { url, method: 'POST', body };
@@ -85,7 +80,7 @@ async function chat(opts = {}) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
       redirect: 'error',
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     const name = err && err.name;
@@ -131,7 +126,7 @@ async function listModels(opts = {}) {
     response = await fetchImpl(url, {
       method: 'GET',
       redirect: 'error',
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch {
     return { ok: false, reason: 'unreachable', models: [], generationAuthorized: false, url };

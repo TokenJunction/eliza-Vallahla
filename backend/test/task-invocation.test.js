@@ -59,15 +59,25 @@ test("the same binding replays and a different body conflicts", () => {
     app: "ai-workspace",
     text: "one",
     conversationId: "c1",
+    idempotencyKey: "idem-key-1",
   }, policy, seat);
   const again = admit(cache, member, {
     capability: "reasoning",
     app: "ai-workspace",
     text: "one",
     conversationId: "c1",
+    idempotencyKey: "idem-key-1",
   }, policy, seat);
   assert.equal(again.replay, true);
   assert.equal(again.response.taskId, first.record.taskId);
+  const fresh = admit(cache, member, {
+    capability: "reasoning",
+    app: "ai-workspace",
+    text: "one",
+    conversationId: "c1",
+  }, policy, seat);
+  assert.equal(fresh.replay, false);
+  assert.notEqual(fresh.record.taskId, first.record.taskId);
   const clash = admit(cache, member, {
     taskId: first.record.taskId,
     capability: "reasoning",
@@ -127,6 +137,7 @@ test("the same stopped body does not open a new task", () => {
     app: "ai-workspace",
     text: "same",
     conversationId: "c1",
+    idempotencyKey: "idem-stopped",
   }, policy, seat);
   stopTask(cache, member, first.record.taskId);
   finish(cache, first.record, { completed: true, text: "late" });
@@ -135,6 +146,7 @@ test("the same stopped body does not open a new task", () => {
     app: "ai-workspace",
     text: "same",
     conversationId: "c1",
+    idempotencyKey: "idem-stopped",
   }, policy, seat);
   assert.equal(again.status, 409);
   assert.equal(again.reason, "stopped");
@@ -158,7 +170,12 @@ test("a missing membership row is not an install grant", () => {
 test("an empty conversation is rejected and a reloaded run is interrupted", () => {
   const cache = createTaskCache();
   const policy = serverPolicy(member, { VALHALLA_LOCAL_RELAY: "1" });
-  assert.equal(admit(cache, member, { capability: "chat", app: "ai-workspace", text: "hi" }, policy, seat).reason, "conversation_required");
+  assert.equal(admit(cache, member, { capability: "chat", app: "ai-workspace", text: "hi", conversationId: "" }, policy, seat).reason, "conversation_required");
+  assert.equal(admit(cache, member, { capability: "chat", app: "ai-workspace", text: "hi", conversationId: "0" }, policy, seat).reason, "conversation_required");
+  const issued = admit(cache, member, { capability: "chat", app: "ai-workspace", text: "hi" }, policy, seat);
+  assert.equal(issued.ok, true);
+  assert.notEqual(issued.record.conversationId, "0");
+  assert.equal(issued.record.conversationId.length, 32);
   const started = admit(cache, member, { capability: "chat", app: "ai-workspace", text: "hi", conversationId: "c1" }, policy, seat);
   assert.equal(started.status, 200);
   const store = { data: {}, flush() {} };

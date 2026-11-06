@@ -53,7 +53,11 @@ export function provisionMember(store, userId) {
   if (!userId) return null;
   if (!store.data.membership) store.data.membership = {};
   if (store.data.membership[userId]) return store.data.membership[userId];
-  store.data.membership[userId] = { installed: ["ai-workspace"], role: "member", entitlement: "preview" };
+  store.data.membership[userId] = {
+    installed: ["trading", "ai-workspace"],
+    role: "member",
+    entitlement: "preview",
+  };
   store.flush();
   return store.data.membership[userId];
 }

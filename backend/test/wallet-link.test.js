@@ -139,8 +139,9 @@ test("a deployment key is not BYOK and an empty packed key is rejected", () => {
   assert.equal(logged.includes("tenant-key"), false);
   const store = { data: { membership: {} }, flush() {} };
   const row = provisionMember(store, "member-1");
-  assert.deepEqual(row.installed, ["ai-workspace"]);
+  assert.deepEqual(row.installed, ["trading", "ai-workspace"]);
   assert.equal(row.role, "member");
+  assert.equal(row.installed.includes("thalos"), false);
   assert.equal(provisionMember(store, "member-1"), row);
   const { mapTask } = createRequire(import.meta.url)("../provider/channel.cjs");
   assert.equal(mapTask({ capability: "chat" }).capability, "chat");

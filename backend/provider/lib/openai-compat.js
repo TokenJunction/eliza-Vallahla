@@ -54,7 +54,7 @@ async function chatOpenAICompat(providerId, opts = {}) {
 
   const key = readEnvKey(spec, env);
   if (!key) return missingCredential(providerId);
-  const model = readEnvModel(spec, env);
+  const model = opts.model || readEnvModel(spec, env);
   if (!model) return missingModel(providerId);
 
   const messages = [];
@@ -82,7 +82,7 @@ async function chatOpenAICompat(providerId, opts = {}) {
       headers,
       body: JSON.stringify(body),
       redirect: 'error',
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     const name = err && err.name;
@@ -153,7 +153,7 @@ async function chatGeminiNative(opts = {}) {
       },
       body: JSON.stringify(body),
       redirect: 'error',
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     const name = err && err.name;
@@ -186,7 +186,7 @@ async function listOpenAIModels(providerId, opts = {}) {
       method: 'GET',
       headers: { authorization: `Bearer ${key.value}` },
       redirect: 'error',
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch {
     return { ok: false, reason: 'unreachable', models: [], generationAuthorized: false };
