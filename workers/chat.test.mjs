@@ -200,6 +200,25 @@ test("falls through the fixed OpenRouter models on rate limits and server errors
   assert.equal(response.headers.get("x-valhalla-model"), "deepseek/deepseek-r1:free");
 });
 
+test("falls through the OpenRouter models on network errors", async (t) => {
+  var models = [];
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    models.push(JSON.parse(options.body).model);
+    if (models.length === 1) throw new Error("network error");
+    return jsonResponse({ choices: [{ message: { content: "Fallback response." } }] });
+  });
+  var response = await worker.fetch(request({ text: "Hello" }), env({
+    CHAT_PROVIDER: "openrouter",
+    OPENROUTER_API_KEY: "test-key"
+  }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(models, [
+    "google/gemini-2.0-flash-exp:free",
+    "meta-llama/llama-3.3-70b-instruct:free"
+  ]);
+  assert.equal(response.headers.get("x-valhalla-model"), models[1]);
+});
+
 test("does not fall through OpenRouter models on non-retryable errors", async (t) => {
   var calls = 0;
   t.mock.method(globalThis, "fetch", async () => {

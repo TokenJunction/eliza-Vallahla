@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#008080">
-  <meta name="description" content="ValhallaOS desktop: read-only system status and tools.">
-  <title>ValhallaOS Web98</title>
+  <meta name="theme-color" content="#080a0c">
+  <meta name="description" content="ValhallaOS command desk for wallet connections and assistant chat.">
+  <title>ValhallaOS · Command Desk</title>
   <link rel="stylesheet" href="/os/os.css">
+  <script src="/site-config.js" defer></script>
   <script src="/os/app.js" defer></script>
+  <script src="/os/bridge.js" defer></script>
 </head>
 <body>
   <svg class="icon-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
@@ -36,8 +38,10 @@
 
   <main class="desktop" id="desktop">
     <header class="desktop-heading">
-      <h1>ValhallaOS</h1>
-      <p>Web98 desktop · monitoring is read-only</p>
+      <img src="/assets/mark.svg" alt="" width="40" height="40">
+      <div><h1>VALHALLA<span>OS</span></h1>
+      <p>COMMAND DESK / PAPER-FIRST</p></div>
+      <div class="header-state"><span class="state-dot"></span> PUBLIC DESK <span class="paper-badge">LIVE TRADING OFF</span></div>
     </header>
 
     <nav class="desktop-icons" aria-label="Desktop applications">
@@ -58,7 +62,53 @@
       </button>
     </nav>
 
-    <section class="window" id="window-status" data-window="status" aria-labelledby="title-status"
+    <div class="workspace">
+      <section class="workspace-panel overview-panel" aria-labelledby="overview-title">
+        <div class="panel-heading"><h2 id="overview-title">Wallet / overview</h2><span>NON-CUSTODIAL</span></div>
+        <div class="overview-body">
+          <div class="overview-copy">
+            <p class="panel-label">YOUR CONNECTION</p>
+            <p class="overview-value" id="overview-wallet">Not connected</p>
+            <p id="overview-wallet-detail">Connect a wallet to view its public address.</p>
+            <button type="button" class="classic-button accent-button" data-open="wallet">Connect wallet</button>
+            <p class="safety-note">Your keys stay in your wallet. No transaction is requested.</p>
+          </div>
+          <img class="overview-mech" src="/assets/mech.jpg" alt="" loading="lazy">
+        </div>
+        <div class="overview-footer"><span>EXECUTION <b>DISABLED</b></span><span>MODE <b>PAPER-FIRST</b></span></div>
+      </section>
+
+      <section class="workspace-panel chat-panel" aria-labelledby="chat-title">
+        <div class="panel-heading"><h2 id="chat-title">Assistant / chat</h2><span>CONFIGURED CHAT SERVICE</span></div>
+        <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Assistant conversation">
+          <p class="chat-intro"><strong>VALHALLA ASSISTANT</strong><br>Ask about the desk, market concepts, or paper trading. Chat cannot place trades or access your wallet.</p>
+        </div>
+        <form id="chat-form" class="chat-form">
+          <label class="sr-only" for="chat-input">Message the assistant</label>
+          <textarea id="chat-input" maxlength="500" rows="2" placeholder="Ask the assistant…" required></textarea>
+          <button type="submit" class="classic-button accent-button">Send</button>
+        </form>
+        <div class="chat-voice"><button type="button" class="classic-button" id="chat-voice" aria-pressed="false">Voice replies off</button><span>Uses your browser's speech engine.</span></div>
+        <p id="chat-status" class="chat-status" role="status">Never share a seed phrase or private key. Not financial advice.</p>
+      </section>
+
+      <section class="workspace-panel positions-panel" aria-labelledby="positions-title">
+        <div class="panel-heading"><h2 id="positions-title">Positions</h2><span>NOT CONNECTED</span></div>
+        <p>No position data is connected. Wallet connection alone does not load balances or positions.</p>
+      </section>
+      <section class="workspace-panel activity-panel" aria-labelledby="activity-title">
+        <div class="panel-heading"><h2 id="activity-title">System / activity</h2><span>LOCAL SESSION</span></div>
+        <p>Live trading is disabled. Configure the simulated bot in the existing trading desk; sign-in may be required.</p>
+        <div class="tool-row">
+          <a class="classic-button accent-button" href="/app/#botPanel">Paper bot controls</a>
+          <button type="button" class="classic-button" data-open="status">Service status</button>
+          <button type="button" class="classic-button" data-open="swarm">Swarm monitor</button>
+          <button type="button" class="classic-button" data-open="memory">Memory inspector</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="window" id="window-status" data-window="status" aria-labelledby="title-status" hidden
       style="left:clamp(150px, 24vw, 320px);top:76px;width:min(460px, calc(100vw - 32px));">
       <header class="title-bar" data-drag-handle>
         <h2 id="title-status">System Status</h2>
@@ -144,8 +194,16 @@
         </div>
       </header>
       <div class="window-body">
-        <p class="inset-panel">Wallet actions are unavailable in this read-only preview.</p>
-        <p>No transaction, signature request, key access, or wallet connection is initiated here.</p>
+        <p>Connect an installed wallet to share its public address. Your wallet controls permissions; this desk will not request a transaction or signature.</p>
+        <div class="wallet-actions">
+          <button type="button" class="classic-button" data-wallet="solflare">Connect Solflare</button>
+          <button type="button" class="classic-button" data-wallet="metamask">Connect MetaMask</button>
+          <button type="button" class="classic-button" disabled>Privy unavailable</button>
+        </div>
+        <p class="fine-print">Privy requires an application ID and a configured integration. MetaMask connects an Ethereum address; Solflare connects a Solana address.</p>
+        <p class="inset-panel" id="wallet-status" role="status">No wallet connected.</p>
+        <button type="button" class="classic-button" id="wallet-disconnect" hidden>Disconnect</button>
+        <p class="fine-print">Live trading is disabled. This bridge does not request, store, or transmit private keys.</p>
       </div>
     </section>
 
@@ -162,8 +220,7 @@
 
     <footer class="taskbar">
       <button class="start-button" id="start-button" type="button" aria-expanded="false" aria-controls="start-menu">
-        <svg aria-hidden="true" viewBox="0 0 20 20"><path fill="#f33" d="M1 2 9 1v8H1z"/><path fill="#2a4" d="M11 1 19 0v9h-8z"/><path fill="#26c" d="M1 11h8v8l-8-1z"/><path fill="#fc3" d="M11 11h8v9l-8-1z"/></svg>
-        Start
+        Tools
       </button>
       <div class="taskbar-apps" id="taskbar-apps" aria-label="Open applications"></div>
       <time class="taskbar-clock" id="clock"></time>

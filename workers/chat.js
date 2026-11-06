@@ -302,6 +302,7 @@ async function handle(request, env) {
   messages.push({ role: "user", content: userContent });
 
   var upstream;
+  var providerUnreachable = false;
   var models = provider.name === "openrouter" ? OPENROUTER_FALLBACK_MODELS : [provider.model];
   for (var modelIndex = 0; modelIndex < models.length; modelIndex += 1) {
     provider.model = models[modelIndex];
@@ -326,11 +327,15 @@ async function handle(request, env) {
         signal: AbortSignal.timeout(45000)
       });
     } catch (error) {
+      providerUnreachable = true;
+      if (modelIndex + 1 < models.length) continue;
       return fail(request, 502, "V-CHAT-UPSTREAM", "The chat provider could not be reached.");
     }
+    providerUnreachable = false;
     if (upstream.ok || (upstream.status !== 429 && upstream.status < 500)) break;
   }
 
+  if (providerUnreachable || !upstream) return fail(request, 502, "V-CHAT-UPSTREAM", "The chat provider could not be reached.");
   if (!upstream.ok) return fail(request, 502, "V-CHAT-UPSTREAM", "The chat provider is temporarily unavailable.");
   if (streaming) {
     if (!upstream.body) return fail(request, 502, "V-CHAT-UPSTREAM", "The chat provider returned no response.");

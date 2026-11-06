@@ -12,7 +12,7 @@ shutil.copytree(
         'scripts',
         '.env', '.env.*', 'package.json', 'package-lock.json', 'bun.lock',
         'bun.lockb', 'render.yaml', 'valhalla-elizaos', 'supabase', 'lib',
-        'valhallaQueueEngine.js', 'valhallaQueueEngine.test.cjs', 'setup.ps1', 'setup.sh'
+        'valhallaQueueEngine.js', 'valhallaQueueEngine.test.cjs', 'bridge.test.cjs', 'setup.ps1', 'setup.sh'
     )
 )
 
