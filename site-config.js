@@ -29,6 +29,9 @@ window.VALHALLA_SITE = {
   TURNSTILE_VERIFY_URL: "https://valhalla-turnstile-verify.valhalla-app.workers.dev/api/verify",
   /* Public Google OAuth web client. Origins: https://valhalla-app.xyz and https://www.valhalla-app.xyz. Scopes: openid, email, profile. */
   GOOGLE_CLIENT_ID: "1085862906383-cmiqc9bu96uqigm73nb3jkp5vfjf9b7l.apps.googleusercontent.com",
+  /* Public Supabase values. The service-role key stays on the server. */
+  SUPABASE_URL: "https://girltjnrrwlyeufrcors.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_PKNzsuQZMMs4Sb81gnoFaw_PCgSbclp",
   /* Optional email sign-in Worker. POST {email}. Leave empty until that Worker exists. */
   MAGIC_LINK_URL: "",
   /* Live sign-in Worker valhalla-auth: Google token check and the emailed 6-digit code. */

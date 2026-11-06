@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { browserName, codeDecision, maskEmail, needSecondFactor, validEmail } from "./auth-logic.js";
 
-test("every login needs a code until this login has entered one", () => {
+test("email login needs a code, and a verified Google login does not", () => {
   assert.equal(needSecondFactor({ knownDevice: true, knownIp: true, alwaysAsk: false, leader: false, codeThisLogin: false }), true);
   assert.equal(needSecondFactor({ codeThisLogin: true }), false);
+  assert.equal(needSecondFactor({ codeThisLogin: false, googleVerified: true }), false);
 });
 
 test("a code allows five tries and then locks", () => {

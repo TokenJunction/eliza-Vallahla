@@ -243,58 +243,75 @@
     }
   }
 
-  function verifyGoogle(credential, note) {
-    if (!credential) {
-      fail(note, "V-AUTH", "empty google credential", function () { location.reload(); });
+  function finishSupabase(accessToken, note) {
+    if (!accessToken) {
+      fail(note, "V-AUTH", "empty supabase session", function () { location.reload(); });
       return;
     }
-    fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(credential))
-      .then(function (res) { return res.json().then(function (body) { body.httpOk = res.ok; return body; }); })
-      .then(function (info) {
-        var iss = String(info.iss || "");
-        var verified = info.email_verified === true || info.email_verified === "true";
-        var audOk = info.aud === cfg.GOOGLE_CLIENT_ID;
-        var issOk = iss === "https://accounts.google.com" || iss === "accounts.google.com";
-        if (!info.httpOk || !audOk || !issOk || Number(info.exp) * 1000 < Date.now() || !verified || !info.email) {
-          fail(note, "V-AUTH", "google token rejected", function () { location.reload(); });
+    postAuth("/auth/supabase", { accessToken: accessToken }).then(function (body) {
+      if (!body.ok || !body.session) {
+        var friendly = authNote(body.error);
+        if (body.error === "incomplete") note.textContent = "Google sign-in did not return a session.";
+        else if (body.error === "auth-not-configured") note.textContent = "Google sign-in is not configured on the server.";
+        else if (friendly) note.textContent = friendly;
+        else fail(note, "V-AUTH", "google worker " + (body.error || body.status || ""), function () { location.reload(); });
+        return;
+      }
+      acceptAccount(body);
+    }).catch(function (err) {
+      fail(note, "V-AUTH", String(err && err.message || err), function () { location.reload(); });
+    });
+  }
+
+  function startGoogle(note) {
+    if (!termsOk()) return;
+    import("/valhalla/google-auth.js").then(function (mod) {
+      var verifier = mod.createVerifier();
+      sessionStorage.setItem("valhalla-pkce-verifier", verifier);
+      return mod.codeChallenge(verifier).then(function (challenge) {
+        var redirectTo = location.origin + "/app/";
+        var start = mod.authorizeRequest(cfg, redirectTo, challenge);
+        if (!start) {
+          fail(note, "V-AUTH", "supabase public key missing", function () { location.reload(); });
           return;
         }
-        var prior = readAccount() || {};
-        var email = String(info.email).toLowerCase();
-        writeAccount({
-          email: email,
-          name: info.name || prior.name || "",
-          picture: info.picture || prior.picture || "",
-          wallet: prior.wallet || "",
-          walletPref: prior.walletPref || "",
-          method: "google",
-          agentUrl: prior.agentUrl || "",
-          bot: prior.bot || null,
-          riskAccepted: prior.riskAccepted === true,
-          termsAccepted: true,
-          plan: prior.plan || "free"
-        });
-        sessionStorage.setItem("valhalla-auth", "1");
-        saveRemember({ email: email, name: info.name || prior.name, wallet: prior.wallet, walletPref: prior.walletPref, plan: prior.plan || "free" }, "google");
-        if (!authBase()) {
-          showCode(email, "wallet");
-          fail(document.getElementById("codeNote"), "V-MAIL", "code service unavailable", function () { location.reload(); });
-          return;
-        }
-        postAuth("/auth/google", { credential: credential, alwaysAsk: true }).then(function (body) {
-          if (!body.ok) {
-            var friendly = authNote(body.error);
-            if (friendly) note.textContent = friendly;
-            else fail(note, "V-AUTH", "google worker " + (body.error || ""), function () { verifyGoogle(credential, note); });
+        location.assign(start.url);
+      });
+    }).catch(function (err) {
+      fail(note, "V-AUTH", String(err && err.message || err), function () { location.reload(); });
+    });
+  }
+
+  function resumeGoogle(note) {
+    var search = location.search || "";
+    if (search.indexOf("code=") < 0 && search.indexOf("error=") < 0) return;
+    import("/valhalla/google-auth.js").then(function (mod) {
+      var parsed = mod.callbackCode(search);
+      if (!parsed.ok) {
+        fail(note, "V-AUTH", parsed.error || "google redirect failed", function () { location.reload(); });
+        return;
+      }
+      var verifier = sessionStorage.getItem("valhalla-pkce-verifier") || "";
+      var exchange = mod.tokenExchange(cfg, parsed.code, verifier);
+      if (!exchange) {
+        fail(note, "V-AUTH", "supabase public key missing", function () { location.reload(); });
+        return;
+      }
+      fetch(exchange.url, { method: exchange.method, headers: exchange.headers, body: exchange.body })
+        .then(function (res) { return res.json().then(function (body) { body.status = res.status; return body; }); })
+        .then(function (token) {
+          sessionStorage.removeItem("valhalla-pkce-verifier");
+          history.replaceState(null, "", location.pathname);
+          if (!token.access_token) {
+            fail(note, "V-AUTH", "supabase token " + (token.error_description || token.msg || token.status), function () { location.reload(); });
             return;
           }
-          acceptAccount(body);
-        }).catch(function (err) {
-          fail(note, "V-AUTH", String(err && err.message || err), function () { verifyGoogle(credential, note); });
+          finishSupabase(token.access_token, note);
+        })
+        .catch(function (err) {
+          fail(note, "V-AUTH", String(err && err.message || err), function () { location.reload(); });
         });
-      }).catch(function (err) {
-        fail(note, "V-AUTH", "tokeninfo " + String(err && err.message || err), function () { verifyGoogle(credential, note); });
-      });
+    });
   }
 
   function postAuth(path, payload) {
@@ -358,43 +375,19 @@
         forgetDevice();
       });
     }
-    if (!keyReady(cfg.GOOGLE_CLIENT_ID)) {
+    resumeGoogle(note);
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+      google.hidden = false;
+      google.onclick = function () { startGoogle(note); };
+    } else if (!keyReady(cfg.GOOGLE_CLIENT_ID)) {
       google.onclick = function () {
         if (!termsOk()) return;
         fail(note, "V-AUTH", "google client id missing", function () { location.reload(); });
       };
-    } else if (!google.dataset.gis) {
-      google.dataset.gis = "1";
-      google.hidden = true;
-      var script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client";
-      script.async = true;
-      script.onload = function () {
-        window.google.accounts.id.initialize({
-          client_id: cfg.GOOGLE_CLIENT_ID,
-          ux_mode: "popup",
-          auto_select: false,
-          cancel_on_tap_outside: true,
-          use_fedcm_for_prompt: false,
-          context: "signin",
-          callback: function (resp) {
-            if (window.google.accounts.id.cancel) window.google.accounts.id.cancel();
-            if (!termsOk()) return;
-            verifyGoogle(resp && resp.credential, note);
-          }
-        });
-        window.google.accounts.id.renderButton(document.getElementById("googleSlot"), {
-          theme: "filled_black",
-          size: "large",
-          text: "signin_with",
-          shape: "rectangular",
-          width: 360
-        });
+    } else {
+      google.onclick = function () {
+        fail(note, "V-AUTH", "supabase public key missing", function () { location.reload(); });
       };
-      script.onerror = function () {
-        fail(note, "V-AUTH", "google identity script failed to load", function () { location.reload(); });
-      };
-      document.head.appendChild(script);
     }
     var showCreate = document.getElementById("showCreate");
     var showLogin = document.getElementById("showLogin");
