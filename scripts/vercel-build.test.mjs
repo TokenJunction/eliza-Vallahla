@@ -153,9 +153,11 @@ test("public preview keeps the site pages and leaves backend out", async () => {
     }
 
     const risk = await status("/disclaimer.html");
-    assert.match(risk.text, /Valhalla disclaimer/);
+    assert.match(risk.text, /<h1>Disclaimer<\/h1>/);
     assert.match(risk.text, /not financial, legal, or tax advice/);
     assert.match(risk.text, /Crypto can lose money/);
+    assert.match(risk.text, /irreversible/);
+    assert.match(risk.text, /not risk-free/);
     assert.match(risk.text, /stylesheet" href="\/styles.css"/);
     const plain = await status("/disclaimer.md");
     assert.equal(plain.status, 404);
