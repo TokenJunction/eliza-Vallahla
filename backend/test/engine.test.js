@@ -388,3 +388,25 @@ test("local relay stays closed unless this process is the local relay", async ()
   assert.equal(closed.status, 409);
   await app.stop();
 });
+
+test("a session cookie cannot change state without the matching CSRF token", async () => {
+  const app = await boot();
+  const admin = await api(app.base, "/api/bootstrap", {
+    method: "POST",
+    body: { email: "root@customer.test", code: app.code, deviceId: "d1" },
+  });
+  const cookie = `vh_session=${admin.json.token}; vh_csrf=match-token`;
+  const denied = await fetch(`${app.base}/api/setup/branding`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ name: "Northwind", accent: "#112233" }),
+  });
+  assert.equal(denied.status, 403);
+  const allowed = await fetch(`${app.base}/api/setup/branding`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json", "x-csrf-token": "match-token" },
+    body: JSON.stringify({ name: "Northwind", accent: "#112233" }),
+  });
+  assert.equal(allowed.status, 200);
+  await app.stop();
+});

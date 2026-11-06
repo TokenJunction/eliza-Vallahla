@@ -4,7 +4,7 @@
  * RESEND_API_KEY and the AUTH_KV id.
  * The code is emailed and stored only as a hash. It is not logged.
  */
-import { browserName, codeDecision, maskEmail, needSecondFactor, validEmail } from "./auth-logic.js";
+import { browserName, codeDecision, maskEmail, needSecondFactor, sessionApiCookies, validEmail } from "./auth-logic.js";
 import { acceptLive, sessionKey } from "./live-session.mjs";
 
 var ALLOWED = ["https://valhalla-app.xyz", "https://www.valhalla-app.xyz"];
@@ -30,9 +30,22 @@ function cors(request) {
 }
 
 function json(body, status, request, extra) {
-  var headers = cors(request);
-  headers["content-type"] = "application/json";
-  if (extra) Object.keys(extra).forEach(function (key) { headers[key] = extra[key]; });
+  var headers = new Headers();
+  var base = cors(request);
+  Object.keys(base).forEach(function (key) { headers.set(key, base[key]); });
+  headers.set("content-type", "application/json");
+  if (extra) {
+    Object.keys(extra).forEach(function (key) {
+      var value = extra[key];
+      if (String(key).toLowerCase() === "set-cookie") {
+        (Array.isArray(value) ? value : [value]).forEach(function (cookie) {
+          if (cookie) headers.append("set-cookie", cookie);
+        });
+      } else {
+        headers.set(key, value);
+      }
+    });
+  }
   return new Response(JSON.stringify(body), { status: status || 200, headers: headers });
 }
 
@@ -123,10 +136,15 @@ async function readToken(secret, token) {
   }
 }
 
-function cookieHeader(request) {
+function cookieValue(request, name) {
   var raw = request.headers.get("Cookie") || "";
-  var hit = raw.split(";").map(function (part) { return part.trim(); }).find(function (part) { return part.indexOf("vh_device=") === 0; });
-  return hit ? hit.slice("vh_device=".length) : "";
+  var prefix = name + "=";
+  var hit = raw.split(";").map(function (part) { return part.trim(); }).find(function (part) { return part.indexOf(prefix) === 0; });
+  return hit ? decodeURIComponent(hit.slice(prefix.length)) : "";
+}
+
+function cookieHeader(request) {
+  return cookieValue(request, "vh_device");
 }
 
 function deviceCookie(token) {
@@ -308,7 +326,12 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
     google: live.google
   });
   var cookie = await issue(env.DEVICE_COOKIE_SECRET, { eh: emailHash, did: did, exp: now + 30 * 24 * 60 * 60 * 1000 });
-  return { needCode: false, session: session, cookie: deviceCookie(cookie) };
+  return {
+    needCode: false,
+    session: session,
+    cookie: deviceCookie(cookie),
+    apiCookies: sessionApiCookies(session, crypto.randomUUID())
+  };
 }
 
 function leaderEmail(env) {
@@ -376,7 +399,7 @@ export default {
         email: maskEmail(info.email),
         session: next.session,
         redirect: await loginRedirect(env, emailHash, true)
-      }, 200, request, { "set-cookie": next.cookie });
+      }, 200, request, { "set-cookie": [next.cookie].concat(next.apiCookies || []) });
     }
     if (url.pathname === "/auth/email/start" && request.method === "POST") {
       if (!(await turnstileOk(env, body.turnstile))) return json({ ok: false, error: "turnstile" }, 403, request);
@@ -403,14 +426,20 @@ export default {
         email: maskEmail(checkEmail),
         session: ready.session,
         redirect: await loginRedirect(env, checked.emailHash, checked.googleVerified)
-      }, 200, request, { "set-cookie": ready.cookie });
+      }, 200, request, { "set-cookie": [ready.cookie].concat(ready.apiCookies || []) });
     }
     if (url.pathname === "/auth/chat-config" && request.method === "GET") {
       var config = JSON.parse((await env.AUTH_KV.get("manager:chat-config")) || "{}");
       var model = CHAT_MODELS.indexOf(config.model) >= 0 ? config.model : CHAT_MODELS[0];
       return json({ provider: "openai", model: model, models: CHAT_MODELS }, 200, request);
     }
-    var session = await readAccess(env, bearer(request));
+    if (url.pathname === "/auth/session" && request.method === "GET") {
+      var presented = bearer(request) || cookieValue(request, "vh_session");
+      var live = await readAccess(env, presented);
+      if (!live) return json({ ok: false, authenticated: false }, 401, request);
+      return json({ ok: true, authenticated: true }, 200, request);
+    }
+    var session = await readAccess(env, bearer(request) || cookieValue(request, "vh_session"));
     if (!session) return json({ ok: false, error: "session" }, 401, request);
     if (url.pathname === "/auth/access" && request.method === "GET") {
       var account = await accountOf(env, session.eh);

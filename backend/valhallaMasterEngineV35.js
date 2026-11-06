@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 const require = createRequire(import.meta.url);
 const { generateForRequest } = require("./provider/channel.cjs");
 const { mapCustomerFromBearer } = require("../lib/customer-identity.js");
-import { bearer, isRoot, normalizeEmail, resolveRoot } from "./authz.js";
+import { csrfOk, isRoot, normalizeEmail, presentedCredential, resolveRoot } from "./authz.js";
 import { claimAdmin, cleanDisplayName, issueBoundSession, openStore, revokeBoundSession, tenantFor, verifyBoundSession } from "./sessions.js";
 import { runElizaTask } from "./eliza-route.js";
 import { admit, finish, history, loadTasks, readTask, saveTasks, serverPolicy, stopTask } from "./task-invocation.js";
@@ -206,7 +206,9 @@ export function createServer(options = {}) {
       }
       const openApi = url.pathname === "/api/bootstrap" || url.pathname.startsWith("/api/billing/webhook/");
       if (url.pathname.startsWith("/api/") && !openApi) {
-        const token = bearer(req);
+        const cred = presentedCredential(req);
+        if (!csrfOk(req, cred)) return json(res, 403, { ok: false, code: "V-CSRF" }, origin);
+        const token = cred.token;
         const local = verifyBoundSession(state.store, token);
         if (local) {
           req.session = local;

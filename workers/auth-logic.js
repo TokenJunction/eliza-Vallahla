@@ -32,3 +32,11 @@ export function maskEmail(email) {
 export function validEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").toLowerCase());
 }
+
+export function sessionApiCookies(token, csrf) {
+  var maxAge = 12 * 60 * 60;
+  return [
+    "vh_session=" + token + "; HttpOnly; Secure; SameSite=Lax; Path=/api; Max-Age=" + maxAge,
+    "vh_csrf=" + csrf + "; Secure; SameSite=Lax; Path=/api; Max-Age=" + maxAge
+  ];
+}

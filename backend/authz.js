@@ -55,3 +55,29 @@ export function bearer(req) {
   const header = req.headers.authorization || "";
   return header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
 }
+
+function cookieJar(req) {
+  const jar = {};
+  String(req.headers.cookie || "").split(";").forEach((part) => {
+    const text = part.trim();
+    const index = text.indexOf("=");
+    if (index < 1) return;
+    jar[text.slice(0, index)] = decodeURIComponent(text.slice(index + 1));
+  });
+  return jar;
+}
+
+export function presentedCredential(req) {
+  const token = bearer(req);
+  if (token) return { token, via: "bearer" };
+  const jar = cookieJar(req);
+  if (!jar.vh_session) return { token: "", via: "" };
+  return { token: jar.vh_session, via: "cookie", csrf: jar.vh_csrf || "" };
+}
+
+export function csrfOk(req, cred) {
+  if (!cred || cred.via !== "cookie") return true;
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return true;
+  const header = String(req.headers["x-csrf-token"] || "");
+  return header.length > 0 && header === cred.csrf;
+}
