@@ -189,6 +189,7 @@
     if (error === "rate") return "Please wait a moment, then ask for a new code.";
     if (error === "locked") return "That code was tried too many times. Ask for a new one.";
     if (error === "expired" || error === "code" || error === "missing") return "That code was not accepted.";
+    if (error === "email-sender-rejected") return "The sign-in email was rejected by the mail service. Try again shortly.";
     return "";
   }
 
@@ -248,7 +249,13 @@
       fail(note, "V-AUTH", "empty supabase session", function () { location.reload(); });
       return;
     }
-    postAuth("/auth/supabase", { accessToken: accessToken }).then(function (body) {
+    var nonce = sessionStorage.getItem("valhalla-auth-nonce") || "";
+    var callback = sessionStorage.getItem("valhalla-auth-callback") || "";
+    postAuth("/auth/supabase", { accessToken: accessToken, nonce: nonce, callback: callback }).then(function (body) {
+      if (body.ok && body.needCode) {
+        acceptAccount(body);
+        return;
+      }
       if (!body.ok || !body.session) {
         var friendly = authNote(body.error);
         if (body.error === "incomplete") note.textContent = "Google sign-in did not return a session.";
@@ -269,13 +276,22 @@
       var verifier = mod.createVerifier();
       sessionStorage.setItem("valhalla-pkce-verifier", verifier);
       return mod.codeChallenge(verifier).then(function (challenge) {
-        var redirectTo = location.origin + "/app/";
-        var start = mod.authorizeRequest(cfg, redirectTo, challenge);
-        if (!start) {
-          fail(note, "V-AUTH", "supabase public key missing", function () { location.reload(); });
-          return;
-        }
-        location.assign(start.url);
+        return fetch(authBase() + "/auth/supabase", { method: "GET", credentials: "include" }).then(function (res) {
+          return res.json().catch(function () { return { ok: false }; });
+        }).then(function (issued) {
+          if (!issued || issued.ok !== true || !issued.callback || !issued.nonce || issued.stateSupported !== false) {
+            fail(note, "V-AUTH", "auth callback missing", function () { location.reload(); });
+            return;
+          }
+          sessionStorage.setItem("valhalla-auth-nonce", issued.nonce);
+          sessionStorage.setItem("valhalla-auth-callback", issued.callback);
+          var start = mod.authorizeRequest(cfg, issued.callback, challenge);
+          if (!start || start.stateSupported !== false) {
+            fail(note, "V-AUTH", "supabase public key missing", function () { location.reload(); });
+            return;
+          }
+          location.assign(start.url);
+        });
       });
     }).catch(function (err) {
       fail(note, "V-AUTH", String(err && err.message || err), function () { location.reload(); });

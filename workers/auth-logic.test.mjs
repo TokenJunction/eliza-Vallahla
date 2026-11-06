@@ -2,10 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { browserName, codeDecision, maskEmail, needSecondFactor, validEmail } from "./auth-logic.js";
 
-test("email login needs a code, and a verified Google login does not", () => {
-  assert.equal(needSecondFactor({ knownDevice: true, knownIp: true, alwaysAsk: false, leader: false, codeThisLogin: false }), true);
-  assert.equal(needSecondFactor({ codeThisLogin: true }), false);
-  assert.equal(needSecondFactor({ codeThisLogin: false, googleVerified: true }), false);
+test("stored alwaysAsk, a new device, and the owner still require the email code", () => {
+  var known = { knownDevice: true, alwaysAsk: false, leader: false, revoked: false, baseVerified: true, codeThisLogin: false };
+  assert.equal(needSecondFactor(known), false);
+  assert.equal(needSecondFactor(Object.assign({}, known, { alwaysAsk: true })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { knownDevice: false })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { leader: true })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { revoked: true })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { baseVerified: false })), true);
+  assert.equal(needSecondFactor({ codeThisLogin: true, knownDevice: false, leader: true, alwaysAsk: true }), false);
+  assert.equal(needSecondFactor({ googleVerified: true, knownDevice: false, alwaysAsk: true, leader: true }), true);
 });
 
 test("a code allows five tries and then locks", () => {
