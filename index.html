@@ -16,7 +16,7 @@
     <header class="topbar" data-nav="locked">
       <a class="brand" href="/"><svg id="brand-mark" class="brand-mark" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><path fill="none" stroke="#E8B65A" stroke-width="1.6" d="M5 23c4.2-11 17.8-11 22 0"/><path fill="none" stroke="#C9963E" stroke-width="1.2" d="M9 23c2.8-7 11.2-7 14 0"/><path fill="#E8B65A" d="M15 13h2v10h-2z"/></svg><span>VALHALLAOS</span></a>
       <nav aria-label="Main navigation">
-        <a href="#access">Client access</a>
+        <a href="/app/">Client access</a>
       </nav>
     </header>
 
@@ -47,19 +47,6 @@
         <p>The preview does not execute swaps or take payment. Sign-in and quote review are planned for when the service is connected. This page does not complete sign-in.</p>
       </section>
 
-      <section class="access" id="access" aria-labelledby="access-title">
-        <div class="access-body">
-          <h2 id="access-title">Client access</h2>
-          <form id="home-email" action="/app/" method="get">
-            <label for="home-email-address">Email address</label>
-            <input id="home-email-address" type="email" autocomplete="email" placeholder="you@example.com" required>
-            <button type="submit">Continue with email</button>
-          </form>
-          <div class="divider"><span>or</span></div>
-          <a class="google-link" id="home-google" href="/app/">Continue with Google</a>
-          <p class="security-note">Never share a seed phrase or private key. ValhallaOS will not ask for one.</p>
-        </div>
-      </section>
     </main>
 
     <footer>
@@ -73,7 +60,6 @@
     </footer>
   </div>
   <script src="/site-config.js"></script>
-  <script src="/home.js"></script>
   <script src="/home-motion.js"></script>
   <script src="/site-chrome.js"></script>
 </body>

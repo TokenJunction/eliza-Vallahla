@@ -141,9 +141,8 @@ test("public preview keeps the site pages and leaves backend out", async () => {
 
     const home = await status("/");
     assert.equal(home.status, 200);
-    assert.match(home.text, /id="home-email"/);
-    assert.match(home.text, /action="\/app\/"/);
-    assert.match(home.text, /Continue with email/);
+    assert.match(home.text, /href="\/app\/">Client access/);
+    assert.doesNotMatch(home.text, /id="home-email"|href="#access"|id="access"/);
     assert.match(home.text, /rel="canonical" href="https:\/\/valhalla-app\.xyz\/"/);
     assert.doesNotMatch(home.text, /ADMIN/);
 
