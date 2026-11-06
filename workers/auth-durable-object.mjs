@@ -66,8 +66,14 @@ export class AuthDurableObject {
     return fn();
   }
 
+  first(query, ...params) {
+    var cursor = this.sql().exec(query, ...params);
+    var list = cursor && typeof cursor.toArray === "function" ? cursor.toArray() : [];
+    return list && list.length ? list[0] : null;
+  }
+
   accountRow() {
-    return this.sql().exec("SELECT eh, body FROM account").one();
+    return this.first("SELECT eh, body FROM account");
   }
 
   requireEh(eh) {
@@ -110,7 +116,7 @@ export class AuthDurableObject {
   bindUid(eh, uid, provider) {
     if (!uid) return;
     if (!UID.test(String(uid)) || provider !== "google") throw coded("uid");
-    var human = this.sql().exec("SELECT id, eh, provider FROM humans WHERE id = ?", uid).one();
+    var human = this.first("SELECT id, eh, provider FROM humans WHERE id = ?", uid);
     if (human && (human.eh !== eh || human.provider !== "google")) throw coded("uid");
     if (!human) this.sql().exec("INSERT INTO humans (id, eh, provider) VALUES (?, ?, ?)", uid, eh, "google");
   }
@@ -192,7 +198,7 @@ export class AuthDurableObject {
       if (!UID.test(uid)) throw coded("uid");
       this.bindUid(eh, uid, "google");
     } else if (uid) throw coded("uid");
-    var revoked = this.sql().exec("SELECT did, eh FROM revoked_devices WHERE did = ?", session.did).one();
+    var revoked = this.first("SELECT did, eh FROM revoked_devices WHERE did = ?", session.did);
     if (revoked && revoked.eh === eh) throw coded("revoked");
     if (revoked && revoked.eh !== eh) throw coded("eh");
     var exp = Number(session.exp);
@@ -238,7 +244,7 @@ export class AuthDurableObject {
     var rowAccount = this.requireEh(eh);
     if (!rowAccount || rowAccount.eh !== eh) return null;
     var sid = String(claims.sid || "");
-    var record = this.sql().exec("SELECT sid, eh, uid, did, exp, v, code, google, purpose, last_seen FROM sessions WHERE sid = ?", sid).one();
+    var record = this.first("SELECT sid, eh, uid, did, exp, v, code, google, purpose, last_seen FROM sessions WHERE sid = ?", sid);
     if (!record) return null;
     if (record.eh !== eh || record.eh !== rowAccount.eh) return null;
     if (String(record.did) !== String(claims.did || "")) return null;
@@ -249,7 +255,7 @@ export class AuthDurableObject {
     if (String(record.purpose) !== String(claims.use || "")) return null;
     if (String(record.uid || "") !== String(claims.uid || "")) return null;
     if (record.google === 1 && !UID.test(String(record.uid || ""))) return null;
-    var revoked = this.sql().exec("SELECT did FROM revoked_devices WHERE did = ? AND eh = ?", record.did, eh).one();
+    var revoked = this.first("SELECT did FROM revoked_devices WHERE did = ? AND eh = ?", record.did, eh);
     if (revoked) return null;
     if (Number(record.exp) < now) {
       this.sql().exec("DELETE FROM sessions WHERE sid = ?", sid);
@@ -325,15 +331,17 @@ export class AuthDurableObject {
     if (typeof input === "string") {
       var id = String(input || "");
       if (!id || id.length > 128) throw coded("nonce");
-      var existing = this.sql().exec("SELECT id FROM nonces WHERE id = ?", id).one();
+      var existing = this.first("SELECT id FROM nonces WHERE id = ?", id);
       if (existing) return false;
       this.sql().exec("INSERT INTO nonces (id, exp, used) VALUES (?, ?, 0)", id, Date.now() + 10 * 60 * 1000);
       return true;
     }
     var spec = input || {};
     var eh = String(spec.eh || "");
-    this.requireEh(eh);
-    if (!this.accountRow()) this.writeBody(eh, blankAccount());
+    if (!HEX.test(eh)) throw coded("eh");
+    var row = this.first("SELECT eh FROM account");
+    if (row && row.eh !== eh) throw coded("eh");
+    if (!row) this.writeBody(eh, blankAccount());
     if (spec.uid) this.bindUid(eh, spec.uid, "google");
     var exp = Number(spec.exp);
     if (!spec.hash || !spec.salt || !Number.isFinite(exp) || exp < Date.now()) throw coded("code");
@@ -370,7 +378,7 @@ export class AuthDurableObject {
   async takeCode(input, now) {
     if (typeof input === "string") {
       var id = String(input || "");
-      var nonce = this.sql().exec("SELECT id, exp, used FROM nonces WHERE id = ?", id).one();
+      var nonce = this.first("SELECT id, exp, used FROM nonces WHERE id = ?", id);
       if (!nonce || Number(nonce.used) === 1 || Number(nonce.exp) < now) return false;
       var marked = this.sql().exec("UPDATE nonces SET used = 1 WHERE id = ? AND used = 0", id);
       return Boolean(marked && marked.rowsWritten);
@@ -383,7 +391,7 @@ export class AuthDurableObject {
       this.sql().exec("DELETE FROM login_code WHERE eh = ?", eh);
       return { ok: true, dropped: true };
     }
-    var code = this.sql().exec("SELECT eh, hash, salt, attempts, exp, google_verified, uid, hint FROM login_code WHERE eh = ?", eh).one();
+    var code = this.first("SELECT eh, hash, salt, attempts, exp, google_verified, uid, hint FROM login_code WHERE eh = ?", eh);
     if (!code) return { ok: false, error: "missing" };
     if (code.eh !== eh) return { ok: false, error: "eh" };
     if (Number(code.exp) < now) return { ok: false, error: "expired" };

@@ -253,6 +253,39 @@ test("the owner still receives an email code, and a sender rejection stores noth
   assert.equal((await reused.json()).error, "missing");
 });
 
+test("a first customer gets a code from Supabase and can verify it once", async () => {
+  var state = setup();
+  var opened = await nonceFor(state.env);
+  await withUser(state.env, customerEmail, async function () {
+    var started = await worker.fetch(request("/auth/supabase", "POST", {
+      accessToken: "supabase-user-access-token",
+      callback: opened.callback,
+      nonce: opened.nonce
+    }), state.env);
+    var body = await started.json();
+    assert.equal(started.status, 200);
+    assert.equal(body.needCode, true);
+    assert.equal(body.session, undefined);
+    assert.equal(state.env.sent.length, 1);
+    var code = codeFrom(state.env.sent[0]);
+    assert.match(code, /^\d{6}$/);
+    var verified = await worker.fetch(request("/auth/email/verify", "POST", {
+      email: customerEmail,
+      code: code
+    }), state.env);
+    var done = await verified.json();
+    assert.equal(verified.status, 200);
+    assert.equal(typeof done.session, "string");
+    assert.equal(done.redirect, "/dashboard/analytics/");
+    var replay = await worker.fetch(request("/auth/email/verify", "POST", {
+      email: customerEmail,
+      code: code
+    }), state.env);
+    assert.equal(replay.status, 401);
+    assert.equal((await replay.json()).error, "missing");
+  });
+});
+
 test("alwaysAsk and a new device still require the customer email code", async () => {
   var state = setup();
   var started = await worker.fetch(request("/auth/email/start", "POST", { email: customerEmail, alwaysAsk: true }), state.env);

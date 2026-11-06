@@ -23,7 +23,14 @@ export function memoryCtx() {
             var list = stmt.all(...params);
             return {
               toArray: function () { return list; },
-              one: function () { return list[0] || null; },
+              one: function () {
+                if (list.length !== 1) {
+                  var err = new Error("one() requires exactly one row");
+                  err.code = "sqlite-one";
+                  throw err;
+                }
+                return list[0];
+              },
               rowsWritten: 0
             };
           }

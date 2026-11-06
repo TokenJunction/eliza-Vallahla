@@ -124,6 +124,43 @@ test("one-time nonces and codes survive concurrent consume and then expire", asy
   })).error, "code");
 });
 
+test("the first code for a new mailbox is stored before any account row exists", async () => {
+  var stub = new AuthDurableObject(memoryCtx());
+  var email = "new@valhalla-app.xyz";
+  async function hexOf(text) {
+    var digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return [...new Uint8Array(digest)].map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+  }
+  var mailbox = await hexOf(email);
+  var salt = "salt-first";
+  var code = "654321";
+  var codeHash = await hexOf(code + ":" + salt + ":" + email);
+  var saved = await stub.putCode({
+    eh: mailbox,
+    hash: codeHash,
+    salt: salt,
+    exp: Date.now() + 10000,
+    googleVerified: true,
+    uid: uid
+  });
+  assert.equal(saved.ok, true);
+  assert.equal((await stub.getAccount(mailbox)).eh, mailbox);
+  assert.equal((await stub.putCode({
+    eh: ehB,
+    hash: codeHash,
+    salt: salt,
+    exp: Date.now() + 10000,
+    googleVerified: true,
+    uid: uidB
+  })).error, "eh");
+  var opened = await stub.consumeCode({ eh: mailbox, email: email, presented: code });
+  assert.equal(opened.ok, true);
+  assert.equal(opened.uid, uid);
+  var replay = await stub.consumeCode({ eh: mailbox, email: email, presented: code });
+  assert.equal(replay.ok, false);
+  assert.equal(replay.error, "missing");
+});
+
 test("a Google user id binds once and is not a random value", async () => {
   var ns = namespace(AuthDurableObject);
   var first = ns.get(ns.idFromName("uid:" + uid));
