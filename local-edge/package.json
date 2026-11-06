@@ -1,0 +1,13 @@
+{
+  "name": "valhalla-local-edge-offline",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "description": "Offline tests for device grants, the loopback relay, and the local generate client. This package is not the main engine and it does not listen in production.",
+  "scripts": {
+    "test": "node --test ../lib/IdentityManager.test.cjs ../backend/wsRelayServer.test.js ./ollamaTunnelClient.test.cjs ./offline-harness.test.mjs"
+  },
+  "dependencies": {
+    "ws": "8.22.1"
+  }
+}
