@@ -8,7 +8,8 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
 .page { min-height: 100vh; display: flex; flex-direction: column; padding-bottom: 14rem; background: radial-gradient(ellipse 78% 62% at 50% 44%, rgba(228, 194, 122, .28), rgba(228, 194, 122, 0) 64%), linear-gradient(180deg, #1c2838 0%, #121a27 48%, #0e1622 100%); }
 .topbar, footer { width: min(1440px, 100%); margin: 0 auto; padding-left: clamp(20px, 4vw, 56px); padding-right: clamp(20px, 4vw, 56px); }
 .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: #f3e6c8; text-decoration: none; font-size: 13px; font-weight: 650; letter-spacing: .22em; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: #E8B65A; text-decoration: none; font-size: 13px; font-weight: 650; letter-spacing: .22em; }
+.brand-mark { display: block; width: 28px; height: 28px; flex: 0 0 auto; }
 .topbar nav, footer nav { display: flex; align-items: center; flex-wrap: wrap; gap: 22px; }
 .topbar nav a, footer a { color: #e6dccb; font-size: 13px; text-decoration: none; }
 .topbar nav a:hover, footer a:hover { color: #f0d7a2; }
