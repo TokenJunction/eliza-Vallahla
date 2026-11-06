@@ -92,7 +92,7 @@ function bodyHash(session, body) {
     provider: body.provider || "",
     tool: body.tool || "none",
     query: toolQuery(body),
-    text: String(body.text || "").slice(0, 8000),
+    text: String(body.text || ""),
     source: String(body.source || ""),
   }))).digest("hex");
 }
@@ -179,6 +179,7 @@ export function admit(cache, session, body, policy, membership = { installed: []
     return { ok: false, status: 503, reason: "durable_store_required" };
   }
   if (!session || !session.userId) return { ok: false, status: 401, reason: "auth" };
+  if (Buffer.byteLength(String(body.text || "")) > 8000) return { ok: false, status: 400, reason: "text_too_long" };
   const extra = unknownField(body);
   if (extra) return { ok: false, status: 400, reason: "unknown_field" };
   if (body.model && !(policy.models || []).includes(body.model)) {

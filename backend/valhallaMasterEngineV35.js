@@ -15,6 +15,8 @@ import { ADAPTER_VERSION, PROVIDER_CATALOG, blankProvider, testProvider } from "
 import { FIRST_APPS, NOT_CONFIGURED_APPS, builtinManifests, canLaunch, editionAllows, scopeKey } from "./apps.js";
 import { identityMode } from "./identity-mode.js";
 import { createPlanStore, setCapacity, viewCapacity } from "./plans.js";
+import { createWalletDesk, issueChallenge, verifyLink } from "./wallet-link.js";
+import { createFlywheelGrant, enableFlywheel, haltFlywheel, reviewSubmission } from "./flywheel-grant.js";
 import { connectorRequest, listConnectors } from "./connectors.js";
 import { deskOpenApi } from "./desk-openapi.js";
 import { modelRoute } from "./model-route.js";
@@ -137,6 +139,8 @@ export function createServer(options = {}) {
   state.store = options.store || openStore(options.dataDir);
   state.tasks = loadTasks(state.store);
   state.plans = createPlanStore();
+  state.walletDesk = createWalletDesk();
+  state.flywheel = new Map();
   const rateBuckets = new Map();
   const fetchImpl = options.fetchImpl || fetch;
   const bus = createBus({
@@ -492,6 +496,47 @@ export function createServer(options = {}) {
         if (!editionAllows(app, entitlements(state.setup.license))) return json(res, 403, { ok: false, code: "V-LIC" }, origin);
         if (!state.setup.installed.includes(id)) state.setup.installed.push(id);
         return json(res, 200, { ok: true, installed: state.setup.installed }, origin);
+      }
+      if (req.method === "POST" && url.pathname === "/api/wallet/challenge") {
+        if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        const { json: body } = await readJson(req);
+        const issued = issueChallenge(state.walletDesk, {
+          tenantId: req.session.userId,
+          subject: req.session.userId,
+          sessionId: req.session.sid,
+        }, req.headers.host, String(body.wallet || ""));
+        return json(res, issued.ok ? 200 : issued.reason === "rate" ? 429 : 400, issued, origin);
+      }
+      if (req.method === "POST" && url.pathname === "/api/wallet/link") {
+        if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        const { json: body } = await readJson(req);
+        const linked = await verifyLink(state.walletDesk, {
+          tenantId: req.session.userId,
+          subject: req.session.userId,
+          sessionId: req.session.sid,
+        }, body);
+        return json(res, linked.ok ? 200 : 400, linked, origin);
+      }
+      if (req.method === "POST" && url.pathname === "/api/flywheel/grant") {
+        if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        const grant = state.flywheel.get(req.session.userId) || createFlywheelGrant({
+          tenantId: req.session.userId,
+          subject: req.session.userId,
+        });
+        state.flywheel.set(req.session.userId, grant);
+        const attempt = enableFlywheel(grant, { owner: isRoot(req.session.email, env, state.setup) });
+        return json(res, 200, { ok: true, grant, enable: attempt }, origin);
+      }
+      if (req.method === "POST" && url.pathname === "/api/flywheel/submit") {
+        if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        const { json: body } = await readJson(req);
+        const grant = state.flywheel.get(req.session.userId) || createFlywheelGrant({
+          tenantId: req.session.userId,
+          subject: req.session.userId,
+        });
+        if (body.halt === true || body.pause === true || body.customerCancelled === true) haltFlywheel(grant, "halt");
+        const reviewed = reviewSubmission(grant, body.tx);
+        return json(res, 403, reviewed, origin);
       }
       if (req.method === "GET" && url.pathname === "/api/apps/trading/capabilities") {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
