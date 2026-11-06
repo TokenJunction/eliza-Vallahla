@@ -79,7 +79,7 @@ test("public preview keeps the site pages and leaves backend out", async () => {
     "terms/index.html",
     "privacy/index.html",
     "cookies/index.html",
-    "disclaimer.md",
+    "disclaimer.html",
     "404.html",
     "assets/hero-ascent.mp4",
     "assets/hero-ascent-poster.jpg",
@@ -128,7 +128,8 @@ test("public preview keeps the site pages and leaves backend out", async () => {
   try {
     const port = server.address().port;
     async function status(pathname) {
-      const response = await fetch("http://127.0.0.1:" + port + pathname);
+      const response = await fetch("http://127.0.0.1:" + port + pathname, { headers: { accept: "text/html" } });
+      assert.equal(response.headers.get("www-authenticate"), null);
       const text = await response.text();
       return { status: response.status, text };
     }
@@ -146,15 +147,27 @@ test("public preview keeps the site pages and leaves backend out", async () => {
     assert.match(mark.text, /<svg/);
     assert.equal((await status("/assets/")).status, 404);
 
-    for (const pathname of ["/app/", "/os/", "/faq/", "/contact/", "/pay/", "/shop/", "/terms/", "/privacy/", "/cookies/", "/disclaimer.md"]) {
+    for (const pathname of ["/app/", "/os/", "/faq/", "/contact/", "/pay/", "/shop/", "/terms/", "/privacy/", "/cookies/", "/disclaimer.html"]) {
       const page = await status(pathname);
       assert.equal(page.status, 200, pathname);
     }
+
+    const risk = await status("/disclaimer.html");
+    assert.match(risk.text, /Valhalla disclaimer/);
+    assert.match(risk.text, /not financial, legal, or tax advice/);
+    assert.match(risk.text, /Crypto can lose money/);
+    assert.match(risk.text, /stylesheet" href="\/styles.css"/);
+    const plain = await status("/disclaimer.md");
+    assert.equal(plain.status, 404);
+    assert.doesNotMatch(plain.text, /id="home-email"/);
 
     const desk = await status("/app/");
     assert.match(desk.text, /HUMAN CHECK/);
     assert.match(desk.text, /id="magicEmail"/);
     assert.doesNotMatch(desk.text, /mock session|authentication succeeded|signed in as/i);
+    const gate = readFileSync(path.join(outDir, "app", "gate.js"), "utf8");
+    assert.match(gate, /ux_mode:\s*"popup"/);
+    assert.doesNotMatch(gate, /ux_mode:\s*"redirect"|pending iframe|oidc iframe/i);
 
     for (const pathname of ["/workers/auth.js", "/package.json", "/render.yaml", "/admin", "/admin/", "/adminsource", "/docs/", "/source/", "/api/health", "/auth/google", "/valhallaMasterEngineV35.js", "/.env"]) {
       const blocked = await status(pathname);

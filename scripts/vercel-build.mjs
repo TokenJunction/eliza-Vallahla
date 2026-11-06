@@ -23,7 +23,7 @@ const ROOT_FILES = [
   "faq.json",
   "changelog.json",
   "monetization.json",
-  "disclaimer.md",
+  "disclaimer.html",
   "valhalla-command.css"
 ];
 
