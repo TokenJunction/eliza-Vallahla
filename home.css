@@ -12,23 +12,21 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
 .topbar nav, footer nav { display: flex; align-items: center; flex-wrap: wrap; gap: 22px; }
 .topbar nav a, footer a { color: #e6dccb; font-size: 13px; text-decoration: none; }
 .topbar nav a:hover, footer a:hover { color: #f0d7a2; }
-.stage-wrap { flex: 0 1 auto; display: flex; align-items: center; justify-content: center; padding: 8px clamp(16px, 4vw, 56px) 12px; max-width: 100%; }
-.stage { position: relative; width: min(1120px, 100%, calc((100dvh - 24rem) * 16 / 9)); max-width: 100%; aspect-ratio: 16 / 9; }
-.scene { position: absolute; inset: 0; overflow: hidden; background: transparent; }
-.still, .scene video { -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, #000 72%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, #000 72%, transparent 100%); }
+.status { width: min(960px, 100%); margin: 18px auto 8px; padding: 0 clamp(16px, 4vw, 56px); color: #f0e2c4; font-size: 14px; letter-spacing: .04em; }
+.stage-wrap { flex: 0 1 auto; width: min(960px, 100%); margin: 0 auto; padding: 8px clamp(16px, 4vw, 56px) 0; max-width: 100%; }
+.stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; }
+.scene { position: absolute; inset: 0; overflow: hidden; background: #101826; }
 .still, .scene video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; }
 .scene video { opacity: 0; transition: opacity 1.1s ease; }
 .scene.is-playing video { opacity: 1; }
-.veil { position: absolute; inset: 0; pointer-events: none; background: none; }
-.scene-copy { position: absolute; z-index: 2; top: 12%; left: 5%; width: min(22rem, 42%); max-width: calc(100% - 340px); padding: 12px 14px; transform: none; text-align: left; background: #101826; }
-.wordmark, .subtitle, h1, h2, p { margin: 0; }
-.wordmark { color: #fffaf3; font-size: clamp(15px, 1.7vw, 22px); font-weight: 650; letter-spacing: .28em; }
-.subtitle { margin-top: 8px; color: #f0e2c4; font-size: 12px; letter-spacing: .28em; }
-h1 { margin-top: 12px; color: #fffaf3; font-size: clamp(16px, 1.55vw, 22px); font-weight: 650; letter-spacing: .01em; line-height: 1.35; }
+.sound-note { position: absolute; z-index: 5; right: 12px; bottom: 12px; margin: 0; padding: 6px 8px; background: #101826; color: #fffaf3; font-size: 13px; }
+figcaption, #hero-fallback, .stage-wrap noscript p { width: min(62ch, 100%); margin: 10px 0 0; color: #f0e2c4; font-size: 16px; line-height: 1.5; }
+h1, h2, p { margin: 0; }
+h1 { margin-bottom: 10px; color: #fffaf3; font-size: clamp(28px, 4vw, 40px); font-weight: 650; letter-spacing: .01em; line-height: 1.2; }
 .motion-slot { position: absolute; z-index: 5; left: 12px; bottom: 12px; margin: 0; }
 .motion-control { min-width: 44px; min-height: 44px; padding: 8px 12px; border: 1px solid #e4c27a; background: #101826; color: #fffaf3; font: inherit; font-size: 16px; cursor: pointer; }
 .motion-control[hidden] { display: none; }
-.access { position: absolute; z-index: 2; right: 3.2%; bottom: 7%; width: min(300px, 34%); color: #f6f1e8; background: rgba(16, 24, 38, .78); border: 1px solid rgba(228, 194, 122, .85); box-shadow: inset 0 0 0 1px rgba(74, 58, 32, .95), inset 0 0 0 5px rgba(16, 24, 38, .55), inset 0 0 0 6px rgba(228, 194, 122, .45), 0 18px 40px rgba(8, 12, 20, .28); backdrop-filter: blur(16px); }
+.access { width: min(28rem, 100%); margin: 8px auto 36px; color: #f6f1e8; background: rgba(16, 24, 38, .78); border: 1px solid rgba(228, 194, 122, .85); box-shadow: inset 0 0 0 1px rgba(74, 58, 32, .95), inset 0 0 0 5px rgba(16, 24, 38, .55), inset 0 0 0 6px rgba(228, 194, 122, .45); }
 .access-body { padding: 18px 16px 16px; }
 .access h2 { margin-bottom: 14px; font-size: 18px; font-weight: 600; letter-spacing: .04em; }
 .access label { display: block; margin-bottom: 8px; color: #f6f1e8; font-size: 13px; font-weight: 650; }
@@ -43,22 +41,15 @@ h1 { margin-top: 12px; color: #fffaf3; font-size: clamp(16px, 1.55vw, 22px); fon
 .access .access-help, .access .security-note { color: #e4d9c8; font-size: 12px; line-height: 1.5; }
 .access .access-help { margin-top: 14px; }
 .access .security-note { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(212, 184, 122, .28); }
-.intro-note { width: min(1120px, 100%); margin: 8px auto 28px; color: #f6f1e8; }
-.intro-note h2 { margin-bottom: 8px; font-size: 20px; }
-.intro-note p { max-width: 62ch; color: #f0e2c4; font-size: 16px; line-height: 1.5; }
+.intro-note { width: min(960px, 100%); margin: 22px auto 12px; padding: 0 clamp(16px, 4vw, 56px); color: #f6f1e8; }
+.intro-note h2 { margin-bottom: 6px; font-size: 18px; }
+.intro-note p { max-width: 68ch; margin-top: 10px; color: #f0e2c4; font-size: 16px; line-height: 1.5; }
 .intro-note a { color: #f0d7a2; }
 footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px 22px; padding-top: 18px; padding-bottom: 28px; color: #e6dccb; font-size: 12px; }
 footer p { margin: 0; max-width: 42ch; line-height: 1.5; }
-@media (max-width: 980px), (max-height: 700px) {
-  .stage { width: min(720px, 100%); aspect-ratio: auto; display: flex; flex-direction: column; gap: 16px; }
-  .scene { position: relative; width: 100%; aspect-ratio: 16 / 9; }
-  .scene-copy { top: 10px; left: 12px; width: min(18rem, calc(100% - 24px)); max-width: calc(100% - 24px); padding: 8px 10px; }
-  .access { position: static; width: min(100%, 28rem); }
-  h1 { font-size: 16px; }
-}
 @media (max-height: 700px) {
   .motion-slot { top: 10px; right: 10px; bottom: auto; left: auto; }
-  .scene-copy { width: min(16rem, calc(100% - 11rem)); max-width: calc(100% - 11rem); }
+  .sound-note { left: 12px; right: auto; bottom: 12px; }
 }
 @media (max-width: 520px) {
   .topbar { min-height: 0; padding-top: 14px; padding-bottom: 8px; align-items: flex-start; }

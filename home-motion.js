@@ -12,8 +12,25 @@
     return !!(connection && connection.saveData);
   }
 
-  function autoplayAllowed() {
-    return !reduceQuery.matches && !saveDataOn();
+  function heldOff() {
+    var queryOff = false;
+    var stored = false;
+    try {
+      queryOff = new URLSearchParams(window.location.search).get("motion") === "0";
+      stored = sessionStorage.getItem("valhalla-hero-paused") === "1";
+    } catch (error) {
+      queryOff = false;
+    }
+    return reduceQuery.matches || saveDataOn() || queryOff || stored;
+  }
+
+  function remember(paused) {
+    try {
+      if (paused) sessionStorage.setItem("valhalla-hero-paused", "1");
+      else sessionStorage.removeItem("valhalla-hero-paused");
+    } catch (error) {
+      // Playback still works when storage is blocked.
+    }
   }
 
   function attachSources() {
@@ -50,18 +67,29 @@
 
   function stopMotion() {
     video.pause();
+    remember(true);
+    setPlaying(false);
+  }
+
+  function showFallback() {
+    var note = document.getElementById("hero-fallback");
+    if (note) note.hidden = false;
     setPlaying(false);
   }
 
   toggle.addEventListener("click", function () {
     if (scene.classList.contains("is-playing")) stopMotion();
-    else startMotion();
+    else {
+      remember(false);
+      startMotion();
+    }
   });
+  video.addEventListener("error", showFallback);
 
   video.addEventListener("pause", function () { setPlaying(false); });
   video.addEventListener("playing", function () { setPlaying(true); });
 
-  if (!reduceQuery.matches && autoplayAllowed()) startMotion();
+  if (!heldOff()) startMotion();
   else setPlaying(false);
 
   if (typeof reduceQuery.addEventListener === "function") {

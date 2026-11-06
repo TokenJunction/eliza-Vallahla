@@ -4,8 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#121a27">
-  <meta name="description" content="What is ValhallaOS?">
-  <meta name="twitter:site" content="@ValhallaOS">
+  <meta name="description" content="Alpha preview. ValhallaOS visual introduction and a short overview. Not a finished product.">
   <link rel="canonical" href="https://valhalla-app.xyz/">
   <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="preload" as="image" href="/assets/hero-ascent-poster.jpg" fetchpriority="high">
@@ -15,54 +14,58 @@
 <body>
   <div class="page">
     <header class="topbar" data-nav="locked">
-      <a class="brand" href="/"><img src="/assets/mark.svg" alt="Valhalla™ mech logo" width="28" height="28"><span>VALHALLA</span></a>
+      <a class="brand" href="/"><span>VALHALLAOS</span></a>
       <nav aria-label="Main navigation">
-        <a href="#discover">Discover</a>
-        <a href="/os/">Public desk</a>
+        <a href="#discover">Overview</a>
         <a href="/faq/">Help</a>
-        <a href="#access">Sign in</a>
+        <a href="#access">Enter</a>
       </nav>
     </header>
 
     <main>
-      <div class="stage-wrap">
+      <p class="status">Alpha preview. In development. Not a finished product.</p>
+      <figure class="stage-wrap">
         <div class="stage">
           <div class="scene" id="hero-scene">
-            <img class="still" src="/assets/hero-ascent-poster.jpg" alt="" width="1280" height="720" aria-hidden="true">
-            <video id="hero-video" muted loop playsinline preload="none" poster="/assets/hero-ascent-poster.jpg" aria-hidden="true"></video>
-            <div class="veil" aria-hidden="true"></div>
-            <div class="scene-copy">
-              <p class="wordmark">VALHALLA</p>
-              <p class="subtitle">OS</p>
-              <h1 id="home-title">The next realm of your digital world.</h1>
-            </div>
+            <img class="still" src="/assets/hero-ascent-poster.jpg" alt="" width="1280" height="720">
+            <video id="hero-video" muted loop playsinline preload="none" poster="/assets/hero-ascent-poster.jpg" aria-describedby="hero-note"></video>
+            <p class="sound-note">No sound</p>
             <p class="motion-slot"><button class="motion-control" id="hero-motion" type="button" aria-pressed="false">Play motion</button></p>
           </div>
-
-          <section class="access" id="access" aria-labelledby="access-title">
-            <div class="access-body">
-              <h2 id="access-title">Sign in</h2>
-              <form id="home-email" action="/app/" method="get">
-                <label for="home-email-address">Email address</label>
-                <input id="home-email-address" type="email" autocomplete="email" placeholder="you@example.com" required>
-                <button type="submit">Continue with email</button>
-              </form>
-              <div class="divider"><span>or</span></div>
-              <a class="google-link" id="home-google" href="/app/">Continue with Google</a>
-              <p class="access-help">New here? Choose <strong>Create account</strong> on the next screen. Returning or recovering access? Use your email to receive a sign-in code.</p>
-              <p class="security-note">Never share a seed phrase or private key. Valhalla will not ask for one.</p>
-            </div>
-          </section>
         </div>
-      </div>
+        <figcaption id="hero-note">ValhallaOS visual introduction. A short celestial scene. It does not show the product. No sound.</figcaption>
+        <p id="hero-fallback" hidden>The scene did not play. The still image is the same introduction. No sound. It does not show the product.</p>
+        <noscript><p>ValhallaOS visual introduction. A short celestial scene with no sound. It does not show the product. The still image is the introduction.</p></noscript>
+      </figure>
+
       <section class="intro-note" id="discover" aria-labelledby="discover-title">
-        <h2 id="discover-title">What is ValhallaOS?</h2>
-        <p>ValhallaOS is the browser desk. You can open the public desk with no account. Sign-in is optional and uses the existing email or Google check. The desk is paper-first. This page is a preview of that entry. It does not add new tools. <a href="/faq/">Read the FAQ</a> or <a href="/os/">open the public desk</a>.</p>
+        <h1 id="discover-title">A unified desktop workspace for apps and trading.</h1>
+        <p>ValhallaWorkspace is the desktop for AI-assisted workflows, modular apps, customer-owned providers, and paper-first trading tools.</p>
+        <p>Alpha preview. Those parts are the direction of the product. They are not all connected, and this page does not turn them on.</p>
+        <p>X and Telegram connectors are planned and optional. This preview does not show them as live.</p>
+        <p>A wider network, sometimes called Web4, is planned. That is not a claim that ValhallaOS is fully decentralized.</p>
+        <p><a href="https://github.com/TokenJunction/eliza-valhalla">Repository</a></p>
+      </section>
+
+      <section class="access" id="access" aria-labelledby="access-title">
+        <div class="access-body">
+          <h2 id="access-title">Access ValhallaOS</h2>
+          <p>Optional. This opens the existing sign-in check. This public preview does not complete sign-in, because the account service is not connected here. Alpha is pending before release.</p>
+          <form id="home-email" action="/app/" method="get">
+            <label for="home-email-address">Email address</label>
+            <input id="home-email-address" type="email" autocomplete="email" placeholder="you@example.com" required>
+            <button type="submit">Continue with email</button>
+          </form>
+          <div class="divider"><span>or</span></div>
+          <a class="google-link" id="home-google" href="/app/">Continue with Google</a>
+          <p class="access-help">New here? Choose <strong>Create account</strong> on the next screen. Returning or recovering access? Use your email to receive a sign-in code.</p>
+          <p class="security-note">Never share a seed phrase or private key. Valhalla will not ask for one.</p>
+        </div>
       </section>
     </main>
 
     <footer>
-      <span>VALHALLA</span>
+      <span>VALHALLAOS</span>
       <nav aria-label="Footer">
         <a href="/faq/">FAQ</a>
         <a href="/contact/">Contact</a>
@@ -73,6 +76,7 @@
         <a href="/disclaimer.html">Risk</a>
       </nav>
       <p>Crypto is risky. Results are not guaranteed. This is not financial advice.</p>
+      <p class="legal-tm">by TokenJunction</p>
     </footer>
   </div>
   <script src="/site-config.js"></script>
