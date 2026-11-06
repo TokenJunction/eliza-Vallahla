@@ -10,9 +10,10 @@ export function redact(value) {
     .replace(/(api[_-]?key|secret|token|password)"?\s*[:=]\s*"?[^"\s,}]*/gi, "$1=[redacted]");
 }
 
-export function encryptSecret(master, plaintext) {
+export function encryptSecret(master, plaintext, tenantId) {
   if (!master) throw new Error("SETUP_MASTER_KEY is required");
-  const key = createHash("sha256").update(String(master)).digest();
+  if (!tenantId) throw new Error("tenant-required");
+  const key = createHash("sha256").update(`${master}\n${tenantId}`).digest();
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
   const enc = Buffer.concat([cipher.update(String(plaintext), "utf8"), cipher.final()]);
@@ -20,8 +21,24 @@ export function encryptSecret(master, plaintext) {
   return Buffer.concat([iv, tag, enc]).toString("base64");
 }
 
-export function decryptSecret(master, packed) {
-  const key = createHash("sha256").update(String(master)).digest();
+export function resolveProviderKey(env, packed, tenantId) {
+  if (packed != null) {
+    if (!env || !env.SETUP_MASTER_KEY || !tenantId || packed === "") return { ok: false, source: "byok", reason: "empty" };
+    try {
+      const key = decryptSecret(env.SETUP_MASTER_KEY, packed, tenantId);
+      if (!key) return { ok: false, source: "byok", reason: "empty" };
+      return { ok: true, source: "byok", key };
+    } catch {
+      return { ok: false, source: "byok", reason: "rejected" };
+    }
+  }
+  if (env && env.DEEPSEEK_API_KEY) return { ok: true, source: "deployment", key: env.DEEPSEEK_API_KEY };
+  return { ok: false, source: "none", reason: "missing" };
+}
+
+export function decryptSecret(master, packed, tenantId) {
+  if (!tenantId) throw new Error("tenant-required");
+  const key = createHash("sha256").update(`${master}\n${tenantId}`).digest();
   const buf = Buffer.from(packed, "base64");
   const iv = buf.subarray(0, 12);
   const tag = buf.subarray(12, 28);

@@ -186,6 +186,10 @@
   }
 
   function authNote(error) {
+    if (error === "auth-store-disabled") return "Google sign-in cannot finish until the session store is configured. This page cannot create a session by itself.";
+    if (error === "email-not-configured") return "The email code service is not configured.";
+    if (error === "nonce") return "The Google sign-in challenge expired. Try again.";
+    if (error === "origin") return "This site is not an allowed Google sign-in origin.";
     if (error === "rate") return "Please wait a moment, then ask for a new code.";
     if (error === "locked") return "That code was tried too many times. Ask for a new one.";
     if (error === "expired" || error === "code" || error === "missing") return "That code was not accepted.";
@@ -281,7 +285,7 @@
           fail(document.getElementById("codeNote"), "V-MAIL", "code service unavailable", function () { location.reload(); });
           return;
         }
-        postAuth("/auth/google", { credential: credential, alwaysAsk: true }).then(function (body) {
+        postAuth("/auth/google", { credential: credential, nonce: sessionStorage.getItem("valhalla-google-nonce") || "" }).then(function (body) {
           if (!body.ok) {
             var friendly = authNote(body.error);
             if (friendly) note.textContent = friendly;
@@ -370,8 +374,15 @@
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
       script.onload = function () {
+        postAuth("/auth/google/nonce", {}).then(function (issued) {
+          if (!issued.ok || !issued.nonce) {
+            fail(note, "V-AUTH", issued.error || "nonce", function () { location.reload(); });
+            return;
+          }
+          sessionStorage.setItem("valhalla-google-nonce", issued.nonce);
         window.google.accounts.id.initialize({
           client_id: cfg.GOOGLE_CLIENT_ID,
+          nonce: issued.nonce,
           ux_mode: "popup",
           auto_select: false,
           cancel_on_tap_outside: true,
@@ -389,6 +400,7 @@
           text: "signin_with",
           shape: "rectangular",
           width: 360
+        });
         });
       };
       script.onerror = function () {

@@ -1,3 +1,5 @@
+import { channelCatalog, channelRequest } from "./channels.js";
+
 export const CONNECTORS = [
   {
     id: "google-drive",
@@ -37,12 +39,15 @@ export function listConnectors() {
     api: item.api,
     official: true,
     configured: false,
+    connected: false,
+    testPassed: false,
     status: "not-configured",
     scraping: false,
-  }));
+  })).concat(channelCatalog());
 }
 
 export function connectorRequest(id, input) {
+  if (id === "telegram" || id === "x") return channelRequest(id, input);
   const item = CONNECTORS.find((row) => row.id === id);
   if (!item) return { ok: false, status: 404, error: "unknown" };
   if (item.prefixRequired && !String(input && input.prefix || "").trim()) {

@@ -1,8 +1,10 @@
 /** Pure sign-in rules. No secrets and no codes. */
 
 export function needSecondFactor(input) {
-  if (input && input.secondFactor === false) return false;
-  return !input || input.codeThisLogin !== true;
+  if (input && input.codeThisLogin === true) return false;
+  // Opting out does not skip the code for an unknown device or when the user asked to be challenged.
+  if (input && input.secondFactor === false && input.knownDevice === true && input.alwaysAsk !== true) return false;
+  return true;
 }
 
 export function codeDecision(record, now) {
@@ -29,4 +31,12 @@ export function maskEmail(email) {
 
 export function validEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").toLowerCase());
+}
+
+export function sessionApiCookies(token, csrf) {
+  var maxAge = 12 * 60 * 60;
+  return [
+    "vh_session=" + token + "; HttpOnly; Secure; SameSite=Lax; Path=/api; Max-Age=" + maxAge,
+    "vh_csrf=" + csrf + "; Secure; SameSite=Lax; Path=/api; Max-Age=" + maxAge
+  ];
 }

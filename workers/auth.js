@@ -4,7 +4,9 @@
  * RESEND_API_KEY and the AUTH_KV id.
  * The code is emailed and stored only as a hash. It is not logged.
  */
-import { browserName, codeDecision, needSecondFactor, validEmail } from "./auth-logic.js";
+import { browserName, codeDecision, maskEmail, needSecondFactor, sessionApiCookies, validEmail } from "./auth-logic.js";
+import { sessionKey } from "./live-session.mjs";
+import { TOKEN_AUD, TOKEN_ISS, TOKEN_PURPOSE } from "./auth-store.mjs";
 
 var ALLOWED = ["https://valhalla-app.xyz", "https://www.valhalla-app.xyz"];
 var TEXT = new TextEncoder();
@@ -29,9 +31,22 @@ function cors(request) {
 }
 
 function json(body, status, request, extra) {
-  var headers = cors(request);
-  headers["content-type"] = "application/json";
-  if (extra) Object.keys(extra).forEach(function (key) { headers[key] = extra[key]; });
+  var headers = new Headers();
+  var base = cors(request);
+  Object.keys(base).forEach(function (key) { headers.set(key, base[key]); });
+  headers.set("content-type", "application/json");
+  if (extra) {
+    Object.keys(extra).forEach(function (key) {
+      var value = extra[key];
+      if (String(key).toLowerCase() === "set-cookie") {
+        (Array.isArray(value) ? value : [value]).forEach(function (cookie) {
+          if (cookie) headers.append("set-cookie", cookie);
+        });
+      } else {
+        headers.set(key, value);
+      }
+    });
+  }
   return new Response(JSON.stringify(body), { status: status || 200, headers: headers });
 }
 
@@ -73,6 +88,48 @@ async function issue(secret, payload) {
   return body + "." + await hmac(secret, body);
 }
 
+var TURNSTILE_ACTION = "valhalla-signin";
+var TURNSTILE_HOSTS = ["valhalla-app.xyz", "www.valhalla-app.xyz"];
+
+async function turnstileOk(env, token, emailHash) {
+  if (!env.TURNSTILE_SECRET) return true;
+  if (!env.AUTH_DO) return false;
+  var value = String(token || "");
+  if (!value || !emailHash) return false;
+  var seen = "ts:" + value;
+  if (await env.AUTH_KV.get(seen)) return false;
+  var form = new URLSearchParams();
+  form.set("secret", env.TURNSTILE_SECRET);
+  form.set("response", value);
+  try {
+    var response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+    if (!response.ok) return false;
+    var verdict = await response.json();
+    if (!verdict || verdict.success !== true) return false;
+    if (verdict.action !== TURNSTILE_ACTION) return false;
+    if (TURNSTILE_HOSTS.indexOf(String(verdict.hostname || "")) < 0) return false;
+  } catch (err) {
+    return false;
+  }
+  var bound = await env.AUTH_DO.bindHuman(value, {
+    emailHash: emailHash,
+    action: TURNSTILE_ACTION,
+    host: "valhalla-app.xyz"
+  });
+  if (!bound) return false;
+  await env.AUTH_KV.put(seen, emailHash, { expirationTtl: 600 });
+  return true;
+}
+
+async function readAccess(env, token) {
+  if (!env.AUTH_DO || env.AUTH_DO.consistent === false) return null;
+  var claims = await readToken(env.DEVICE_COOKIE_SECRET, token);
+  if (!claims || !claims.sid || claims.ver == null) return null;
+  if (claims.iss !== TOKEN_ISS || claims.aud !== TOKEN_AUD || claims.purpose !== TOKEN_PURPOSE) return null;
+  if (typeof env.AUTH_DO.readSession !== "function") return null;
+  return env.AUTH_DO.readSession(claims);
+}
+
 async function readToken(secret, token) {
   var parts = String(token || "").split(".");
   if (!secret || parts.length !== 2) return null;
@@ -87,10 +144,15 @@ async function readToken(secret, token) {
   }
 }
 
-function cookieHeader(request) {
+function cookieValue(request, name) {
   var raw = request.headers.get("Cookie") || "";
-  var hit = raw.split(";").map(function (part) { return part.trim(); }).find(function (part) { return part.indexOf("vh_device=") === 0; });
-  return hit ? hit.slice("vh_device=".length) : "";
+  var prefix = name + "=";
+  var hit = raw.split(";").map(function (part) { return part.trim(); }).find(function (part) { return part.indexOf(prefix) === 0; });
+  return hit ? decodeURIComponent(hit.slice(prefix.length)) : "";
+}
+
+function cookieHeader(request) {
+  return cookieValue(request, "vh_device");
 }
 
 function deviceCookie(token) {
@@ -189,7 +251,10 @@ async function startCode(env, email, request, googleVerified) {
     return { ok: false, error: "email" };
   }
   if (!sent) return { ok: false, error: "email-not-configured" };
+  if (!env.AUTH_DO) return { ok: false, error: "auth-store-disabled" };
+  await env.AUTH_DO.putCode("code:" + emailHash + ":" + salt);
   await env.AUTH_KV.put("code:" + emailHash, JSON.stringify({
+    id: salt,
     salt: salt,
     hash: await sha256(code + ":" + salt + ":" + email),
     attempts: 0,
@@ -205,6 +270,10 @@ async function checkCode(env, email, code) {
   var record = JSON.parse((await env.AUTH_KV.get(key)) || "null");
   var state = codeDecision(record, Date.now());
   if (state !== "ok") return { ok: false, error: state };
+  if (!env.AUTH_DO) return { ok: false, error: "auth-store-disabled" };
+  if (!record.id || !(await env.AUTH_DO.consumeCode("code:" + emailHash + ":" + record.id))) {
+    return { ok: false, error: "used" };
+  }
   record.attempts += 1;
   var expected = await sha256(String(code || "") + ":" + record.salt + ":" + email);
   if (!safeEqual(expected, record.hash)) {
@@ -212,6 +281,7 @@ async function checkCode(env, email, code) {
     else await env.AUTH_KV.put(key, JSON.stringify(record), { expirationTtl: 600 });
     return { ok: false, error: record.attempts >= 5 ? "locked" : "code" };
   }
+  await env.AUTH_KV.put("used-code:" + record.id, "1", { expirationTtl: 600 });
   await env.AUTH_KV.delete(key);
   return { ok: true, emailHash: emailHash, googleVerified: record.googleVerified === true };
 }
@@ -220,7 +290,8 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
   var account = await accountOf(env, emailHash);
   var ipHash = await sha256(request.headers.get("CF-Connecting-IP") || "none");
   var existing = await readToken(env.DEVICE_COOKIE_SECRET, cookieHeader(request));
-  var knownDevice = Boolean(existing && existing.eh === emailHash && (account.devices || []).some(function (row) { return row.id === existing.did; }));
+  var knownMatches = existing ? (account.devices || []).filter(function (row) { return row.id === existing.did; }) : [];
+  var knownDevice = Boolean(existing && existing.eh === emailHash && knownMatches.length === 1);
   var knownIp = (account.ips || []).indexOf(ipHash) >= 0;
   var need = needSecondFactor({
     knownDevice: knownDevice,
@@ -232,6 +303,7 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
   });
   if (need && !codeThisLogin) return { needCode: true, account: account, ipHash: ipHash };
   var did = knownDevice ? existing.did : crypto.randomUUID();
+  var sid = crypto.randomUUID();
   var now = Date.now();
   var device = (account.devices || []).find(function (row) { return row.id === did; }) || {
     id: did,
@@ -240,33 +312,66 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
     browser: browserName(request.headers.get("User-Agent"))
   };
   device.last = now;
+  device.sid = sid;
   account.devices = [device].concat((account.devices || []).filter(function (row) { return row.id !== did; }));
   if (account.ips.indexOf(ipHash) < 0) account.ips.unshift(ipHash);
   account.signins.unshift({ at: now, city: place(request), browser: device.browser, ok: true });
   await saveAccount(env, emailHash, account);
   var exp = now + 12 * 60 * 60 * 1000;
-  var session = await issue(env.DEVICE_COOKIE_SECRET, {
+  var live = {
+    sid: sid,
+    ver: 1,
     eh: emailHash,
     did: did,
     exp: exp,
     code: codeThisLogin === true,
-    google: googleVerified === true
+    google: googleVerified === true,
+    revoked: false
+  };
+  if (!env.AUTH_DO) return { disabled: true };
+  await env.AUTH_DO.putSession({
+    sid: sid,
+    eh: emailHash,
+    did: did,
+    exp: exp,
+    code: live.code,
+    google: live.google,
+    v: 1,
+    lastSeen: now
+  });
+  await env.AUTH_KV.put(sessionKey(sid), JSON.stringify(live), { expirationTtl: 12 * 60 * 60 });
+  var session = await issue(env.DEVICE_COOKIE_SECRET, {
+    iss: TOKEN_ISS,
+    aud: TOKEN_AUD,
+    purpose: TOKEN_PURPOSE,
+    eh: emailHash,
+    did: did,
+    sid: sid,
+    ver: 1,
+    sv: 1,
+    exp: exp,
+    code: live.code,
+    google: live.google
   });
   var cookie = await issue(env.DEVICE_COOKIE_SECRET, { eh: emailHash, did: did, exp: now + 30 * 24 * 60 * 60 * 1000 });
-  return { needCode: false, session: session, cookie: deviceCookie(cookie) };
+  return {
+    needCode: false,
+    session: session,
+    cookie: deviceCookie(cookie),
+    apiCookies: sessionApiCookies(session, crypto.randomUUID())
+  };
 }
 
-function leaderEmails(env) {
-  return [env && env.LEADER_EMAIL, env && env.MASTER_ADMIN_EMAIL]
-    .map(function (email) { return String(email || "").trim().toLowerCase(); })
-    .filter(function (email, index, emails) { return Boolean(email) && emails.indexOf(email) === index; });
+function leaderEmail(env) {
+  // One policy mailbox for a later resend. A master alias is not a second owner.
+  return String(env && env.LEADER_EMAIL ? env.LEADER_EMAIL : "").trim().toLowerCase();
 }
 
 async function isLeader(env, session) {
-  var emails = leaderEmails(env);
-  if (!emails.length || !session || session.code !== true || session.google !== true) return false;
-  var hashes = await Promise.all(emails.map(sha256));
-  return hashes.some(function (expected) { return safeEqual(String(session.eh || ""), expected); });
+  var email = leaderEmail(env);
+  if (!email || !session || session.code !== true || session.google !== true) return false;
+  var expected = await sha256(email);
+  return safeEqual(String(session.eh || ""), expected);
 }
 
 async function loginRedirect(env, emailHash, googleVerified) {
@@ -290,8 +395,15 @@ async function googleInfo(env, credential) {
   if (iss !== "https://accounts.google.com" && iss !== "accounts.google.com") return null;
   if (Number(info.exp) * 1000 < Date.now()) return null;
   if (!verified || !validEmail(info.email)) return null;
-  if (/gmail|drive/i.test(scope)) return null;
-  return { email: String(info.email).toLowerCase(), name: String(info.name || ""), picture: String(info.picture || "") };
+  if (/googleapis\.com\/auth\/(gmail|drive)/i.test(scope)) return null;
+  if (!/^\d+$/.test(String(info.sub || ""))) return null;
+  return {
+    email: String(info.email).toLowerCase(),
+    sub: String(info.sub),
+    nonce: String(info.nonce || ""),
+    name: String(info.name || ""),
+    picture: String(info.picture || "")
+  };
 }
 
 export default {
@@ -302,60 +414,78 @@ export default {
     }
     var url = new URL(request.url);
     var body = request.method === "POST" ? await request.json().catch(function () { return {}; }) : {};
+    if (url.pathname === "/auth/google/nonce" && request.method === "POST") {
+      if (ALLOWED.indexOf(request.headers.get("Origin") || "") < 0) return json({ ok: false, error: "origin" }, 403, request);
+      if (!env.AUTH_DO) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
+      var nonce = crypto.randomUUID().replace(/-/g, "");
+      await env.AUTH_DO.putCode("google-nonce:" + nonce);
+      return json({ ok: true, nonce: nonce }, 200, request);
+    }
     if (url.pathname === "/auth/google" && request.method === "POST") {
+      if (ALLOWED.indexOf(request.headers.get("Origin") || "") < 0) return json({ ok: false, error: "origin" }, 403, request);
       var info = await googleInfo(env, String(body.credential || ""));
       if (!info) return json({ ok: false, error: "google" }, 401, request);
+      if (!env.AUTH_DO) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
+      var postedNonce = String(body.nonce || "");
+      if (!postedNonce || info.nonce !== postedNonce || !(await env.AUTH_DO.consumeCode("google-nonce:" + postedNonce))) {
+        return json({ ok: false, error: "nonce" }, 401, request);
+      }
       var emailHash = await sha256(info.email);
+      if (!(await turnstileOk(env, body.turnstile, emailHash))) return json({ ok: false, error: "turnstile" }, 403, request);
       var account = await accountOf(env, emailHash);
-      if (body.alwaysAsk === true) account.alwaysAsk = true;
       await saveAccount(env, emailHash, account);
-      var next = await sessionFor(env, emailHash, request, false, true);
+      var leaderMailbox = info.email === leaderEmail(env);
+      var next = await sessionFor(env, emailHash, request, leaderMailbox ? false : true, true);
+      if (next.disabled) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       if (next.needCode) {
         var sent = await startCode(env, info.email, request, true);
         if (!sent.ok) return json(sent, sent.error === "rate" ? 429 : 503, request);
-        return json({ ok: true, needCode: true, email: info.email, name: info.name, picture: info.picture }, 200, request);
+        return json({ ok: true, needCode: true, email: maskEmail(info.email) }, 200, request);
       }
       return json({
         ok: true,
         needCode: false,
-        email: info.email,
-        name: info.name,
-        picture: info.picture,
+        email: maskEmail(info.email),
         session: next.session,
+        googleSub: info.sub,
+        supabaseAuthUid: null,
         redirect: await loginRedirect(env, emailHash, true)
-      }, 200, request, { "set-cookie": next.cookie });
+      }, 200, request, { "set-cookie": [next.cookie].concat(next.apiCookies || []) });
     }
     if (url.pathname === "/auth/email/start" && request.method === "POST") {
       var email = String(body.email || "").toLowerCase().trim();
       if (!validEmail(email)) return json({ ok: false, error: "email" }, 400, request);
-      if (body.alwaysAsk === true) {
-        var hash = await sha256(email);
-        var existing = await accountOf(env, hash);
-        existing.alwaysAsk = true;
-        await saveAccount(env, hash, existing);
-      }
+      if (!(await turnstileOk(env, body.turnstile, await sha256(email)))) return json({ ok: false, error: "turnstile" }, 403, request);
       var started = await startCode(env, email, request, false);
       return json(started.ok ? { ok: true } : started, started.ok ? 200 : started.error === "rate" ? 429 : 503, request);
     }
     if (url.pathname === "/auth/email/verify" && request.method === "POST") {
       var checkEmail = String(body.email || "").toLowerCase().trim();
+      if (!(await turnstileOk(env, body.turnstile, await sha256(checkEmail)))) return json({ ok: false, error: "turnstile" }, 403, request);
       var checked = await checkCode(env, checkEmail, String(body.code || ""));
       if (!checked.ok) return json({ ok: false, error: checked.error }, 401, request);
       var ready = await sessionFor(env, checked.emailHash, request, true, checked.googleVerified);
+      if (ready.disabled) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       return json({
         ok: true,
         needCode: false,
-        email: checkEmail,
+        email: maskEmail(checkEmail),
         session: ready.session,
         redirect: await loginRedirect(env, checked.emailHash, checked.googleVerified)
-      }, 200, request, { "set-cookie": ready.cookie });
+      }, 200, request, { "set-cookie": [ready.cookie].concat(ready.apiCookies || []) });
     }
     if (url.pathname === "/auth/chat-config" && request.method === "GET") {
       var config = JSON.parse((await env.AUTH_KV.get("manager:chat-config")) || "{}");
       var model = CHAT_MODELS.indexOf(config.model) >= 0 ? config.model : CHAT_MODELS[0];
       return json({ provider: "openai", model: model, models: CHAT_MODELS }, 200, request);
     }
-    var session = await readToken(env.DEVICE_COOKIE_SECRET, bearer(request));
+    if (url.pathname === "/auth/session" && request.method === "GET") {
+      var presented = bearer(request) || cookieValue(request, "vh_session");
+      var live = await readAccess(env, presented);
+      if (!live) return json({ ok: false, authenticated: false }, 401, request);
+      return json({ ok: true, authenticated: true }, 200, request);
+    }
+    var session = await readAccess(env, bearer(request) || cookieValue(request, "vh_session"));
     if (!session) return json({ ok: false, error: "session" }, 401, request);
     if (url.pathname === "/auth/access" && request.method === "GET") {
       var account = await accountOf(env, session.eh);
@@ -425,9 +555,13 @@ export default {
     }
     if (url.pathname === "/auth/devices/revoke" && request.method === "POST") {
       var account = await accountOf(env, session.eh);
+      var doomed = (account.devices || []).filter(function (row) { return row.id === String(body.id || ""); });
+      if (!doomed.length) return json({ ok: false, error: "device" }, 403, request);
+      if (!env.AUTH_DO) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       account.devices = (account.devices || []).filter(function (row) { return row.id !== String(body.id || ""); });
       await saveAccount(env, session.eh, account);
-      await env.AUTH_KV.delete("device:" + String(body.id || ""));
+      var revoked = await env.AUTH_DO.revokeDevice(session.eh, String(body.id || ""));
+      if (!revoked.ok) return json({ ok: false, error: "device" }, 403, request);
       return json({ ok: true }, 200, request);
     }
     if (url.pathname === "/auth/security" && request.method === "POST") {

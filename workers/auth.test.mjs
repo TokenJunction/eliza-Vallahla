@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash, createHmac } from "node:crypto";
 import test from "node:test";
 import worker from "./auth.js";
+import { TOKEN_AUD, TOKEN_ISS, TOKEN_PURPOSE, createAuthStore } from "./auth-store.mjs";
 
 var secret = "test-device-cookie-secret";
 var leaderEmail = "leader@example.test";
@@ -34,6 +35,7 @@ function setup() {
         put: async (key, value) => values.set(key, String(value)),
         delete: async (key) => values.delete(key)
       },
+      AUTH_DO: createAuthStore(),
       DEVICE_COOKIE_SECRET: secret,
       GOOGLE_CLIENT_ID: "test-client",
       LEADER_EMAIL: leaderEmail
@@ -42,8 +44,32 @@ function setup() {
   };
 }
 
-function session(emailHash, code, google) {
-  return token({ eh: emailHash, did: "device", exp: Date.now() + 60000, code: code, google: google === true });
+function session(state, emailHash, code, google) {
+  var sid = "sid-" + emailHash + "-" + (code ? "1" : "0") + (google ? "g" : "n");
+  var exp = Date.now() + 60000;
+  state.env.AUTH_DO.seed({
+    sid: sid,
+    eh: emailHash,
+    did: "device",
+    exp: exp,
+    code: code === true,
+    google: google === true,
+    v: 1,
+    lastSeen: Date.now()
+  });
+  return token({
+    iss: TOKEN_ISS,
+    aud: TOKEN_AUD,
+    purpose: TOKEN_PURPOSE,
+    eh: emailHash,
+    did: "device",
+    sid: sid,
+    ver: 1,
+    sv: 1,
+    exp: exp,
+    code: code,
+    google: google === true
+  });
 }
 
 test("chat configuration is public but restricted to approved OpenAI models", async () => {
@@ -60,34 +86,34 @@ test("chat configuration is public but restricted to approved OpenAI models", as
 test("only a Google-authenticated, code-verified session for the configured email gets manager access", async () => {
   var state = setup();
   var other = await worker.fetch(request(
-    "/auth/leader", "POST", { email: leaderEmail }, session("other-hash", true)
+    "/auth/leader", "POST", { email: leaderEmail }, session(state,"other-hash", true)
   ), state.env);
   assert.equal((await other.json()).role, "member");
 
-  var unverified = await worker.fetch(request("/auth/leader", "POST", {}, session(leaderHash, false, true)), state.env);
+  var unverified = await worker.fetch(request("/auth/leader", "POST", {}, session(state,leaderHash, false, true)), state.env);
   assert.equal((await unverified.json()).role, "member");
 
-  var emailOnly = await worker.fetch(request("/auth/leader", "POST", {}, session(leaderHash, true)), state.env);
+  var emailOnly = await worker.fetch(request("/auth/leader", "POST", {}, session(state,leaderHash, true)), state.env);
   assert.equal((await emailOnly.json()).role, "member");
 
-  var owner = await worker.fetch(request("/auth/leader", "POST", {}, session(leaderHash, true, true)), state.env);
+  var owner = await worker.fetch(request("/auth/leader", "POST", {}, session(state,leaderHash, true, true)), state.env);
   assert.equal((await owner.json()).role, "leader");
 });
 
 test("model changes require the verified owner session and an approved model", async () => {
   var state = setup();
   var unauthorized = await worker.fetch(request(
-    "/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, session("other-hash", true)
+    "/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, session(state,"other-hash", true)
   ), state.env);
   assert.equal(unauthorized.status, 403);
 
   var unsupported = await worker.fetch(request(
-    "/auth/chat-config", "POST", { model: "meta-llama" }, session(leaderHash, true, true)
+    "/auth/chat-config", "POST", { model: "meta-llama" }, session(state,leaderHash, true, true)
   ), state.env);
   assert.equal(unsupported.status, 400);
 
   var accepted = await worker.fetch(request(
-    "/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, session(leaderHash, true, true)
+    "/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, session(state,leaderHash, true, true)
   ), state.env);
   assert.equal(accepted.status, 200);
   assert.equal(JSON.parse(await state.values.get("manager:chat-config")).model, "gpt-4.1-mini");
@@ -95,7 +121,7 @@ test("model changes require the verified owner session and an approved model", a
 
 test("engagement collection requires analytics consent and stores aggregate event counts", async () => {
   var state = setup();
-  var owner = session(leaderHash, true, true);
+  var owner = session(state,leaderHash, true, true);
   var denied = await worker.fetch(request(
     "/auth/engagement", "POST", { event: "page_view", analyticsConsent: false }, owner
   ), state.env);
@@ -110,4 +136,14 @@ test("engagement collection requires analytics consent and stores aggregate even
   var body = await report.json();
   assert.equal(body.approximate, true);
   assert.equal(body.days[6].page_view, 1);
+});
+
+test("turnstile stays off until its secret is set, then a missing token is rejected", async () => {
+  var state = setup();
+  var open = await worker.fetch(request("/auth/email/start", "POST", { email: "ada@example.test" }), state.env);
+  assert.notEqual((await open.json()).error, "turnstile");
+  state.env.TURNSTILE_SECRET = "turnstile-secret";
+  var closed = await worker.fetch(request("/auth/email/start", "POST", { email: "ada@example.test" }), state.env);
+  assert.equal(closed.status, 403);
+  assert.equal((await closed.json()).error, "turnstile");
 });

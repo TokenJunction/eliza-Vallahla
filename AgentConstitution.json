@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://valhalla-app.xyz/AgentConstitution.json",
+  "title": "AgentConstitution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pending", "ownerRole", "execution", "spendCeilingUsd", "liveTrading", "executionPolicy"],
+  "properties": {
+    "pending": { "const": false },
+    "ownerRole": { "const": "owner" },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local", "cloud"],
+      "properties": {
+        "local": { "$ref": "#/$defs/cap" },
+        "cloud": { "$ref": "#/$defs/cap" }
+      }
+    },
+    "spendCeilingUsd": { "type": "number", "minimum": 0, "maximum": 1000 },
+    "liveTrading": { "const": false },
+    "executionPolicy": { "const": "none" }
+  },
+  "$defs": {
+    "cap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cap"],
+      "properties": {
+        "cap": { "type": "integer", "minimum": 0, "maximum": 8 }
+      }
+    }
+  }
+}
