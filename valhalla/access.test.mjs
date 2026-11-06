@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { commandPayload, normalizeAccess, replyText } from "./access.js";
+import { accessRequest, commandPayload, normalizeAccess, replyText, tasksRequest } from "./access.js";
+
+test("the sign-in check uses the configured worker and omits cookies", () => {
+  assert.equal(accessRequest({ AUTH_URL: "https://auth.example" }, ""), null);
+  var call = accessRequest({ AUTH_URL: "https://auth.example" }, "token");
+  assert.equal(call.url, "https://auth.example/auth/access");
+  assert.equal(call.credentials, "omit");
+  assert.equal(call.headers.authorization, "Bearer token");
+  assert.equal(tasksRequest({ AGENT_API_URL: "" }, "token", {}), null);
+});
 
 test("access is signed in only when the server says ok", () => {
   assert.deepEqual(normalizeAccess(null), { ok: false });
@@ -10,8 +19,10 @@ test("access is signed in only when the server says ok", () => {
   assert.equal(normalizeAccess({ ok: true, leader: true }).admin, undefined);
 });
 
-test("a command uses conversation 0 and shows text only when completed", () => {
-  assert.equal(commandPayload("hello").conversationId, "0");
+test("a command is chat and does not invent a conversation id", () => {
+  assert.equal(commandPayload("hello").capability, "chat");
+  assert.equal(commandPayload("hello").conversationId, undefined);
+  assert.equal(commandPayload("hello", "server-id").conversationId, "server-id");
   assert.equal(commandPayload("hello").app, "ai-workspace");
   assert.equal(replyText({ ok: true, status: "unavailable", text: null }), null);
   assert.equal(replyText({ ok: true, status: "completed", text: "  " }), null);

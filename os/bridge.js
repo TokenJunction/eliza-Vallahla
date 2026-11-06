@@ -116,6 +116,7 @@
   var submitting = false;
   var voiceEnabled = false;
   var taskId = "";
+  var taskConversation = "";
   var listening = false;
   var recognition = null;
 
@@ -164,11 +165,18 @@
     var timeout = window.setTimeout(function () { controller.abort(); }, 145000);
     try {
       var access = await import('/valhalla/access.js');
-      var response = await fetch('/api/v1/tasks', {
+      var sessionToken = '';
+      try { sessionToken = sessionStorage.getItem('valhalla-auth-token') || ''; } catch (error) { sessionToken = ''; }
+      var taskCall = access.tasksRequest(window.VALHALLA_SITE || {}, sessionToken, access.commandPayload(text, taskConversation));
+      if (!taskCall) {
+        chatStatus.textContent = 'Command service is not configured.';
+        return;
+      }
+      var response = await fetch(taskCall.url, {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(access.commandPayload(text)),
+        credentials: taskCall.credentials,
+        headers: taskCall.headers,
+        body: JSON.stringify(taskCall.body),
         signal: controller.signal
       });
       var body = await response.json();
@@ -178,6 +186,7 @@
         return;
       }
       taskId = typeof body.taskId === 'string' ? body.taskId : '';
+      if (typeof body.conversationId === 'string' && body.conversationId) taskConversation = body.conversationId;
       message('YOU', text);
       message('COMMAND', reply);
       input.value = '';
@@ -216,10 +225,18 @@
     if (!window.confirm('Stop this command?')) return;
     chatStatus.textContent = 'Stop requested';
     try {
-      var response = await fetch('/api/v1/tasks/stop', {
+      var access = await import('/valhalla/access.js');
+      var sessionToken = '';
+      try { sessionToken = sessionStorage.getItem('valhalla-auth-token') || ''; } catch (error) { sessionToken = ''; }
+      var taskCall = access.tasksRequest(window.VALHALLA_SITE || {}, sessionToken, { taskId: taskId });
+      if (!taskCall) {
+        chatStatus.textContent = 'Stop was not confirmed.';
+        return;
+      }
+      var response = await fetch(taskCall.url.replace(/\/api\/v1\/tasks$/, '/api/v1/tasks/stop'), {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
+        credentials: taskCall.credentials,
+        headers: taskCall.headers,
         body: JSON.stringify({ taskId: taskId })
       });
       var body = await response.json();
