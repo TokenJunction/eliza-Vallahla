@@ -5,7 +5,8 @@
     "start": "node valhallaMasterEngineV35.js",
     "build": "python scripts/build-site.py",
     "validate:env": "node scripts/validateEnv.js",
-    "test": "node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs valhallaQueueEngine.test.cjs scripts/validateEnv.test.cjs backend/test/engine.test.js backend/test/contracts.test.js backend/test/task-invocation.test.js backend/test/channels.test.js backend/test/policy.test.js backend/test/did.test.js backend/test/jupiter-v2.test.js backend/provider/test/*.cjs"
+    "test": "node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs valhallaQueueEngine.test.cjs scripts/validateEnv.test.cjs backend/test/engine.test.js backend/test/contracts.test.js backend/test/task-invocation.test.js backend/test/channels.test.js backend/test/policy.test.js backend/test/did.test.js backend/test/jupiter-v2.test.js backend/provider/test/*.cjs site/src/lib/identity-manager.test.js backend/test/ws-relay.test.js backend/test/public-surface.test.js local-edge/ollama-tunnel.test.js",
+    "test:identity-relay": "node --test site/src/lib/identity-manager.test.js backend/test/ws-relay.test.js backend/test/public-surface.test.js local-edge/ollama-tunnel.test.js"
   },
   "engines": {
     "node": ">=22"
@@ -16,6 +17,9 @@
     "bullmq": "^6.7.0",
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
-    "ioredis": "^6.0.0"
+    "ioredis": "^6.0.0",
+    "jose": "6.2.15",
+    "socket.io": "4.8.4",
+    "socket.io-client": "4.8.4"
   }
 }

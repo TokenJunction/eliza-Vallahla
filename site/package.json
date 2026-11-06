@@ -1,0 +1,10 @@
+{
+  "name": "valhalla-identity",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@toruslabs/tss-dkls-lib": "4.1.0",
+    "@toruslabs/tss-frost-lib": "1.0.0",
+    "@web3auth/mpc-core-kit": "3.6.0"
+  }
+}
