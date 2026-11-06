@@ -115,6 +115,9 @@
   var history = [];
   var submitting = false;
   var voiceEnabled = false;
+  var taskId = "";
+  var listening = false;
+  var recognition = null;
 
   if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') {
     voiceButton.disabled = true;
@@ -154,35 +157,35 @@
       chatStatus.textContent = 'Do not share a seed phrase or private key. Your message was not sent.';
       return;
     }
-    var base = String((window.VALHALLA_SITE || {}).CHAT_URL || '').replace(/\/+$/, '');
-    if (!base) {
-      chatStatus.textContent = 'Chat service is not configured.';
-      return;
-    }
     submitting = true;
     form.querySelector('button').disabled = true;
-    input.disabled = true;
-    message('YOU', text);
-    input.value = '';
-    chatStatus.textContent = 'Waiting for the chat service…';
+    chatStatus.textContent = 'Waiting for the command service…';
     var controller = new AbortController();
     var timeout = window.setTimeout(function () { controller.abort(); }, 145000);
     try {
-      var response = await fetch(base + '/chat', {
+      var access = await import('/valhalla/access.js');
+      var response = await fetch('/api/v1/tasks', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: text, history: history.slice(-8), stream: false }),
+        body: JSON.stringify(access.commandPayload(text)),
         signal: controller.signal
       });
       var body = await response.json();
-      if (!response.ok) throw new Error(body.error || 'Chat request failed.');
-      if (typeof body.reply !== 'string' || !body.reply.trim()) throw new Error('The chat service returned an empty reply.');
-      message('ASSISTANT', body.reply);
+      var reply = access.replyText(body);
+      if (!reply) {
+        chatStatus.textContent = 'Command unavailable. No reply was returned.';
+        return;
+      }
+      taskId = typeof body.taskId === 'string' ? body.taskId : '';
+      message('YOU', text);
+      message('COMMAND', reply);
+      input.value = '';
       var speechFailed = false;
       if (voiceEnabled) {
         try {
           window.speechSynthesis.cancel();
-          window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(body.reply));
+          window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(reply));
         } catch (error) {
           speechFailed = true;
           voiceEnabled = false;
@@ -191,7 +194,7 @@
           chatStatus.textContent = 'Reply received, but browser speech failed. Try voice again.';
         }
       }
-      history.push({ role: 'user', content: text }, { role: 'assistant', content: body.reply.slice(0, 500) });
+      history.push({ role: 'user', content: text }, { role: 'assistant', content: reply.slice(0, 500) });
       history = history.slice(-8);
       if (!speechFailed) chatStatus.textContent = 'Never share a seed phrase or private key. Not financial advice.';
     } catch (error) {
@@ -203,5 +206,79 @@
       input.disabled = false;
       input.focus();
     }
+  });
+
+  document.getElementById('chat-stop').addEventListener('click', async function () {
+    if (!taskId) {
+      chatStatus.textContent = 'No task to stop.';
+      return;
+    }
+    if (!window.confirm('Stop this command?')) return;
+    chatStatus.textContent = 'Stop requested';
+    try {
+      var response = await fetch('/api/v1/tasks/stop', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ taskId: taskId })
+      });
+      var body = await response.json();
+      chatStatus.textContent = response.ok && body && body.ok === true
+        ? 'Stop completed.'
+        : 'Stop was not confirmed.';
+    } catch {
+      chatStatus.textContent = 'Stop was not confirmed.';
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (document.getElementById('desktop').hidden) return;
+      event.preventDefault();
+      input.focus();
+    }
+  });
+
+  var transcript = document.getElementById('chat-transcript');
+  var listenButton = document.getElementById('chat-listen');
+  var listenStatus = document.getElementById('listen-status');
+  var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    listenButton.disabled = true;
+    listenStatus.textContent = 'Speech recognition is not supported.';
+  } else {
+    recognition = new SpeechRec();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = function (event) {
+      var said = event.results && event.results[0] && event.results[0][0]
+        ? event.results[0][0].transcript
+        : '';
+      transcript.value = said;
+      listenStatus.textContent = 'Transcript ready. Edit it, then use it. Nothing was sent.';
+    };
+    recognition.onerror = function () {
+      listening = false;
+      listenButton.textContent = 'Start listening';
+      listenStatus.textContent = 'Speech recognition failed. Nothing was sent.';
+    };
+    recognition.onend = function () {
+      listening = false;
+      listenButton.textContent = 'Start listening';
+    };
+    listenButton.addEventListener('click', function () {
+      if (listening) {
+        recognition.stop();
+        return;
+      }
+      listening = true;
+      listenButton.textContent = 'Stop listening';
+      listenStatus.textContent = 'Listening. This does not send the form.';
+      recognition.start();
+    });
+  }
+  document.getElementById('use-transcript').addEventListener('click', function () {
+    input.value = transcript.value;
+    input.focus();
   });
 })();

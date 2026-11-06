@@ -20,6 +20,19 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
 ::selection { color: #fff; background: #000080; }
 
 .icon-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.session-gate {
+  min-height: 100dvh;
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: #0c1421;
+  color: #f2f3f6;
+}
+.session-gate[hidden] { display: none; }
+.session-kicker { margin: 0; color: #e3c27c; letter-spacing: .08em; text-transform: uppercase; font-size: 12px; }
+#transcript-group { display: grid; gap: 8px; margin-top: 8px; }
+#chat-transcript, #chat-input { width: 100%; }
 .desktop {
   position: relative;
   width: 100%;

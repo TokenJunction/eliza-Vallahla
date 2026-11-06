@@ -10,8 +10,15 @@
   <script src="/site-config.js" defer></script>
   <script src="/os/app.js" defer></script>
   <script src="/os/bridge.js" defer></script>
+  <script type="module" src="/valhalla/gate.js"></script>
 </head>
 <body>
+  <section id="session-gate" class="session-gate" role="status" aria-labelledby="session-gate-title">
+    <p class="session-kicker">ValhallaOS</p>
+    <h1 id="session-gate-title">Sign-in</h1>
+    <p id="session-gate-status">Checking the existing sign-in.</p>
+    <p id="session-note"></p>
+  </section>
   <svg class="icon-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
     <symbol id="icon-computer" viewBox="0 0 32 32">
       <path fill="#d4d0c8" stroke="#222" d="M3 4h26v19H3z"/><path fill="#000080" d="M5 6h22v14H5z"/>
@@ -36,7 +43,7 @@
     </symbol>
   </svg>
 
-  <main class="desktop" id="desktop">
+  <main class="desktop" id="desktop" hidden>
     <header class="desktop-heading">
       <img src="/assets/mark.svg" alt="" width="40" height="40">
       <div><h1>VALHALLA<span>OS</span></h1>
@@ -79,7 +86,7 @@
       </section>
 
       <section class="workspace-panel chat-panel" aria-labelledby="chat-title">
-        <div class="panel-heading"><h2 id="chat-title">Assistant / chat</h2><span>CONFIGURED CHAT SERVICE</span></div>
+        <div class="panel-heading"><h2 id="chat-title">Command</h2><span>SAME SIGN-IN</span></div>
         <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Assistant conversation">
           <p class="chat-intro"><strong>VALHALLA ASSISTANT</strong><br>Ask about the desk, market concepts, or paper trading. Chat cannot place trades or access your wallet.</p>
         </div>
@@ -87,8 +94,16 @@
           <label class="sr-only" for="chat-input">Message the assistant</label>
           <textarea id="chat-input" maxlength="500" rows="2" placeholder="Ask the assistant…" required></textarea>
           <button type="submit" class="classic-button accent-button">Send</button>
+          <button type="button" class="classic-button" id="chat-stop">Stop</button>
         </form>
-        <div class="chat-voice"><button type="button" class="classic-button" id="chat-voice" aria-pressed="false">Voice replies off</button><span>Uses your browser's speech engine.</span></div>
+        <div id="transcript-group">
+          <label for="chat-transcript">Transcript</label>
+          <textarea id="chat-transcript" rows="2"></textarea>
+          <button type="button" class="classic-button" id="use-transcript">Use transcript</button>
+          <button type="button" class="classic-button" id="chat-listen">Start listening</button>
+          <p id="listen-status" role="status">Speech recognition has not been checked.</p>
+        </div>
+        <div class="chat-voice"><button type="button" class="classic-button" id="chat-voice" aria-pressed="false">Voice replies off</button><span>Browser speech only. Nothing plays until you turn this on.</span></div>
         <p id="chat-status" class="chat-status" role="status">Never share a seed phrase or private key. Not financial advice.</p>
       </section>
 
