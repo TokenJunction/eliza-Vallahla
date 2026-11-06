@@ -168,15 +168,9 @@ export function DeskApp(props: DeskAppProps) {
   const timers = useRef<number[]>([]);
   const taskRef = useRef<TaskClient | null>(null);
   if (!taskRef.current) {
-    let conversationId = "desk-conversation";
-    try {
-      conversationId = createConversationId();
-    } catch {
-      conversationId = "desk-conversation";
-    }
     taskRef.current = new TaskClient(
       props.taskTransport ?? unavailableTaskTransport(),
-      conversationId,
+      createConversationId(),
     );
   }
   const taskClient = taskRef.current;
@@ -244,6 +238,9 @@ export function DeskApp(props: DeskAppProps) {
   }
 
   function closeWindow(id: WindowId) {
+    if (id === "voice") {
+      window.dispatchEvent(new Event("valhalla-stop-mic"));
+    }
     setWindows((state) => reduceWindows(state, { type: "close", id }));
     document.getElementById(`desk-icon-${id}`)?.focus();
   }
@@ -719,6 +716,7 @@ export function DeskApp(props: DeskAppProps) {
           >
             Voice
           </button>
+          <p id="tray-status">Microphone paused</p>
           {windows.frames
             .filter((frame) => frame.open)
             .map((frame) => (

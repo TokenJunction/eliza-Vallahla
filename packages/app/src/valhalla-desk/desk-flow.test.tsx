@@ -122,6 +122,13 @@ test("GET /api/v1/session failure is not a signed-in session", async () => {
   if (result.state === "unavailable") {
     expect(result.message).toContain("session_inventory_unavailable");
   }
+  const forged = await defaultAuthSource(async () => {
+    return new Response(JSON.stringify({ id: "admin", role: "admin" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  expect(forged.state).toBe("unavailable");
 });
 
 test("verified entry, local label, Guide, and Omni stay inside real boundaries", async () => {

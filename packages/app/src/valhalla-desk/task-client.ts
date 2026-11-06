@@ -26,12 +26,9 @@ export class DuplicateTaskError extends Error {
   }
 }
 
+/** `0` means the server has not assigned a conversation id yet. */
 export function createConversationId(): string {
-  const randomUUID = globalThis.crypto?.randomUUID;
-  if (typeof randomUUID !== "function") {
-    throw new Error("This browser cannot create a conversation id.");
-  }
-  return randomUUID.call(globalThis.crypto);
+  return "0";
 }
 
 export class TaskClient {
@@ -55,16 +52,32 @@ export class TaskClient {
     idempotencyKey: string;
   }): AsyncGenerator<TaskStreamEvent> {
     if (this.#seen.has(input.idempotencyKey)) {
-      throw new DuplicateTaskError();
+      yield {
+        kind: "status",
+        message:
+          "This task is still pending in this page. The browser does not store tenant idempotency. No second call was made.",
+      };
+      return;
     }
     this.#seen.add(input.idempotencyKey);
     this.#calls += 1;
-    yield* this.#transport({
+    let sawResult = false;
+    for await (const event of this.#transport({
       conversationId: this.conversationId,
       idempotencyKey: input.idempotencyKey,
       text: input.text,
       source: input.source,
-    });
+    })) {
+      if (event.kind !== "status") sawResult = true;
+      yield event;
+    }
+    if (!sawResult) {
+      yield {
+        kind: "error",
+        message:
+          "The task service returned no result. The command is unavailable.",
+      };
+    }
   }
 }
 

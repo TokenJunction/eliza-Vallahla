@@ -27,21 +27,3 @@ export function classifyPublicEndpoint(input: string): PublicEndpoint {
   return { kind: "https-read", url: url.toString() };
 }
 
-export async function readPublicEndpoint(
-  input: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<{ detail: string }> {
-  const classified = classifyPublicEndpoint(input);
-  if (classified.kind === "rejected") return { detail: classified.message };
-  try {
-    const response = await fetchImpl(classified.url, { method: "GET" });
-    return {
-      detail: `Public HTTPS read returned HTTP ${String(response.status)}. This was not a message and no funds moved.`,
-    };
-  } catch {
-    return {
-      detail:
-        "The public HTTPS read could not be completed. No message was sent and no funds moved.",
-    };
-  }
-}

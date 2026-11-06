@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type BrowserTab,
   createTab,
@@ -12,7 +12,7 @@ import {
   saveBookmarkPreference,
   validatePublicUrl,
 } from "./browser-nav.ts";
-import { checkElizaHealth } from "./eliza-service.ts";
+import { elizaServiceStatus } from "./eliza-service.ts";
 import { filterSensitiveText, PRIVACY_LIMIT } from "./privarun.ts";
 import type { TaskClient, TaskSource, TaskStreamEvent } from "./task-client.ts";
 import { THEME_IDS, THEMES, type ThemeId } from "./theme.ts";
@@ -25,8 +25,6 @@ import {
   type SynthesisHost,
   spokenIdempotencyKey,
 } from "./voice-capability.ts";
-import { readPublicEndpoint } from "./web4.ts";
-
 export async function collectTask(
   client: TaskClient,
   input: { text: string; source: TaskSource; idempotencyKey: string },
@@ -129,6 +127,8 @@ export function CommandBar(props: { client: TaskClient; focusedApp: string }) {
       session.current = recognition;
       setListening(true);
       setLog("Microphone is on for this task. It is not always listening.");
+      const tray = document.getElementById("tray-status");
+      if (tray) tray.textContent = "Microphone on";
     } catch (error) {
       setListening(false);
       setLog(
@@ -142,7 +142,14 @@ export function CommandBar(props: { client: TaskClient; focusedApp: string }) {
     session.current = null;
     setListening(false);
     setLog("Microphone is off.");
+    const tray = document.getElementById("tray-status");
+    if (tray) tray.textContent = "Microphone paused";
   }
+
+  useEffect(() => {
+    window.addEventListener("valhalla-stop-mic", stopMic);
+    return () => window.removeEventListener("valhalla-stop-mic", stopMic);
+  }, []);
 
   return (
     <form
@@ -518,54 +525,15 @@ export function BrowserPanel() {
 }
 
 export function OptionalServices() {
-  const [elizaUrl, setElizaUrl] = useState("");
-  const [eliza, setEliza] = useState(
-    "ElizaOS is optional and has not been checked. Not connected.",
-  );
-  const [webUrl, setWebUrl] = useState("");
-  const [web, setWeb] = useState("No public read has been requested.");
-
+  const eliza = elizaServiceStatus();
   return (
     <details id="optional-services">
       <summary>Optional services</summary>
-      <label htmlFor="eliza-base">ElizaOS base address</label>
-      <input
-        id="eliza-base"
-        value={elizaUrl}
-        autoComplete="off"
-        onChange={(event) => setElizaUrl(event.target.value)}
-      />
-      <button
-        type="button"
-        id="eliza-check"
-        onClick={() => {
-          void checkElizaHealth(elizaUrl).then((result) =>
-            setEliza(result.detail),
-          );
-        }}
-      >
-        Check ElizaOS health
-      </button>
-      <p id="eliza-status">{eliza}</p>
-      <label htmlFor="web4-url">Public https address</label>
-      <input
-        id="web4-url"
-        value={webUrl}
-        autoComplete="off"
-        onChange={(event) => setWebUrl(event.target.value)}
-      />
-      <button
-        type="button"
-        id="web4-read"
-        onClick={() => {
-          void readPublicEndpoint(webUrl).then((result) =>
-            setWeb(result.detail),
-          );
-        }}
-      >
-        Read public endpoint
-      </button>
-      <p id="web4-status">{web}</p>
+      <p id="eliza-status">{eliza.detail}</p>
+      <p id="web4-status">
+        Public network reads stay on a server adapter. This desk has no address
+        field and does not move funds.
+      </p>
     </details>
   );
 }

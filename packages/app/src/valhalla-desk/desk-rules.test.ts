@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { sameOriginTabUrl } from "./browser-nav.ts";
-import { checkElizaHealth } from "./eliza-service.ts";
+import { elizaServiceStatus } from "./eliza-service.ts";
 import { MockCredentialVault } from "./mock-adapters.ts";
 import {
   cloudFallbackCopy,
@@ -144,9 +144,10 @@ test("light and colorblind themes stay readable without color-only status", () =
   }
 });
 
-test("ElizaOS and public reads stay unconfigured until a real address is set", async () => {
-  const health = await checkElizaHealth("");
+test("ElizaOS health is not requested from the browser", () => {
+  const health = elizaServiceStatus();
   expect(health.state).toBe("not-configured");
+  expect(health.detail).toContain("No browser request");
   expect(health.detail).toContain("Not connected");
   expect(classifyPublicEndpoint("http://example.invalid").kind).toBe(
     "rejected",

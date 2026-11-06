@@ -60,17 +60,9 @@ function readSessionBody(body: unknown): AuthCheck {
       message: `Session service reported ${reason}. You are not signed in and you are not an admin.`,
     };
   }
-  if (typeof record.id !== "string" || record.id.length === 0) {
-    return {
-      state: "unavailable",
-      message: `GET ${SESSION_PATH} did not return a session id. You are not signed in and you are not an admin.`,
-    };
-  }
   return {
-    state: "verified",
-    source: `GET ${SESSION_PATH}`,
-    displayName:
-      typeof record.displayName === "string" ? record.displayName : "",
+    state: "unavailable",
+    message: `GET ${SESSION_PATH} has no server session contract yet. A response body is not a session and it is not an admin grant.`,
   };
 }
 
