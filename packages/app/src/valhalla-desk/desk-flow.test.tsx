@@ -1,6 +1,7 @@
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, test } from "vitest";
+import { writeWorkspacePreference } from "./workspace-preference.ts";
 import {
   type AuthCheck,
   defaultAuthSource,
@@ -138,6 +139,7 @@ test("verified entry, local label, Guide, and Omni stay inside real boundaries",
   click("ascent-primary");
   await flush();
   click("ascent-primary");
+  await flush();
   const name = document.getElementById("workspace-name");
   expect(name?.textContent).toBe(label);
   expect(document.querySelector("#workspace-hello img")).toBeNull();
@@ -162,4 +164,53 @@ test("verified entry, local label, Guide, and Omni stay inside real boundaries",
   const raw = storage.getItem("valhalla-workspace-preference") ?? "";
   expect(raw).toContain("bootSeen");
   expect(raw).not.toContain("admin");
+  click("guide-apps");
+  expect(document.getElementById("paper-warning")?.textContent).toContain(
+    "Demo only",
+  );
+  expect(document.getElementById("motoko-bounds")?.textContent).toContain(
+    "Preview",
+  );
+  expect(document.getElementById("idle-compute")?.textContent).toContain(
+    "off",
+  );
+  expect(document.querySelector("audio")).toBeNull();
+});
+
+test("a saved boot flag does not open the workspace after session expiry", async () => {
+  const storage = memoryStorage();
+  writeWorkspacePreference(storage, { displayName: "Kept", bootSeen: true });
+  mount(
+    <ValhallaWorkspace
+      storage={storage}
+      reducedMotion
+      authSource={async () => ({
+        state: "unavailable",
+        message: "Session expired. You are not signed in and you are not an admin.",
+      })}
+    />,
+  );
+  await flush();
+  expect(document.getElementById("workspace-heading")).toBeNull();
+  expect(document.getElementById("ascent-next")?.textContent).toContain(
+    "does not open the workspace",
+  );
+});
+
+test("a verified return skips the boot replay", async () => {
+  const storage = memoryStorage();
+  writeWorkspacePreference(storage, { displayName: "Kept", bootSeen: true });
+  mount(
+    <ValhallaWorkspace
+      storage={storage}
+      reducedMotion
+      authSource={verified}
+    />,
+  );
+  await flush();
+  expect(document.getElementById("workspace-heading")).toBeTruthy();
+  expect(document.getElementById("ascent-name")).toBeNull();
+  expect(
+    document.querySelector(".vd-workspace")?.getAttribute("data-reduced-motion"),
+  ).toBe("true");
 });

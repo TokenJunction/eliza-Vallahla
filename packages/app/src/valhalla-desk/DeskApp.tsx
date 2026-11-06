@@ -1359,7 +1359,11 @@ function AppsPanel(props: {
                   : "Not installed."}
               </p>
               {id === "motoko" ? (
-                <p>Canister deploy is not available in this prototype.</p>
+                <p id="motoko-bounds">
+                  Preview. Experimental only. Least privilege. No canister
+                  deploy, no extra tools, and no budget is granted. Unsupported
+                  actions stay blocked.
+                </p>
               ) : null}
               <button
                 type="button"
@@ -1381,6 +1385,32 @@ function AppsPanel(props: {
           );
         })}
       </ul>
+      <section id="paper-trading" aria-label="Paper trading">
+        <h3>Paper trading</h3>
+        <p id="paper-warning">
+          Demo only. These results are simulated. Live trading can lose real
+          money. This desk does not take a wallet key, send an order, or offer
+          withdraw.
+        </p>
+        <p>Paper balance: not loaded. No exchange was contacted.</p>
+      </section>
+      <section id="desk-terms" aria-label="Terms and idle compute">
+        <h3>Terms</h3>
+        <p>
+          These terms do not remove liability. Sign-in uses the smallest
+          identity the existing service already asks for. Drive and Gmail
+          access are not part of sign-in.
+        </p>
+        <p id="idle-compute">
+          Optional idle compute is off. It would run only non-sensitive work
+          you opt into. It does not sell privacy, read secrets, or start a paid
+          background call.
+        </p>
+        <label htmlFor="idle-opt-in">
+          <input id="idle-opt-in" type="checkbox" /> Opt in to non-sensitive
+          idle compute
+        </label>
+      </section>
     </div>
   );
 }

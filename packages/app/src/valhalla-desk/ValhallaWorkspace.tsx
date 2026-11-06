@@ -104,7 +104,15 @@ export function ValhallaWorkspace(props: ValhallaWorkspaceProps) {
     if (phase !== "auth") return;
     let cancel = false;
     void authSource().then((result) => {
-      if (!cancel) setAuth(result);
+      if (cancel) return;
+      setAuth(result);
+      if (result.state === "verified" && saved.bootSeen) {
+        const label = sanitizeDisplayName(
+          result.displayName || saved.displayName,
+        );
+        setDisplayName(label);
+        setPhase("desktop");
+      }
     });
     return () => {
       cancel = true;
@@ -132,7 +140,13 @@ export function ValhallaWorkspace(props: ValhallaWorkspaceProps) {
     document.getElementById(focusId)?.focus();
   }, [phase]);
 
-  function enterWorkspace(name: string) {
+  async function enterWorkspace(name: string) {
+    const latest = await authSource();
+    setAuth(latest);
+    if (latest.state !== "verified") {
+      setPhase("auth");
+      return;
+    }
     const label = sanitizeDisplayName(name);
     setDisplayName(label);
     if (storage) {
@@ -200,6 +214,13 @@ export function ValhallaWorkspace(props: ValhallaWorkspaceProps) {
                   ? `Signup check verified by ${auth.source}. This is not an admin role.`
                   : auth.message}
             </p>
+            {auth && auth.state !== "verified" ? (
+              <p id="ascent-next">
+                Next step: sign in on the existing Valhalla site, then choose
+                Retry session check. This page does not create an account and
+                does not open the workspace.
+              </p>
+            ) : null}
             <button
               type="button"
               id="ascent-primary"
@@ -268,7 +289,7 @@ export function ValhallaWorkspace(props: ValhallaWorkspaceProps) {
               type="button"
               id="ascent-primary"
               disabled={health === null}
-              onClick={() => enterWorkspace(displayName)}
+              onClick={() => void enterWorkspace(displayName)}
             >
               {blocked
                 ? "Continue with limited workspace"

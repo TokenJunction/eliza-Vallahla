@@ -12,7 +12,8 @@
   "include": [
     "./**/*.ts",
     "./**/*.tsx",
-    "../../../os/setup/src/valhalla-desk/main.tsx"
+    "../../../os/setup/src/valhalla-desk/main.tsx",
+    "../../../os/setup/src/valhalla-desk/demo-main.tsx"
   ],
   "exclude": ["./**/*.test.ts", "./**/*.test.tsx", "./vitest.config.ts"]
 }

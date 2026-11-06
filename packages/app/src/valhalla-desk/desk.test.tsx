@@ -304,7 +304,7 @@ test("install and revoke ask for confirmation", () => {
       .querySelector("[data-app='motoko']")
       ?.getAttribute("data-installed"),
   ).toBe("yes");
-  expect(text()).toContain("Canister deploy is not available");
+  expect(text()).toContain("No canister deploy");
   click("app-revoke-motoko");
   click("desk-dialog-confirm");
   expect(

@@ -19,7 +19,10 @@ export default defineConfig({
     outDir: path.resolve(here, "dist-valhalla-desk"),
     emptyOutDir: true,
     rollupOptions: {
-      input: path.resolve(here, "desk.html"),
+      input: {
+        desk: path.resolve(here, "desk.html"),
+        demo: path.resolve(here, "desk-demo.html"),
+      },
     },
   },
 });
