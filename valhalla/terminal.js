@@ -1,5 +1,5 @@
-import { SOL_MINT, USDC_MINT, baseUnits, emptyQuote, quoteRequest, quoteView, submitRequest, tradingReady } from "./trading.js";
-import { challengeRequest, readChallenge } from "./wallets.js";
+import { SOL_MINT, USDC_MINT, baseUnits, bindQuote, emptyQuote, quoteRequest, quoteSnapshot, submitRequest, tradingReady, VALHALLA_QUOTE_REVIEW_MS } from "./trading.js";
+import { challengeRequest, readChallenge, walletId } from "./wallets.js";
 
 var inputMint = document.getElementById("trading-input");
 var outputMint = document.getElementById("trading-output");
@@ -26,6 +26,9 @@ var addressNode = document.getElementById("trading-address");
 
 var wallets = [];
 var connected = "";
+var quoteSeq = 0;
+var quoteAbort = null;
+var quoteTimer = 0;
 
 function fixture() {
   var host = location.hostname;
@@ -60,7 +63,11 @@ function onRegister(event) {
   if (typeof event.detail !== "function") return;
   event.detail(Object.freeze({
     register: function (wallet) {
-      if (wallet && wallets.indexOf(wallet) < 0) wallets.push(wallet);
+      if (!walletId(wallet && wallet.name)) return;
+      var features = wallet.features || {};
+      var connect = features["standard:connect"] && typeof features["standard:connect"].connect === "function";
+      if (!connect || wallets.indexOf(wallet) >= 0) return;
+      wallets.push(wallet);
     },
   }));
 }
@@ -104,8 +111,9 @@ async function connectWallet(wallet) {
       return;
     }
     connected = address;
+    invalidateQuote();
     if (addressNode) addressNode.textContent = "…" + address.slice(-4);
-    setStatus("Wallet connected. No transaction was requested.");
+    setStatus("Wallet connected for a public address only. No transaction was requested.");
   } catch (error) {
     setStatus("The wallet connection was not completed. Nothing was signed.");
   }
@@ -149,7 +157,12 @@ function selectedMint(node, fallback) {
   return (node && node.value.trim()) || fallback;
 }
 
-function clearQuote() {
+function invalidateQuote() {
+  quoteSeq += 1;
+  if (quoteAbort) quoteAbort.abort();
+  quoteAbort = null;
+  if (quoteTimer) window.clearTimeout(quoteTimer);
+  quoteTimer = 0;
   paint(emptyQuote());
   if (solscan) {
     solscan.hidden = true;
@@ -159,9 +172,10 @@ function clearQuote() {
 }
 
 async function requestQuote() {
-  clearQuote();
+  invalidateQuote();
+  var seq = quoteSeq;
   if (fixture()) {
-    setStatus("Preview fixture, no provider. This is not a quote.");
+    setStatus("Fixture — not a live quote.");
     return;
   }
   var units = baseUnits(amount && amount.value, decimals && decimals.value);
@@ -184,28 +198,58 @@ async function requestQuote() {
   }, location.hostname);
   if (!call.ok) {
     setStatus(call.reason === "disabled" || call.reason === "unconfigured"
-      ? "Quotes unavailable until the Jupiter and RPC connection is configured."
+      ? "Quotes are not configured. Public RPC readiness is not claimed."
       : "The quote was not requested. " + call.reason);
     return;
   }
+  var snapshot = quoteSnapshot({
+    inputMint: selectedMint(inputMint, SOL_MINT),
+    outputMint: selectedMint(outputMint, USDC_MINT),
+    amount: units.amount,
+    taker: connected,
+    slippageBps: slippage ? slippage.value : "",
+    cluster: "mainnet-beta",
+  });
+  quoteAbort = new AbortController();
+  var receivedMono = window.performance && window.performance.now ? window.performance.now() : Date.now();
   setStatus("Requesting a quote.");
   try {
     var response = await fetch(call.url, {
       method: call.method,
       credentials: call.credentials,
       headers: call.headers,
+      signal: quoteAbort.signal,
     });
-    if (response.status === 503 || response.status === 502) {
+    if (seq !== quoteSeq) return;
+    var body = await response.json().catch(function () { return {}; });
+    if (seq !== quoteSeq) return;
+    if (response.status === 503 || response.status === 502 || !response.ok) {
+      paint(emptyQuote());
       setStatus("The quote service is not ready. No numbers were returned.");
       return;
     }
-    var body = await response.json();
-    var view = response.ok ? quoteView(body) : emptyQuote();
-    paint(view);
-    setStatus(view.quoted
-      ? "Quote received. It is not a transaction and it was not signed."
-      : "The quote was rejected. No numbers are shown.");
+    var bound = bindQuote(snapshot, body, {
+      receivedMono: receivedMono,
+      nowMono: window.performance && window.performance.now ? window.performance.now() : Date.now(),
+      nowWall: Date.now(),
+    });
+    if (!bound.ok || bound.signable !== false) {
+      paint(emptyQuote());
+      setStatus("The quote did not match this request. No numbers are shown.");
+      return;
+    }
+    paint(bound.view);
+    var freshNode = document.getElementById("trading-freshness");
+    if (freshNode) freshNode.textContent = bound.freshness;
+    setStatus(bound.freshness + " Signing is off. A /build result is not a transaction.");
+    quoteTimer = window.setTimeout(function () {
+      if (seq !== quoteSeq) return;
+      invalidateQuote();
+      setStatus("Expired under the ValhallaOS 30-second review policy. This is not a Jupiter time-to-live.");
+    }, VALHALLA_QUOTE_REVIEW_MS);
   } catch (error) {
+    if (error && error.name === "AbortError") return;
+    if (seq !== quoteSeq) return;
     setStatus("The quote service could not be reached. No numbers are shown.");
   }
 }
@@ -236,7 +280,7 @@ if (swap && inputMint && outputMint) {
     var from = inputMint.value;
     inputMint.value = outputMint.value;
     outputMint.value = from;
-    clearQuote();
+    invalidateQuote();
     setStatus("The pair was swapped. No quote was requested.");
   });
 }
@@ -255,7 +299,7 @@ function renderWatch() {
     button.textContent = String(mint).slice(0, 4) + "…" + String(mint).slice(-4);
     button.addEventListener("click", function () {
       if (outputMint) outputMint.value = mint;
-      clearQuote();
+      invalidateQuote();
     });
     item.appendChild(button);
     watchList.appendChild(item);
@@ -283,21 +327,25 @@ document.querySelectorAll("[data-mint]").forEach(function (button) {
   button.addEventListener("click", function () {
     var target = document.getElementById(button.getAttribute("data-mint-target"));
     if (target) target.value = button.getAttribute("data-mint");
-    clearQuote();
+    invalidateQuote();
   });
 });
 
 if (fixture() && quoteButton) {
   quoteButton.disabled = true;
-  quoteButton.textContent = "Quotes unavailable until the Jupiter and RPC connection is configured.";
-  setStatus("Preview fixture, no provider. This is not a quote.");
+  quoteButton.textContent = "Get quote";
+  setStatus("Fixture — not a live quote. Public RPC readiness is not claimed.");
 } else if (quoteButton) {
+  quoteButton.textContent = "Get quote";
   if (!tradingReady(window.VALHALLA_SITE || {})) {
     quoteButton.disabled = true;
-    quoteButton.textContent = "Quotes unavailable until the Jupiter and RPC connection is configured.";
-    setStatus("Preview release. Quotes unavailable until the Jupiter and RPC connection is configured.");
+    setStatus("Quotes are not configured. Public RPC readiness is not claimed.");
   }
 }
+[inputMint, outputMint, amount, decimals, slippage].forEach(function (node) {
+  if (!node) return;
+  node.addEventListener("input", function () { invalidateQuote(); });
+});
 
 paint(emptyQuote());
 renderWatch();

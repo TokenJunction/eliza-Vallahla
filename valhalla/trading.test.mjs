@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { jupiterBuildUrl, parseBuild } from "./jupiter-v2.js";
 import { encodeBase58, readVersionedTransaction, reviewTransaction, signatureLink } from "./tx.js";
-import { baseUnits, emptyQuote, quoteRequest, quoteView, signPlan, submitRequest, tradingReady } from "./trading.js";
+import { baseUnits, bindQuote, emptyQuote, paintAllowed, quoteFreshness, quoteRequest, quoteSnapshot, quoteView, rpcReadiness, signPlan, submitRequest, tradingReady, VALHALLA_QUOTE_REVIEW_MS } from "./trading.js";
 
 const inputMint = "So11111111111111111111111111111111111111112";
 const outputMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -82,6 +82,35 @@ test("base units stay integers and the fee payer must be the connected wallet", 
   assert.equal(signatureLink(unsigned), null);
   assert.equal(readVersionedTransaction(craft(feePayer)).signerCount, 1);
   assert.equal(submitRequest().sent, false);
+});
+
+test("a router response must match the request or it is rejected", () => {
+  function quoted(extra) {
+    return Object.assign({
+      inputMint, outputMint, inAmount: "1000", outAmount: "900", slippageBps: 50,
+      taker, cluster: "mainnet-beta", swapInstruction: instruction(), routePlan: [],
+    }, extra || {});
+  }
+  var snap = quoteSnapshot({ inputMint, outputMint, amount: "1000", taker, slippageBps: 50, cluster: "mainnet-beta" });
+  var timing = { receivedMono: 0, nowMono: 10, nowWall: Date.parse("2026-01-01T00:00:00Z") };
+  var bound = bindQuote(snap, quoted(), timing);
+  assert.equal(bound.ok, true);
+  assert.equal(bound.signable, false);
+  assert.equal(bindQuote(snap, quoted({ outputMint: inputMint }), timing).reason, "outputMint");
+  assert.equal(bindQuote(snap, quoted({ inAmount: "2" }), timing).reason, "inAmount");
+  assert.equal(bindQuote(snap, quoted({ taker: inputMint }), timing).reason, "taker");
+  assert.equal(bindQuote(snap, quoted({ slippageBps: 80 }), timing).reason, "slippage");
+  assert.equal(rpcReadiness().ready, false);
+});
+
+test("a decimal change, a late response, and a 30 second age drop the quote", () => {
+  assert.notEqual(baseUnits("1", 9).amount, baseUnits("1", 6).amount);
+  var stale = quoteFreshness({ receivedMono: 0, nowMono: VALHALLA_QUOTE_REVIEW_MS, nowWall: 0 }, {});
+  assert.equal(stale.reason, "valhalla-review-window");
+  assert.match(stale.label, /not a Jupiter time-to-live/);
+  assert.equal(quoteFreshness({ receivedMono: 0, nowMono: 1000, nowWall: 0 }, {}).reason, "freshness-not-supplied");
+  assert.equal(paintAllowed(1, 1), true);
+  assert.equal(paintAllowed(1, 2), false);
 });
 
 test("the desk names the Jupiter Terminal and does not sign and send", () => {

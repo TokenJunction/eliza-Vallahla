@@ -32,6 +32,21 @@ test("only Solflare and MetaMask are discovered, and an unknown wallet is ignore
   assert.equal(signFeature({ "solana:signTransaction": { signTransaction: function () {} }, "solana:signAndSendTransaction": {} }), "solana:signTransaction");
 });
 
+test("a read-only connect does not require a link signature", () => {
+  var readOnly = discover({
+    standard: [standard("Solflare", {
+      "standard:connect": { connect: function () {} },
+      "solana:signTransaction": { signTransaction: function () {} },
+    })],
+  });
+  assert.equal(readOnly.only, "solflare");
+  assert.equal(readOnly.wallets[0].link, false);
+  assert.equal(readOnly.wallets[0].sign, true);
+  assert.equal(signFeature(readOnly.wallets[0]) === "solana:signTransaction" || signFeature({
+    "solana:signTransaction": { signTransaction: function () {} },
+  }) === "solana:signTransaction", true);
+});
+
 test("one installed wallet connects directly and a missing wallet has an install step", () => {
   var one = discover({
     standard: [],

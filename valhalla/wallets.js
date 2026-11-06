@@ -12,27 +12,40 @@ export function walletId(name) {
 
 export function discover(input) {
   var found = [];
-  function add(id, source) {
-    if (WALLET_IDS.indexOf(id) < 0) return;
+  function caps(features) {
+    return {
+      link: Boolean(features && features["solana:signMessage"] && typeof features["solana:signMessage"].signMessage === "function"),
+      sign: Boolean(features && features["solana:signTransaction"] && typeof features["solana:signTransaction"].signTransaction === "function"),
+      connect: Boolean(features && features["standard:connect"] && typeof features["standard:connect"].connect === "function"),
+    };
+  }
+  function add(id, source, ability) {
+    if (WALLET_IDS.indexOf(id) < 0 || !ability.connect) return;
     if (found.some(function (item) { return item.id === id; })) return;
-    found.push({ id: id, source: source });
+    found.push({ id: id, source: source, link: ability.link === true, sign: ability.sign === true });
   }
   (input && input.standard || []).forEach(function (wallet) {
     var id = walletId(wallet && wallet.name);
-    var features = wallet && wallet.features;
-    var sign = features && features["solana:signMessage"] && typeof features["solana:signMessage"].signMessage === "function";
-    var connect = features && features["standard:connect"] && typeof features["standard:connect"].connect === "function";
-    if (!id || !sign || !connect) return;
-    add(id, "standard");
+    var ability = caps(wallet && wallet.features);
+    if (!id) return;
+    add(id, "standard", ability);
   });
   var injected = input && input.injected || {};
   var solflare = injected.solflare;
-  if (solflare && typeof solflare.connect === "function" && typeof solflare.signMessage === "function") {
-    add("solflare", "injected");
+  if (solflare && typeof solflare.connect === "function") {
+    add("solflare", "injected", {
+      connect: true,
+      link: typeof solflare.signMessage === "function",
+      sign: typeof solflare.signTransaction === "function",
+    });
   }
   var metamask = injected.metamask;
-  if (metamask && metamask.isMetaMask === true && metamask.solana && typeof metamask.solana.connect === "function" && typeof metamask.solana.signMessage === "function") {
-    add("metamask", "injected");
+  if (metamask && metamask.isMetaMask === true && metamask.solana && typeof metamask.solana.connect === "function") {
+    add("metamask", "injected", {
+      connect: true,
+      link: typeof metamask.solana.signMessage === "function",
+      sign: typeof metamask.solana.signTransaction === "function",
+    });
   }
   return {
     wallets: found,

@@ -292,8 +292,8 @@
           <p class="fine-print" id="trading-link-note">A link signature is not a trading approval. The server must issue the message first.</p>
         </div>
         <div class="trade-actions">
-          <button type="button" class="classic-button" id="trading-quote" disabled>Quotes unavailable until the Jupiter and RPC connection is configured.</button>
-          <button type="button" class="classic-button" id="trading-sign" disabled>Sign and submit trade</button>
+          <button type="button" class="classic-button" id="trading-quote" disabled>Get quote</button>
+          <button type="button" class="classic-button" id="trading-sign" disabled>Review</button>
         </div>
         <p id="trading-status" role="status">Connecting services…</p>
         <div class="trade-quote" aria-live="polite">
@@ -303,12 +303,14 @@
           <p>Route <span id="trading-routes"></span></p>
           <p class="fine-print">No quote is shown until the server returns one. An empty line is not zero.</p>
         </div>
-        <p class="trade-risk">A quote does not guarantee a fill, a price, or that a mint is safe. An unknown mint can be worthless. Signing happens only after you press Sign and submit trade, and only for the one transaction you just reviewed.</p>
+        <p id="trading-freshness" role="status">Freshness not supplied; refreshed review required before signing.</p>
+        <p class="trade-risk">A quote does not guarantee a fill, a price, or that a mint is safe. Signing is off. A parsed build instruction is not a transaction, and it is not sent to an execute route.</p>
         <button type="button" class="classic-button" id="trading-note-toggle" aria-expanded="false" aria-controls="trading-note-pane">Route note</button>
         <div id="trading-note-pane" hidden>
           <p id="trading-note">Unavailable</p>
         </div>
         <div class="trade-watch">
+          <p class="fine-print">Draft watchlist. Not verified. Token metadata is not loaded.</p>
           <label for="trading-watch-mint">Watch a mint</label>
           <input id="trading-watch-mint" autocomplete="off" spellcheck="false">
           <button type="button" class="classic-button" id="trading-watch-add">Save mint</button>
