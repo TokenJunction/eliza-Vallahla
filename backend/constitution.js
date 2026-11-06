@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const READONLY = new Set(["voice", "reasoning", "paper", "view"]);
+const READONLY = new Set(["voice", "reasoning", "paper", "view", "chat"]);
 const DRAFT_TOOLS = new Set(["paper-quote", "status"]);
 
 export const POLICIES = Object.freeze({
@@ -12,7 +12,7 @@ export const POLICIES = Object.freeze({
     liveTrading: false,
     executionPolicy: "none",
     effects: Object.freeze({
-      readonly: Object.freeze(["voice", "reasoning", "paper", "view"]),
+      readonly: Object.freeze(["voice", "reasoning", "paper", "view", "chat"]),
       draft: Object.freeze(["paper-quote", "status"]),
       execute: Object.freeze([]),
     }),

@@ -49,6 +49,15 @@ export function tenantFor(store, email) {
   return store.data.users[eh];
 }
 
+export function provisionMember(store, userId) {
+  if (!userId) return null;
+  if (!store.data.membership) store.data.membership = {};
+  if (store.data.membership[userId]) return store.data.membership[userId];
+  store.data.membership[userId] = { installed: ["ai-workspace"], role: "member", entitlement: "preview" };
+  store.flush();
+  return store.data.membership[userId];
+}
+
 export function claimAdmin(store, email, configured) {
   const normalized = String(email || "").trim().toLowerCase();
   if (!normalized) return null;

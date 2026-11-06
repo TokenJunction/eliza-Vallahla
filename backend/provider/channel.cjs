@@ -8,19 +8,26 @@
 const { executeCapability } = require('./lib/execute');
 
 function mapTask(body = {}) {
-  if (body.role === 'thalos' || body.capability === 'paper' || body.capability === 'view') {
-    return { role: 'thalos', capability: body.capability === 'view' ? 'view' : 'paper' };
-  }
-  if (body.role === 'voice' || body.capability === 'voice') {
-    return { role: 'odin', capability: 'voice' };
-  }
-  return { role: 'odin', capability: 'reasoning' };
+  if (body.capability === 'chat') return { role: 'odin', capability: 'chat' };
+  if (body.capability === 'code') return { role: 'odin', capability: 'code' };
+  if (body.capability === 'view') return { role: 'thalos', capability: 'view' };
+  if (body.capability === 'paper' || body.role === 'thalos') return { role: 'thalos', capability: 'paper' };
+  if (body.capability === 'voice' || body.role === 'voice') return { role: 'odin', capability: 'voice' };
+  if (body.capability === 'reasoning') return { role: 'odin', capability: 'reasoning' };
+  return { role: null, capability: null };
 }
 
 async function generateForRequest(body, env, deps = {}) {
+  if (deps.signal && deps.signal.aborted) return { completed: false, text: null, reason: 'cancelled' };
+  const allowed = Array.isArray(deps.allowedModels) ? deps.allowedModels : [];
+  if (body.model && !allowed.includes(body.model)) {
+    return { completed: false, text: null, reason: 'model_rejected' };
+  }
   const local = String(env.VALHALLA_LOCAL_RELAY) === '1';
   const mapped = mapTask(body);
+  if (!mapped.capability) return { completed: false, text: null, reason: 'capability_rejected' };
   const result = await executeCapability({
+    signal: deps.signal,
     role: mapped.role,
     capability: mapped.capability,
     prompt: body.text || body.prompt || '',
@@ -43,4 +50,4 @@ async function generateForRequest(body, env, deps = {}) {
   };
 }
 
-module.exports = { generateForRequest };
+module.exports = { generateForRequest, mapTask };

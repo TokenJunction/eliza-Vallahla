@@ -6,11 +6,11 @@ const require = createRequire(import.meta.url);
 const { generateForRequest } = require("./provider/channel.cjs");
 const { mapCustomerFromBearer } = require("../lib/customer-identity.js");
 import { csrfOk, isRoot, normalizeEmail, presentedCredential, resolveRoot } from "./authz.js";
-import { claimAdmin, cleanDisplayName, issueBoundSession, openStore, revokeBoundSession, tenantFor, verifyBoundSession } from "./sessions.js";
+import { claimAdmin, cleanDisplayName, issueBoundSession, openStore, provisionMember, revokeBoundSession, tenantFor, verifyBoundSession } from "./sessions.js";
 import { runElizaTask } from "./eliza-route.js";
 import { admit, finish, history, loadTasks, readTask, saveTasks, serverPolicy, stopTask } from "./task-invocation.js";
 import { assertPublicTarget } from "./ssrf.js";
-import { jupiterBuildUrl, parseBuild, rpcStatusRequest } from "./jupiter-v2.js";
+import { jupiterBuildUrl, parseBuild, quoteAvailability, rpcStatusRequest } from "./jupiter-v2.js";
 import { ADAPTER_VERSION, PROVIDER_CATALOG, blankProvider, testProvider } from "./adapters.js";
 import { FIRST_APPS, NOT_CONFIGURED_APPS, builtinManifests, canLaunch, editionAllows, scopeKey } from "./apps.js";
 import { identityMode } from "./identity-mode.js";
@@ -230,7 +230,15 @@ export function createServer(options = {}) {
           if (!mapped.ok || mapped.supabaseAuthUid != null || mapped.role !== "customer" || !mapped.memberId) {
             return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
           }
-          req.session = { userId: mapped.memberId, email: "", owner: false, leader: mapped.leader === true };
+          provisionMember(state.store, mapped.memberId);
+          req.session = {
+            userId: mapped.memberId,
+            tenantId: "valhalla",
+            subject: mapped.memberId,
+            email: "",
+            owner: false,
+            leader: false,
+          };
         } else {
           return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
         }
@@ -698,6 +706,8 @@ export function createServer(options = {}) {
         const { json: body } = await readJson(req);
         const session = {
           userId: req.session.userId,
+          tenantId: req.session.tenantId || req.session.userId,
+          subject: req.session.subject || req.session.userId,
           owner: isRoot(req.session.email, env, state.setup),
         };
         const policy = serverPolicy(session, env);
@@ -708,8 +718,14 @@ export function createServer(options = {}) {
         if (!gate.ok) {
           return json(res, gate.status, { ok: false, reason: gate.reason, text: null, code: "V-TASK" }, origin);
         }
-        if (gate.replay) return json(res, 200, gate.response, origin);
+        saveTasks(state.store, state.tasks);
+        if (gate.replay) return json(res, gate.status || 200, gate.response, origin);
+        const controller = new AbortController();
+        if (!state.running) state.running = new Map();
+        state.running.set(gate.record.taskId, controller);
+        json(res, 202, { ok: true, state: "running", taskId: gate.record.taskId, text: null, version: gate.record.version }, origin);
         let generated = { completed: false, text: null, reason: "unavailable" };
+        try {
         if (body.provider === "eliza" || url.pathname === "/api/eliza") {
           const result = await runElizaTask({
             serviceUrl: env.ELIZA_SERVICE_URL,
@@ -721,11 +737,19 @@ export function createServer(options = {}) {
           generated = await generateForRequest({
             text: String(body.text || ""),
             capability: gate.record.capability,
-          }, env, { fetchImpl });
+            model: body.model,
+          }, env, { fetchImpl, signal: controller.signal, allowedModels: policy.models });
         }
-        const payload = finish(state.tasks, gate.record, generated);
+        } catch {
+          generated = { completed: false, text: null, reason: "unavailable" };
+        }
+        if (controller.signal.aborted || gate.record.cancelRequested) {
+          generated = { completed: false, text: null, reason: "cancelled" };
+        }
+        finish(state.tasks, gate.record, generated);
+        state.running.delete(gate.record.taskId);
         saveTasks(state.store, state.tasks);
-        return json(res, payload.ok ? 200 : 503, payload, origin);
+        return;
       }
       if (req.method === "GET" && url.pathname === "/api/v1/tasks") {
         const conversationId = url.searchParams.get("conversationId") || "";
@@ -739,10 +763,15 @@ export function createServer(options = {}) {
       if (req.method === "POST" && url.pathname === "/api/v1/tasks/stop") {
         const { json: body } = await readJson(req);
         const stopped = stopTask(state.tasks, { userId: req.session.userId }, String(body.taskId || ""));
+        const running = state.running && state.running.get(String(body.taskId || ""));
+        if (running) running.abort();
         saveTasks(state.store, state.tasks);
         return json(res, stopped.status, stopped, origin);
       }
       if (req.method === "GET" && url.pathname === "/api/jupiter/quote") {
+        if (env.JUPITER_QUOTE_FETCH !== "1") {
+          return json(res, 200, { ok: true, ...quoteAvailability(env) }, origin);
+        }
         const planned = jupiterBuildUrl({
           inputMint: url.searchParams.get("inputMint") || "",
           outputMint: url.searchParams.get("outputMint") || "",

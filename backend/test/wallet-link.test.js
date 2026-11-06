@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createRequire } from "node:module";
 import { generateEd25519, publicKeyFromRaw, signBytes } from "../ed25519.js";
+import { encryptSecret, resolveProviderKey } from "../secretStore.js";
+import { provisionMember } from "../sessions.js";
 import { createFlywheelGrant, enableFlywheel, haltFlywheel, reviewSubmission } from "../flywheel-grant.js";
 import { admit, createTaskCache, serverPolicy } from "../task-invocation.js";
 import { canonicalLinkMessage, createWalletDesk, issueChallenge, verifyLink } from "../wallet-link.js";
@@ -122,6 +125,26 @@ test("one challenge cannot be consumed twice at the same time", async () => {
     verifyLink(desk, session, body, 1_000),
   ]);
   assert.equal([left.ok, right.ok].filter(Boolean).length, 1);
+});
+
+test("a deployment key is not BYOK and an empty packed key is rejected", () => {
+  const shared = resolveProviderKey({ DEEPSEEK_API_KEY: "server-key" }, null, "tenant-a");
+  assert.equal(shared.source, "deployment");
+  assert.equal(resolveProviderKey({ SETUP_MASTER_KEY: "master" }, "", "tenant-a").reason, "empty");
+  const packed = encryptSecret("master", "tenant-key", "tenant-a");
+  const byok = resolveProviderKey({ SETUP_MASTER_KEY: "master" }, packed, "tenant-a");
+  assert.equal(byok.source, "byok");
+  assert.equal(byok.key, "tenant-key");
+  const logged = JSON.stringify({ source: byok.source });
+  assert.equal(logged.includes("tenant-key"), false);
+  const store = { data: { membership: {} }, flush() {} };
+  const row = provisionMember(store, "member-1");
+  assert.deepEqual(row.installed, ["ai-workspace"]);
+  assert.equal(row.role, "member");
+  assert.equal(provisionMember(store, "member-1"), row);
+  const { mapTask } = createRequire(import.meta.url)("../provider/channel.cjs");
+  assert.equal(mapTask({ capability: "chat" }).capability, "chat");
+  assert.equal(mapTask({ text: "hello" }).capability, null);
 });
 
 test("flywheel stays advisory and a wallet link is not authority", () => {

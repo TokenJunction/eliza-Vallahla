@@ -21,6 +21,21 @@ export function encryptSecret(master, plaintext, tenantId) {
   return Buffer.concat([iv, tag, enc]).toString("base64");
 }
 
+export function resolveProviderKey(env, packed, tenantId) {
+  if (packed != null) {
+    if (!env || !env.SETUP_MASTER_KEY || !tenantId || packed === "") return { ok: false, source: "byok", reason: "empty" };
+    try {
+      const key = decryptSecret(env.SETUP_MASTER_KEY, packed, tenantId);
+      if (!key) return { ok: false, source: "byok", reason: "empty" };
+      return { ok: true, source: "byok", key };
+    } catch {
+      return { ok: false, source: "byok", reason: "rejected" };
+    }
+  }
+  if (env && env.DEEPSEEK_API_KEY) return { ok: true, source: "deployment", key: env.DEEPSEEK_API_KEY };
+  return { ok: false, source: "none", reason: "missing" };
+}
+
 export function decryptSecret(master, packed, tenantId) {
   if (!tenantId) throw new Error("tenant-required");
   const key = createHash("sha256").update(`${master}\n${tenantId}`).digest();

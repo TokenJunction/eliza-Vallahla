@@ -9,7 +9,7 @@ import { classifyAction, executionDecision } from "./constitution.js";
 // finite and greater than 0 before it is reserved. Provider invoices are separate.
 
 export const APP_ALLOW = Object.freeze(["trading", "ai-workspace", "thalos", "data-explorer"]);
-export const CAPABILITIES = Object.freeze(["voice", "reasoning", "paper", "view"]);
+export const CAPABILITIES = Object.freeze(["voice", "reasoning", "paper", "view", "chat"]);
 export const TOOLS = Object.freeze(["none", "paper-quote", "status"]);
 export const TASK_TTL_MS = 15 * 60 * 1000;
 export const CLOUD_ESTIMATE_USD = 0.01;
@@ -81,10 +81,18 @@ function toolQuery(body) {
   };
 }
 
+function scopeIds(session) {
+  return {
+    tenantId: String(session.tenantId || session.userId || ""),
+    subject: String(session.subject || session.userId || ""),
+  };
+}
+
 function bodyHash(session, body) {
+  const scope = scopeIds(session);
   return createHash("sha256").update(JSON.stringify(canonical({
-    tenantId: session.userId,
-    subject: session.userId,
+    tenantId: scope.tenantId,
+    subject: scope.subject,
     app: body.app || "",
     conversationId: String(body.conversationId || ""),
     capability: body.capability || "",
@@ -98,9 +106,10 @@ function bodyHash(session, body) {
 }
 
 function bindingKey(session, app, hash) {
+  const scope = scopeIds(session);
   return createHash("sha256").update([
-    session.userId,
-    session.userId,
+    scope.tenantId,
+    scope.subject,
     String(session.conversationId || ""),
     app,
     hash,
@@ -180,6 +189,10 @@ export function admit(cache, session, body, policy, membership = { installed: []
   }
   if (!session || !session.userId) return { ok: false, status: 401, reason: "auth" };
   if (Buffer.byteLength(String(body.text || "")) > 8000) return { ok: false, status: 400, reason: "text_too_long" };
+  const conversationId = String(body.conversationId || "");
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(conversationId) || conversationId === session.userId) {
+    return { ok: false, status: 400, reason: "conversation_required" };
+  }
   const extra = unknownField(body);
   if (extra) return { ok: false, status: 400, reason: "unknown_field" };
   if (body.model && !(policy.models || []).includes(body.model)) {
@@ -198,10 +211,11 @@ export function admit(cache, session, body, policy, membership = { installed: []
     return { ok: false, status: 400, reason: "tool_rejected" };
   }
   if (!cache.conversations) cache.conversations = {};
-  const conversationId = String(body.conversationId || "");
   if (conversationId) {
     const bound = cache.conversations[conversationId];
-    if (bound && bound.tenantId !== session.userId) return { ok: false, status: 403, reason: "tenant" };
+    if (bound && bound.tenantId !== scopeIds(session).tenantId && bound.tenantId !== session.userId) {
+      return { ok: false, status: 403, reason: "tenant" };
+    }
   }
   const hash = bodyHash(session, body);
   const key = bindingKey({ ...session, conversationId: body.conversationId }, body.app, hash);
@@ -210,7 +224,8 @@ export function admit(cache, session, body, policy, membership = { installed: []
     if (prior.stopped || prior.state === "cancelled") {
       return { ok: false, status: 409, reason: "stopped", taskId: prior.taskId, response: publicRecord(prior) };
     }
-    return { ok: true, status: 200, replay: true, response: publicRecord({ ...prior, replay: true }) };
+    const running = prior.state === "running" || prior.state === "cancel_requested";
+    return { ok: true, status: running ? 202 : 200, replay: true, response: publicRecord({ ...prior, replay: true }) };
   }
   if (body.taskId && cache.byId.has(body.taskId)) {
     const named = cache.byId.get(body.taskId);
@@ -290,6 +305,8 @@ export function admit(cache, session, body, policy, membership = { installed: []
     state: "running",
     reason: null,
     trace: null,
+    version: 1,
+    cancelRequested: false,
     exp: now + TASK_TTL_MS,
     replay: false,
   };
@@ -306,7 +323,16 @@ export function admit(cache, session, body, policy, membership = { installed: []
 export function finish(cache, record, generated) {
   const quoteOk = record.tool !== "paper-quote" || generated?.toolAuthorized === true;
   const text = quoteOk && generated && generated.completed ? String(generated.text || "") : null;
-  if (record.stopped && text) {
+  if (record.cancelRequested) {
+    record.stopped = true;
+    record.state = "cancelled";
+    record.completed = false;
+    record.ok = false;
+    record.text = null;
+    record.reason = "cancelled";
+    record.version = (record.version || 1) + 1;
+    settleSpend(cache, record, 0);
+  } else if (record.stopped && text) {
     record.state = "done";
     record.completed = true;
     record.ok = true;
@@ -356,11 +382,14 @@ export function stopTask(cache, session, taskId) {
   if (record.state === "done") {
     return { ok: true, status: 200, taskId, reason: "provider_finished_before_cancel", state: "done" };
   }
-  record.stopped = true;
-  record.state = "cancelled";
-  record.reason = "cancelled";
-  record.ok = false;
-  return { ok: true, status: 200, taskId, reason: "cancelled", state: "cancelled" };
+  if (record.state === "cancelled" || record.stopped) {
+    return { ok: true, status: 200, taskId, reason: "cancelled", state: "cancelled" };
+  }
+  record.cancelRequested = true;
+  record.state = "cancel_requested";
+  record.reason = "cancel_requested";
+  record.version = (record.version || 1) + 1;
+  return { ok: true, status: 202, taskId, reason: "cancel_requested", state: "cancel_requested" };
 }
 
 export function readTask(cache, session, taskId) {
@@ -391,6 +420,12 @@ export function loadTasks(store) {
   const cache = createTaskCache();
   cache.conversations = store.data.conversations || {};
   for (const record of Object.values(store.data.tasks || {})) {
+    if (record.state === "running" || record.state === "cancel_requested") {
+      record.state = "provider_interrupted";
+      record.text = null;
+      record.completed = false;
+      record.reason = "provider_interrupted";
+    }
     cache.byId.set(record.taskId, record);
     if (record.key) cache.byKey.set(record.key, record);
   }

@@ -90,6 +90,23 @@ export function parseBuild(body) {
   };
 }
 
+export function programLabelAllows() {
+  return false;
+}
+
+export function quoteAvailability(env = {}) {
+  const configured = Boolean(env.JUPITER_API_KEY);
+  return {
+    configured,
+    available: false,
+    mode: configured ? "pending-review" : "unconfigured",
+    simulated: false,
+    live: false,
+    execute: false,
+    reason: configured ? "program-map-not-authority" : "key-absent",
+  };
+}
+
 export function rpcStatusRequest(raw) {
   if (!raw) return { ok: false, configured: false, reason: "unconfigured", method: null };
   let url;

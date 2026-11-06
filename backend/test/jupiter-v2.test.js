@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "../valhallaMasterEngineV35.js";
-import { jupiterBuildUrl, parseBuild, rpcStatusRequest } from "../jupiter-v2.js";
+import { jupiterBuildUrl, parseBuild, programLabelAllows, quoteAvailability, rpcStatusRequest } from "../jupiter-v2.js";
 
 const inputMint = "So11111111111111111111111111111111111111112";
 const outputMint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -50,6 +50,10 @@ test("the build url is only the official v2 path", () => {
   assert.equal(rpcStatusRequest("https://rpc.example/sendTransaction").reason, "path");
   assert.equal(rpcStatusRequest("https://rpc.example").method, "getHealth");
   assert.equal(rpcStatusRequest("https://rpc.example").sendTransaction, false);
+  assert.equal(programLabelAllows({ JUP6: "jupiter" }), false);
+  assert.equal(quoteAvailability({}).mode, "unconfigured");
+  assert.equal(quoteAvailability({ JUPITER_API_KEY: "k", LIVE_TRADING_ENABLED: "1" }).execute, false);
+  assert.equal(quoteAvailability({ JUPITER_API_KEY: "k" }).simulated, false);
 });
 
 test("a v2 build body is prepared unsigned and a bad lookup table is rejected", () => {
@@ -77,6 +81,7 @@ test("the quote route calls v2 build and does not sign", async () => {
       SESSION_SECRET: "test-secret",
       CUSTOMER_ADMIN_EMAIL: "root@customer.test",
       JUPITER_API_KEY: "jupiter-test-key",
+      JUPITER_QUOTE_FETCH: "1",
       SOLANA_RPC_URL: "https://rpc.example",
     },
     resolveImpl: async () => ["203.0.113.10"],

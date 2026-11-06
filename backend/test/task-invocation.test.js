@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { admit, createTaskCache, reserve, serverPolicy, stopTask } from "../task-invocation.js";
+import { admit, createTaskCache, finish, loadTasks, reserve, saveTasks, serverPolicy, stopTask } from "../task-invocation.js";
 
 const member = { userId: "user-a", owner: false };
 const seat = { installed: ["ai-workspace", "thalos", "data-explorer", "trading"], role: "member" };
@@ -87,7 +87,10 @@ test("a stopped task stays stopped until a new parent id is explicit", () => {
     text: "rows",
     conversationId: "c1",
   }, policy, seat);
-  assert.equal(stopTask(cache, member, first.record.taskId).ok, true);
+  assert.equal(stopTask(cache, member, first.record.taskId).reason, "cancel_requested");
+  const settled = finish(cache, first.record, { completed: true, text: "late" });
+  assert.equal(settled.text, null);
+  assert.equal(settled.state, "cancelled");
   const resume = admit(cache, member, {
     taskId: first.record.taskId,
     capability: "view",
@@ -126,6 +129,7 @@ test("the same stopped body does not open a new task", () => {
     conversationId: "c1",
   }, policy, seat);
   stopTask(cache, member, first.record.taskId);
+  finish(cache, first.record, { completed: true, text: "late" });
   const again = admit(cache, member, {
     capability: "reasoning",
     app: "ai-workspace",
@@ -151,10 +155,23 @@ test("a missing membership row is not an install grant", () => {
   assert.equal(gate.reason, "effective_entitlement");
 });
 
+test("an empty conversation is rejected and a reloaded run is interrupted", () => {
+  const cache = createTaskCache();
+  const policy = serverPolicy(member, { VALHALLA_LOCAL_RELAY: "1" });
+  assert.equal(admit(cache, member, { capability: "chat", app: "ai-workspace", text: "hi" }, policy, seat).reason, "conversation_required");
+  const started = admit(cache, member, { capability: "chat", app: "ai-workspace", text: "hi", conversationId: "c1" }, policy, seat);
+  assert.equal(started.status, 200);
+  const store = { data: {}, flush() {} };
+  saveTasks(store, cache);
+  const loaded = loadTasks(store);
+  assert.equal(loaded.byId.get(started.record.taskId).state, "provider_interrupted");
+  assert.equal(loaded.byId.get(started.record.taskId).text, null);
+});
+
 test("unknown tools and apps are rejected", () => {
   const cache = createTaskCache();
   const policy = serverPolicy(member, { VALHALLA_LOCAL_RELAY: "1" });
-  assert.equal(admit(cache, member, { capability: "shell", app: "ai-workspace", text: "x" }, policy).reason, "capability_rejected");
-  assert.equal(admit(cache, member, { capability: "reasoning", app: "other", text: "x" }, policy).reason, "app_rejected");
-  assert.equal(admit(cache, member, { capability: "reasoning", app: "ai-workspace", text: "x", tool: "() => exec()" }, policy, seat).reason, "tool_rejected");
+  assert.equal(admit(cache, member, { capability: "shell", app: "ai-workspace", text: "x", conversationId: "c1" }, policy).reason, "capability_rejected");
+  assert.equal(admit(cache, member, { capability: "reasoning", app: "other", text: "x", conversationId: "c1" }, policy).reason, "app_rejected");
+  assert.equal(admit(cache, member, { capability: "reasoning", app: "ai-workspace", text: "x", tool: "() => exec()", conversationId: "c1" }, policy, seat).reason, "tool_rejected");
 });
