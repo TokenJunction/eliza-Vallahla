@@ -18,7 +18,7 @@
       <nav aria-label="Main navigation">
         <a href="#discover">Overview</a>
         <a href="/faq/">Help</a>
-        <a href="#access">Enter</a>
+        <a href="#access">Client access</a>
       </nav>
     </header>
 
@@ -30,6 +30,11 @@
             <img class="still" src="/assets/hero-ascent-poster.jpg" alt="" width="1280" height="720">
             <video id="hero-video" muted loop playsinline preload="none" poster="/assets/hero-ascent-poster.jpg" aria-describedby="hero-note"></video>
             <p class="sound-note">No sound</p>
+            <ol class="scenes" aria-label="Three scenes">
+              <li>Your trading terminal.</li>
+              <li>Your AI workspace.</li>
+              <li>Connected to Solana.</li>
+            </ol>
             <p class="motion-slot"><button class="motion-control" id="hero-motion" type="button" aria-pressed="false">Play motion</button></p>
           </div>
         </div>
@@ -39,19 +44,24 @@
       </figure>
 
       <section class="intro-note" id="discover" aria-labelledby="discover-title">
-        <h1 id="discover-title">A live Jupiter terminal with optional ElizaOS help.</h1>
+        <h1 id="discover-title">ValhallaOS</h1>
+        <p class="tagline">Trade Solana. Work with AI. Keep control.</p>
+        <p>Jupiter trading, with an AI workspace.</p>
         <p>ValhallaOS is a live Jupiter trading terminal inside an extensible AI workspace.</p>
         <p>Connect your own Solana wallet, inspect routes, quotes, slippage, and fees, and approve each explicit trade yourself.</p>
         <p>ElizaOS assistance is optional.</p>
         <p>Built for live Solana trading through Jupiter with ElizaOS assistance. Powered by Jupiter. This is not an official Jupiter product.</p>
-        <p>This Preview Release is pending until the service passes. A free visit can include sign-up and quote review. It does not promise a trading result, and this page has no checkout.</p>
+        <p>This Preview Release cannot take payment or swaps until the service passes. A free visit can include sign-up and quote review. It does not promise a trading result.</p>
+        <p><a href="#access">Preview the terminal</a></p>
+        <p>Planned hosted plan: $5 a month for a hosted workspace, terminal, and optional ElizaOS help. You bring your own provider, RPC, and Solana funds. There is no checkout and no billing connection. Joining the waitlist does not reserve a quote and does not promise a reply time.</p>
+        <p><button type="button" id="join-waitlist">Join waitlist</button></p>
         <p><a href="https://github.com/TokenJunction/eliza-valhalla">Repository</a></p>
       </section>
 
       <section class="access" id="access" aria-labelledby="access-title">
         <div class="access-body">
           <h2 id="access-title">Access ValhallaOS</h2>
-          <p>Optional. This opens the existing sign-in and account check. It does not connect a wallet on this page, and it does not collect a key. This public preview does not complete sign-in, because the account service is not connected here. Release is pending.</p>
+          <p>Optional. Preview the terminal opens the existing sign-in and account check. This page does not connect a wallet and does not collect a key. This public preview does not complete sign-in, because the account service is not connected here. Release is pending.</p>
           <form id="home-email" action="/app/" method="get">
             <label for="home-email-address">Email address</label>
             <input id="home-email-address" type="email" autocomplete="email" placeholder="you@example.com" required>
@@ -76,12 +86,18 @@
         <a href="/privacy/">Privacy</a>
         <a href="/disclaimer.html">Risk</a>
       </nav>
-      <p>Crypto is risky. Results are not guaranteed. This is not financial advice.</p>
-      <p class="legal-tm">by TokenJunction</p>
+      <p>A live trade is your own wallet transaction. You keep custody. Results are not guaranteed. This is not financial advice.</p>
+      <p class="legal-tm">© 2026 TokenJunction LLC</p>
     </footer>
   </div>
   <script src="/site-config.js"></script>
   <script src="/home.js"></script>
+  <dialog id="waitlist-dialog">
+    <h2>Planned hosted plan</h2>
+    <p>$5 a month is the planned price. There is no checkout and no billing connection. This does not reserve a quote and does not promise a reply time.</p>
+    <p><a href="mailto:hello@valhalla-app.xyz?subject=ValhallaOS%20waitlist">Email support to join the waitlist</a></p>
+    <button type="button" id="waitlist-close">Close</button>
+  </dialog>
   <script src="/home-motion.js"></script>
   <script src="/site-chrome.js"></script>
 </body>

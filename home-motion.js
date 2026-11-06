@@ -97,4 +97,12 @@
       if (reduceQuery.matches) stopMotion();
     });
   }
+
+  var waitlistOpen = document.getElementById("join-waitlist");
+  var waitlistDialog = document.getElementById("waitlist-dialog");
+  var waitlistClose = document.getElementById("waitlist-close");
+  if (waitlistOpen && waitlistDialog && waitlistDialog.showModal) {
+    waitlistOpen.addEventListener("click", function () { waitlistDialog.showModal(); });
+    if (waitlistClose) waitlistClose.addEventListener("click", function () { waitlistDialog.close(); });
+  }
 })();
