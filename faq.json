@@ -1,8 +1,8 @@
 [
   {
-    "q": "What is Valhalla?",
+    "q": "What is ValhallaOS?",
     "keys": ["what", "valhalla", "product"],
-    "a": "Valhalla™ is the website desk at /app first, then the Chrome extension. Telegram is coming soon. The Android app is in testing. TokenJunction LLC publishes it. It is not financial advice."
+    "a": "ValhallaOS is the website Workspace at /app first, then the Chrome extension. Telegram is coming soon. The Android app is in testing. TokenJunction LLC publishes it. It is not financial advice."
   },
   {
     "q": "Can the app move my funds?",
@@ -12,7 +12,7 @@
   {
     "q": "Is this a profit promise?",
     "keys": ["profit", "money", "rich", "gain", "return"],
-    "a": "No. Crypto is risky. You can lose money. Valhalla does not promise profit."
+    "a": "No. Crypto is risky. You can lose money. ValhallaOS does not promise profit."
   },
   {
     "q": "What is free and what is Pro?",

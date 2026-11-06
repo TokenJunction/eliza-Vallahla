@@ -88,7 +88,7 @@
     window.dispatchEvent(new Event("valhalla-keys"));
   });
   document.getElementById("shareX").addEventListener("click", function () {
-    var text = "I just set up my Valhalla™ desk https://valhalla-app.xyz";
+    var text = "I just set up my ValhallaOS desk https://valhalla-app.xyz";
     window.open("https://x.com/intent/post?text=" + encodeURIComponent(text), "_blank", "noopener");
   });
   document.getElementById("themePick").addEventListener("change", function (event) {

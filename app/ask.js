@@ -37,10 +37,10 @@
     var root = document.createElement("div");
     root.id = "askValhalla";
     root.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:40;font:13px/1.4 ui-monospace,monospace";
-    root.innerHTML = '<button type="button" id="askOpen" aria-label="Ask Thales" style="width:48px;height:48px;border-radius:24px;border:1px solid #ffb347;background:#1a140c;color:#ffb347">V</button>'
+    root.innerHTML = '<button type="button" id="askOpen" aria-label="Valhalla Guide" style="width:48px;height:48px;border-radius:24px;border:1px solid #ffb347;background:#1a140c;color:#ffb347">V</button>'
       + '<form id="askPanel" hidden style="width:min(320px,calc(100vw - 32px));background:#0a0a0e;border:1px solid #ffb347;padding:10px;margin-bottom:8px">'
-      + '<p id="askOut">Ask Thales a question. Not financial advice.</p>'
-      + '<textarea id="askText" rows="3" maxlength="500" aria-label="Ask Thales" placeholder="Ask Thales" style="width:100%"></textarea>'
+      + '<p id="askOut">Valhalla Guide. Not financial advice.</p>'
+      + '<textarea id="askText" rows="3" maxlength="500" aria-label="Valhalla Guide" placeholder="Ask Valhalla Guide" style="width:100%"></textarea>'
       + '<button type="submit">Send</button>'
       + '<p>Not financial advice.</p></form>';
     document.body.appendChild(root);
@@ -62,8 +62,8 @@
       document.getElementById("askText").value = "";
       return;
     }
-    var base = String(cfg().CHAT_URL || cfg().AGENT_API_URL || "");
-    if (!base) {
+    var base = String(cfg().CHAT_URL || "");
+    if (base.indexOf("https://") !== 0) {
       out.textContent = "Chat service is not configured. Please try again later. (V-CHAT-CONFIG)";
       return;
     }

@@ -204,7 +204,7 @@
       var node = document.getElementById(id);
       if (!node) return;
       node.hidden = !ok;
-      if (ok) node.textContent = "Affiliate link · we may earn a commission. Valhalla™ house promo. Not trading advice.";
+      if (ok) node.textContent = "Affiliate link · we may earn a commission. ValhallaOS house promo. Not trading advice.";
     });
   }
   function lab() {

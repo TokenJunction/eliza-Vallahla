@@ -68,7 +68,7 @@
       var row = document.createElement("div");
       row.className = "system-status-row system-status-" + line.state.toLowerCase();
       addText(row, "span", "system-status-dot", "");
-      addText(row, "span", "", line.name);
+      addText(row, "span", "", line.name === "MECHA BRAIN" ? "Guide" : line.name);
       addText(row, "strong", "", line.state);
       panel.appendChild(row);
     });

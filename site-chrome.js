@@ -36,10 +36,16 @@
       brand.href = "/";
       header.insertBefore(brand, header.firstChild);
     }
-    if (brand.querySelector("img")) brand.querySelector("img").alt = "Valhalla™ mech logo";
-    if (brand.innerHTML.indexOf("VALHALLA™") < 0) {
-      if (brand.innerHTML.indexOf("VALHALLA") >= 0) brand.innerHTML = brand.innerHTML.replace("VALHALLA", "VALHALLA™");
-      else brand.insertAdjacentHTML("beforeend", " VALHALLA™");
+    var brandImg = brand.querySelector("img");
+    if (brandImg) {
+      brandImg.alt = "ValhallaOS";
+      if (String(brandImg.getAttribute("src") || "").indexOf("mech.jpg") >= 0) brandImg.setAttribute("src", "/assets/mark.svg");
+    }
+    if (brand.textContent.indexOf("ValhallaOS") < 0) {
+      var brandName = document.createElement("span");
+      brandName.className = "brand-name";
+      brandName.textContent = "ValhallaOS";
+      brand.appendChild(brandName);
     }
     var nav = header.querySelector("nav") || header;
     var locked = header.dataset.nav === "locked";
@@ -90,7 +96,7 @@
     if (!foot.querySelector(".legal-tm")) {
       var legal = document.createElement("p");
       legal.className = "legal-tm";
-      legal.textContent = "Valhalla™ and the Valhalla mech logo are trademarks of TokenJunction LLC.";
+      legal.textContent = "ValhallaOS · TokenJunction LLC.";
       host.appendChild(legal);
     }
     var meta = document.querySelector('meta[name="twitter:site"]');
