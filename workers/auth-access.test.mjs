@@ -30,8 +30,22 @@ async function issue(payload) {
   return body + "." + base64url(signature);
 }
 
-async function request(payload) {
-  var token = await issue(Object.assign({ exp: Date.now() + 60000 }, payload));
+async function request(payload, rows) {
+  var sid = payload.sid || ("sid-" + String(payload.eh || "none"));
+  var claims = Object.assign({ exp: Date.now() + 60000, ver: 1, sid: sid, did: payload.did || "device" }, payload);
+  if (rows) {
+    rows["sess:" + sid] = {
+      sid: sid,
+      ver: 1,
+      eh: claims.eh,
+      did: claims.did,
+      exp: claims.exp,
+      code: claims.code === true,
+      google: claims.google === true,
+      revoked: false
+    };
+  }
+  var token = await issue(claims);
   return new Request("https://auth.example/auth/access", {
     headers: {
       authorization: "Bearer " + token,
@@ -53,9 +67,8 @@ function env(rows) {
 
 test("returns Pro status from the server account record", async () => {
   var emailHash = await hash("member@example.test");
-  var response = await worker.fetch(await request({ eh: emailHash, code: true }), env({
-    ["acct:" + emailHash]: { plan: "pro" }
-  }));
+  var rows = { ["acct:" + emailHash]: { plan: "pro" } };
+  var response = await worker.fetch(await request({ eh: emailHash, code: true }, rows), env(rows));
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     ok: true,
@@ -67,10 +80,12 @@ test("returns Pro status from the server account record", async () => {
 
 test("keeps free accounts locked and requires Google plus a verified code for owner access", async () => {
   var emailHash = await hash(EMAIL);
-  var emailOnly = await worker.fetch(await request({ eh: emailHash, code: true }), env({}));
+  var locked = {};
+  var emailOnly = await worker.fetch(await request({ eh: emailHash, code: true }, locked), env(locked));
   assert.equal((await emailOnly.json()).leader, false);
 
-  var response = await worker.fetch(await request({ eh: emailHash, code: true, google: true }), env({}));
+  var open = {};
+  var response = await worker.fetch(await request({ eh: emailHash, code: true, google: true }, open), env(open));
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     ok: true,
@@ -83,11 +98,15 @@ test("keeps free accounts locked and requires Google plus a verified code for ow
 test("a verified master admin alias is a leader only with Google and a code", async () => {
   var alias = "alias@example.test";
   var emailHash = await hash(alias);
-  var settings = env({});
+  var locked = {};
+  var settings = env(locked);
   settings.MASTER_ADMIN_EMAIL = alias;
-  var withoutGoogle = await worker.fetch(await request({ eh: emailHash, code: true }), settings);
+  var withoutGoogle = await worker.fetch(await request({ eh: emailHash, code: true }, locked), settings);
   assert.equal((await withoutGoogle.json()).leader, false);
-  var response = await worker.fetch(await request({ eh: emailHash, code: true, google: true }), settings);
+  var open = {};
+  var allowed = env(open);
+  allowed.MASTER_ADMIN_EMAIL = alias;
+  var response = await worker.fetch(await request({ eh: emailHash, code: true, google: true }, open), allowed);
   assert.equal((await response.json()).leader, true);
 });
 

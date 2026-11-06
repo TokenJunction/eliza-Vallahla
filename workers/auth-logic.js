@@ -1,8 +1,10 @@
 /** Pure sign-in rules. No secrets and no codes. */
 
 export function needSecondFactor(input) {
-  if (input && input.secondFactor === false) return false;
-  return !input || input.codeThisLogin !== true;
+  if (input && input.codeThisLogin === true) return false;
+  // Opting out does not skip the code for an unknown device or when the user asked to be challenged.
+  if (input && input.secondFactor === false && input.knownDevice === true && input.alwaysAsk !== true) return false;
+  return true;
 }
 
 export function codeDecision(record, now) {

@@ -25,7 +25,7 @@ export function builtinManifests() {
       icon: "bot",
       permissions: ["ai.local", "tasks"],
       dataScopes: ["app:ai-workspace"],
-      networkScopes: ["local-relay"],
+      networkScopes: [],
       providerCapabilities: ["chat"],
       license: "core",
       window: { title: "AI Workspace", w: 720, h: 520 },

@@ -6,7 +6,7 @@ import { createServer } from "../valhallaMasterEngineV35.js";
 
 async function boot(env = {}, options = {}) {
   const server = createServer({
-    env: { SESSION_SECRET: "test-secret", ...env },
+    env: { SESSION_SECRET: "test-secret", CUSTOMER_ADMIN_EMAIL: "root@customer.test", ...env },
     ...options,
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -67,8 +67,15 @@ test("a non-admin token cannot open admin metrics", async () => {
     body: { email: "root@customer.test", code: app.code, deviceId: "d1" },
   });
   const { issueSession } = await import("../authz.js");
-  const other = issueSession("test-secret", "member@customer.test");
-  const denied = await api(app.base, "/api/admin/metrics", { token: other });
+  const { issueBoundSession } = await import("../sessions.js");
+  const forged = issueSession("test-secret", "member@customer.test");
+  const hmac = await api(app.base, "/api/admin/metrics", { token: forged });
+  assert.equal(hmac.status, 401);
+  const member = issueBoundSession(app.server.state.store, {
+    email: "member@customer.test",
+    userId: "member-user",
+  });
+  const denied = await api(app.base, "/api/admin/metrics", { token: member.token });
   assert.equal(denied.status, 403);
   const allowed = await api(app.base, "/api/admin/metrics", { token: admin.json.token });
   assert.equal(allowed.status, 200);
@@ -82,7 +89,7 @@ test("factory mode only accepts MASTER_ADMIN_EMAIL", async () => {
     method: "POST",
     body: { email: "owner@factory.test", code: closed.code, deviceId: "d1" },
   });
-  assert.equal(missing.status, 403);
+  assert.equal(missing.status, 503);
   await closed.stop();
   const app = await boot({ VALHALLA_FACTORY: "1", MASTER_ADMIN_EMAIL: "owner@factory.test" });
   const denied = await api(app.base, "/api/bootstrap", {
@@ -186,7 +193,7 @@ test("workspace config round-trips without secrets", async () => {
   const exported = await api(app.base, "/api/setup/export", { token });
   assert.equal(exported.json.config.branding.name, "Northwind");
   assert.equal(JSON.stringify(exported.json).includes("SESSION_SECRET"), false);
-  const other = await boot();
+  const other = await boot({ CUSTOMER_ADMIN_EMAIL: "root@other.test" });
   const admin2 = await api(other.base, "/api/bootstrap", {
     method: "POST",
     body: { email: "root@other.test", code: other.code, deviceId: "d2" },
@@ -257,7 +264,7 @@ test("unsigned apps cannot launch and storage stays inside the app", async () =>
 test("payment claims are denied and replayed webhooks are rejected", async () => {
   const app = await boot({ LEMON_WEBHOOK_SECRET: "lemon-secret" });
   const claim = await api(app.base, "/api/billing/claim", { method: "POST", body: { plan: "pro" } });
-  assert.equal(claim.status, 403);
+  assert.equal(claim.status, 401);
   const { hmacHex } = await import("../commerce.js");
   const payload = { id: "evt-1", at: Date.now(), plan: "pro" };
   const raw = JSON.stringify(payload);

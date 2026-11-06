@@ -1,7 +1,13 @@
 import { createServer as createHttp, request as httpRequest } from "node:http";
 import { randomBytes } from "node:crypto";
+import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { bearer, isRoot, issueSession, normalizeEmail, readSession, resolveRoot } from "./authz.js";
+const require = createRequire(import.meta.url);
+const { generateForRequest } = require("./provider/channel.cjs");
+import { bearer, isRoot, normalizeEmail, resolveRoot } from "./authz.js";
+import { claimAdmin, cleanDisplayName, issueBoundSession, openStore, revokeBoundSession, tenantFor, verifyBoundSession } from "./sessions.js";
+import { runElizaTask } from "./eliza-route.js";
+import { assertPublicTarget } from "./ssrf.js";
 import { ADAPTER_VERSION, PROVIDER_CATALOG, blankProvider, testProvider } from "./adapters.js";
 import { NOT_CONFIGURED_APPS, builtinManifests, canLaunch, editionAllows, scopeKey } from "./apps.js";
 import { connectorRequest, listConnectors } from "./connectors.js";
@@ -16,6 +22,21 @@ import { inspectPrompt } from "./sanitize.js";
 import { createReflexion } from "./valhallaReflexionEngine.js";
 
 const APPS = builtinManifests();
+const MAX_BODY = 64 * 1024;
+const TERMS_VERSION = "2026-11-03";
+const JUPITER_QUOTE = "https://quote-api.jup.ag/v6/quote";
+
+function allowRate(buckets, ip) {
+  const now = Date.now();
+  const bucket = buckets.get(ip) || { count: 0, reset: now + 60_000 };
+  if (now > bucket.reset) {
+    bucket.count = 0;
+    bucket.reset = now + 60_000;
+  }
+  bucket.count += 1;
+  buckets.set(ip, bucket);
+  return bucket.count <= 120;
+}
 
 function json(res, status, body, origin) {
   const text = JSON.stringify(body);
@@ -33,11 +54,28 @@ function allowOrigin(req, env) {
 }
 
 async function readJson(req) {
+  if (req.parsedBody) return req.parsedBody;
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  const started = Date.now();
+  for await (const chunk of req) {
+    if (Date.now() - started > 5000) {
+      const error = new Error("timeout");
+      error.code = "timeout";
+      throw error;
+    }
+    size += chunk.length;
+    if (size > MAX_BODY) {
+      const error = new Error("too_large");
+      error.code = "too_large";
+      throw error;
+    }
+    chunks.push(chunk);
+  }
   const raw = Buffer.concat(chunks).toString("utf8");
-  if (!raw) return { raw: "", json: {} };
-  return { raw, json: JSON.parse(raw) };
+  const parsed = { raw, json: raw ? JSON.parse(raw) : {} };
+  req.parsedBody = parsed;
+  return parsed;
 }
 
 function createState(env) {
@@ -73,24 +111,28 @@ function createState(env) {
   };
 }
 
-function actor(req, state) {
-  return readSession(state.env.SESSION_SECRET, bearer(req));
+function actor(req) {
+  return req.session ? req.session.email : null;
 }
 
 function admin(req, state) {
-  const email = actor(req, state);
+  const email = actor(req);
   if (!email) return { status: 401, email: null };
   if (!isRoot(email, state.env, state.setup)) return { status: 403, email };
   return { status: 200, email };
 }
 
-function cloudAllowed(state) {
-  return Boolean(state.setup.license && state.setup.license.edition === "pro");
+function cloudAllowed() {
+  // A license object in process memory does not grant network or paid apps.
+  return false;
 }
 
 export function createServer(options = {}) {
   const env = options.env || process.env;
   const state = options.state || createState(env);
+  state.store = options.store || openStore(options.dataDir);
+  state.tasks = new Map();
+  const rateBuckets = new Map();
   const fetchImpl = options.fetchImpl || fetch;
   const bus = createBus({
     privateKey: env.VALHALLA_SIGNING_PRIVATE_KEY ? privateKeyFromPem(env.VALHALLA_SIGNING_PRIVATE_KEY) : null,
@@ -126,6 +168,10 @@ export function createServer(options = {}) {
     }
     try {
       const url = new URL(req.url || "/", "http://127.0.0.1");
+      const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "local").split(",")[0].trim();
+      if (!allowRate(rateBuckets, ip)) return json(res, 429, { ok: false, code: "V-RATE" }, origin);
+      const advertised = Number(req.headers["content-length"] || 0);
+      if (advertised > MAX_BODY) return json(res, 413, { ok: false, code: "V-SIZE" }, origin);
       if (req.method === "GET" && url.pathname === "/health") {
         json(res, 200, {
           ok: true,
@@ -137,32 +183,84 @@ export function createServer(options = {}) {
           redis: state.redis,
           signing: Boolean(env.VALHALLA_SIGNING_PRIVATE_KEY),
           factory: String(env.VALHALLA_FACTORY) === "1",
+          model: "unconfigured",
         }, origin);
         return;
+      }
+      if (req.method === "GET" && url.pathname === "/ready") {
+        const providers = state.setup.providers || {};
+        const modelUp = Object.values(providers).some((item) => item.tested === true && item.health === "up");
+        return json(res, state.store.durable ? 200 : 503, {
+          ready: state.store.durable === true,
+          components: {
+            store: state.store.durable ? "ready" : "memory",
+            auth: "live-session",
+            model: modelUp ? "available" : "unconfigured",
+            jupiter: "quote-only",
+            execution: "absent",
+            liveTrading: "disabled",
+          },
+        }, origin);
+      }
+      const openApi = url.pathname === "/api/bootstrap" || url.pathname.startsWith("/api/billing/webhook/");
+      if (url.pathname.startsWith("/api/") && !openApi) {
+        const session = verifyBoundSession(state.store, bearer(req));
+        if (!session) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        req.session = session;
       }
       if (req.method === "POST" && url.pathname === "/api/bootstrap") {
         const { json: body } = await readJson(req);
         const email = normalizeSafe(body.email);
         if (!env.SESSION_SECRET) return json(res, 503, { ok: false, error: "unavailable", code: "V-AUTH" }, origin);
-        if (body.code !== state.bootstrapCode) return json(res, 403, { ok: false, error: "denied", code: "V-AUTH" }, origin);
+        if (!state.bootstrapCode || body.code !== state.bootstrapCode) return json(res, 403, { ok: false, error: "denied", code: "V-AUTH" }, origin);
+        const configured = String(env.VALHALLA_FACTORY) === "1" ? env.MASTER_ADMIN_EMAIL : env.CUSTOMER_ADMIN_EMAIL;
+        if (!configured) return json(res, 503, { ok: false, error: "admin-not-configured", code: "V-AUTH" }, origin);
         const root = resolveRoot(env, { rootEmail: email });
-        if (!root || email !== root) return json(res, 403, { ok: false, error: "denied", code: "V-AUTH" }, origin);
-        const device = deviceId(body.deviceId || "local");
-        const rights = entitlements(state.setup.license);
-        if (state.devices.size >= rights.deviceLimit && !state.devices.has(device)) {
+        if (!root || email !== root || email !== normalizeSafe(configured)) {
+          return json(res, 403, { ok: false, error: "denied", code: "V-AUTH" }, origin);
+        }
+        const tenant = claimAdmin(state.store, root, configured);
+        if (!tenant) return json(res, 403, { ok: false, error: "denied", code: "V-AUTH" }, origin);
+        const device = body.deviceId ? deviceId(body.deviceId) : null;
+        const rights = entitlements(null);
+        if (device && state.devices.size >= rights.deviceLimit && !state.devices.has(device)) {
           return json(res, 403, { ok: false, error: "device-limit", code: "V-LIC" }, origin);
         }
-        state.devices.add(device);
-        if (String(env.VALHALLA_FACTORY) !== "1") state.setup.rootEmail = root;
-        return json(res, 200, { ok: true, token: issueSession(env.SESSION_SECRET, root), email: root }, origin);
+        if (device) state.devices.add(device);
+        state.setup.rootEmail = root;
+        state.bootstrapCode = null;
+        const session = issueBoundSession(state.store, { email: root, userId: tenant.userId, did: device });
+        return json(res, 200, { ok: true, token: session.token, email: root, tenantId: tenant.userId }, origin);
       }
 
       const who = admin(req, state);
-      const authed = actor(req, state);
+      const authed = actor(req);
 
       if (req.method === "GET" && url.pathname === "/api/me") {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
-        return json(res, 200, { ok: true, email: authed, root: isRoot(authed, env, state.setup) }, origin);
+        return json(res, 200, {
+          ok: true,
+          email: authed,
+          role: isRoot(authed, env, state.setup) ? "owner" : "member",
+          tenantId: req.session.userId,
+          displayName: state.store.data.preferences[req.session.userId] || null,
+          root: isRoot(authed, env, state.setup),
+        }, origin);
+      }
+      if (req.method === "PATCH" && url.pathname === "/api/me/preferences") {
+        if (!req.session) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
+        const { json: body } = await readJson(req);
+        const displayName = cleanDisplayName(body.displayName);
+        if (!displayName) return json(res, 400, { ok: false, error: "display-name", code: "V-AUTH" }, origin);
+        state.store.data.preferences[req.session.userId] = displayName;
+        state.store.flush();
+        return json(res, 200, {
+          ok: true,
+          displayName,
+          email: req.session.email,
+          role: isRoot(req.session.email, env, state.setup) ? "owner" : "member",
+          tenantId: req.session.userId,
+        }, origin);
       }
       if (req.method === "GET" && url.pathname === "/api/admin/metrics") {
         if (who.status !== 200) return json(res, who.status, { ok: false, code: "V-AUTH" }, origin);
@@ -206,7 +304,7 @@ export function createServer(options = {}) {
         provider.health = "unknown";
         if (body.apiKey) {
           if (!env.SETUP_MASTER_KEY) return json(res, 400, { ok: false, error: "use-env", code: "V-SEC" }, origin);
-          state.secrets.set(provider.id, encryptSecret(env.SETUP_MASTER_KEY, body.apiKey));
+          state.secrets.set(provider.id, encryptSecret(env.SETUP_MASTER_KEY, body.apiKey, req.session.userId));
           provider.secretStored = true;
           console.debug("valhalla", "V-SEC", redact(`stored ${provider.id}`));
         }
@@ -217,7 +315,13 @@ export function createServer(options = {}) {
         const { json: body } = await readJson(req);
         const provider = state.setup.providers[body.id];
         if (!provider) return json(res, 404, { ok: false, code: "V-ADP" }, origin);
-        const result = await testProvider(provider, fetchImpl, body.apiKey || "");
+        const allowed = provider.baseUrl ? await assertPublicTarget(provider.baseUrl, options.resolveImpl) : { ok: false };
+        if (!allowed.ok) {
+          provider.tested = false;
+          provider.health = "down";
+          return json(res, 200, { ok: false, provider: publicConfig(provider) }, origin);
+        }
+        const result = await testProvider(provider, fetchImpl, "");
         provider.tested = result.ok;
         provider.health = result.health;
         provider.enabled = false;
@@ -294,11 +398,24 @@ export function createServer(options = {}) {
         if (body.demo === true) {
           return json(res, 200, { ok: true, mode: "echo", text: `Local echo. Not a model response. ${inspected.text}` }, origin);
         }
-        const route = modelRoute(state.setup.providers, { role: body.role || body.capability || "chat" });
-        if (!route.available) {
-          return json(res, 503, { ok: false, error: route.reason, ...route, code: "V-AI" }, origin);
+        const generated = await generateForRequest({
+          text: inspected.text,
+          role: body.role,
+          capability: body.capability,
+        }, env, { fetchImpl });
+        if (!generated.completed) {
+          return json(res, 503, { ok: false, error: generated.reason, completed: false, offline: false, text: null, code: "V-AI" }, origin);
         }
-        return json(res, 200, { ok: true, ...route }, origin);
+        return json(res, 200, {
+          ok: true,
+          completed: true,
+          text: generated.text,
+          provider: generated.provider,
+          model: generated.model,
+          simulated: false,
+          audioGenerated: false,
+          code: "V-AI",
+        }, origin);
       }
       if (req.method === "POST" && url.pathname === "/api/privarun/local") {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
@@ -306,15 +423,15 @@ export function createServer(options = {}) {
         const { json: body } = await readJson(req);
         const inspected = inspectPrompt(body.text || "");
         if (!inspected.ok) return json(res, 400, { ok: false, error: "flagged", flags: inspected.flags, code: "V-AI" }, origin);
-        return json(res, 200, { ok: true, mode: "local-relay", text: inspected.text }, origin);
+        return json(res, 503, { ok: false, error: "unavailable", completed: false, text: null, code: "V-AI" }, origin);
       }
       if (req.method === "POST" && url.pathname === "/api/privarun/cloud") {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
         const { json: body } = await readJson(req);
         const inspected = inspectPrompt(body.text || "");
         if (!inspected.ok) return json(res, 400, { ok: false, error: "flagged", code: "V-AI" }, origin);
-        if (!cloudAllowed(state)) return json(res, 403, { ok: false, error: "license", code: "V-LIC" }, origin);
-        return json(res, 200, { ok: true, mode: "cloud", text: inspected.text }, origin);
+        if (!cloudAllowed()) return json(res, 403, { ok: false, error: "license", code: "V-LIC" }, origin);
+        return json(res, 503, { ok: false, error: "unavailable", completed: false, text: null, code: "V-AI" }, origin);
       }
       if (req.method === "GET" && url.pathname === "/api/rules") {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
@@ -492,8 +609,82 @@ export function createServer(options = {}) {
         if (envelope.error) return json(res, 503, { ok: false, error: envelope.error, code: "V-BUS" }, origin);
         return json(res, 200, { ok: true, envelope }, origin);
       }
+      if (req.method === "POST" && (url.pathname === "/api/eliza" || url.pathname === "/api/tasks")) {
+        const { json: body } = await readJson(req);
+        if (body.provider && body.provider !== "eliza" && url.pathname === "/api/eliza") {
+          return json(res, 503, { ok: false, status: "UNAVAILABLE", text: null, code: "V-ELIZA" }, origin);
+        }
+        if (url.pathname === "/api/tasks" && body.provider !== "eliza") {
+          const generated = await generateForRequest({
+            text: String(body.text || ""),
+            role: body.role,
+            capability: body.capability,
+          }, env, { fetchImpl });
+          if (!generated.completed) {
+            return json(res, 503, { ok: false, status: "UNAVAILABLE", text: null, completed: false, code: "V-AI" }, origin);
+          }
+          return json(res, 200, { ok: true, completed: true, text: generated.text, provider: generated.provider, simulated: false, audioGenerated: false }, origin);
+        }
+        const taskId = String(body.taskId || "");
+        if (taskId && state.tasks.has(taskId)) {
+          return json(res, 200, state.tasks.get(taskId), origin);
+        }
+        const result = await runElizaTask({
+          serviceUrl: env.ELIZA_SERVICE_URL,
+          serviceToken: env.ELIZA_SERVICE_TOKEN,
+          providerToken: env.DEEPSEEK_API_KEY || env.GEMINI_API_KEY || "",
+        }, { fetchImpl, resolveImpl: options.resolveImpl });
+        const payload = {
+          ok: false,
+          status: result.status,
+          text: null,
+          reason: result.reason,
+          calls: result.calls,
+          taskId: taskId || null,
+          app: body.app ? { id: String(body.app.id || ""), version: String(body.app.version || "") } : null,
+          code: "V-ELIZA",
+        };
+        if (taskId) state.tasks.set(taskId, payload);
+        return json(res, 503, payload, origin);
+      }
+      if (req.method === "GET" && url.pathname === "/api/jupiter/quote") {
+        const inputMint = url.searchParams.get("inputMint") || "";
+        const outputMint = url.searchParams.get("outputMint") || "";
+        const amount = url.searchParams.get("amount") || "";
+        if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(inputMint) || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(outputMint) || !/^[1-9]\d{0,17}$/.test(amount)) {
+          return json(res, 400, { ok: false, error: "quote-params", code: "V-QUOTE" }, origin);
+        }
+        const target = await assertPublicTarget(`${JUPITER_QUOTE}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}`, options.resolveImpl);
+        if (!target.ok || target.host !== "quote-api.jup.ag") {
+          return json(res, 403, { ok: false, error: "quote-host", code: "V-QUOTE" }, origin);
+        }
+        const response = await fetchImpl(target.href, { method: "GET", redirect: "error", signal: AbortSignal.timeout(8000) });
+        if (!response.ok) return json(res, 502, { ok: false, error: "quote-unavailable", executed: false, code: "V-QUOTE" }, origin);
+        const quote = await response.json();
+        return json(res, 200, { ok: true, quote, executed: false, mode: "paper", signature: null }, origin);
+      }
+      if (req.method === "POST" && url.pathname === "/api/jupiter/paper") {
+        const { json: body } = await readJson(req);
+        if (body.execute === true || body.sign === true || body.broadcast === true) {
+          return json(res, 403, { ok: false, error: "executor-absent", executed: false, signature: null, code: "V-QUOTE" }, origin);
+        }
+        if (!body.quote || typeof body.quote !== "object") {
+          return json(res, 400, { ok: false, error: "quote-required", executed: false, code: "V-QUOTE" }, origin);
+        }
+        return json(res, 200, {
+          ok: true,
+          mode: "paper",
+          executed: false,
+          signature: null,
+          tx: null,
+          outAmount: body.quote.outAmount || null,
+        }, origin);
+      }
       json(res, 404, { ok: false, code: "V-404" }, origin);
     } catch (err) {
+      if (err && (err.code === "too_large" || err.code === "timeout")) {
+        return json(res, err.code === "timeout" ? 408 : 413, { ok: false, code: "V-SIZE" }, origin);
+      }
       console.debug("valhalla", "V-500", redact(err instanceof Error ? err.message : "error"));
       json(res, 500, { ok: false, code: "V-500" }, origin);
     }

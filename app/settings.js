@@ -24,11 +24,18 @@
   }
 
   function fill() {
-    var keys = read(KEYS);
-    document.getElementById("keyBirdeye").value = keys.birdeye || "";
-    document.getElementById("keyRpc").value = keys.rpc || "";
-    document.getElementById("keyOtherName").value = keys.otherName || "";
-    document.getElementById("keyOther").value = keys.otherKey || "";
+    if (localStorage.getItem(KEYS)) {
+      localStorage.removeItem(KEYS);
+      var cleaned = document.getElementById("deleteNote");
+      if (cleaned) cleaned.textContent = "Saved provider keys were removed from this browser. Enter keys only in the server setup.";
+    }
+    ["keyBirdeye", "keyRpc", "keyOther", "keyOtherName"].forEach(function (id) {
+      var field = document.getElementById(id);
+      if (!field) return;
+      field.value = "";
+      field.type = id === "keyOtherName" ? "text" : "password";
+      field.autocomplete = "off";
+    });
     var who = session();
     var wallet = document.getElementById("setWallet");
     var share = document.getElementById("shareX");
@@ -41,7 +48,7 @@
     }
     var google = document.getElementById("setGoogle");
     google.textContent = who.kind === "google"
-      ? "Google: " + (who.email || who.name || "connected")
+      ? "Google: connected"
       : "Google: not connected. Use Continue with Google on the sign-in step.";
   }
 
@@ -56,7 +63,7 @@
   });
   document.getElementById("setCopy").addEventListener("click", function () {
     var who = session();
-    if (who.pubkey && navigator.clipboard) navigator.clipboard.writeText(who.pubkey);
+    if (who.pubkey && navigator.clipboard) navigator.clipboard.writeText(String(who.pubkey).slice(-4));
   });
   document.getElementById("setDisconnect").addEventListener("click", function () {
     localStorage.removeItem(SESSION);
@@ -66,12 +73,8 @@
   document.getElementById("saveKeys").addEventListener("click", function () {
     var rpc = document.getElementById("keyRpc").value.trim();
     if (rpc && rpc.indexOf("https://") !== 0) rpc = "";
-    localStorage.setItem(KEYS, JSON.stringify({
-      birdeye: document.getElementById("keyBirdeye").value.trim(),
-      rpc: rpc,
-      otherName: document.getElementById("keyOtherName").value.trim(),
-      otherKey: document.getElementById("keyOther").value.trim()
-    }));
+    var note = document.getElementById("deleteNote");
+    if (note) note.textContent = "This browser does not store provider keys. Add them on the server for this tenant.";
     window.dispatchEvent(new Event("valhalla-keys"));
   });
   var wipe = document.getElementById("deleteData");

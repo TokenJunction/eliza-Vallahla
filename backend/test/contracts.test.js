@@ -57,7 +57,7 @@ test("the desk document is paper only and a client plan does not grant a pro app
 });
 
 test("compute, catalog, and paper apps do not call a network", async () => {
-  const server = createServer({ env: { SESSION_SECRET: "test-secret" } });
+  const server = createServer({ env: { SESSION_SECRET: "test-secret", CUSTOMER_ADMIN_EMAIL: "root@customer.test" } });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   const boot = await fetch(base + "/api/bootstrap", {
