@@ -23,6 +23,13 @@
 #      npx wrangler deploy --config workers/auth.toml --env preview
 #    The preview migration tag is v1-auth-do and new_sqlite_classes is AuthDurableObject.
 # 5. Point a preview hostname at valhalla-auth-preview. Leave valhalla-auth in place.
+# The preview family sign-in stays off until the preview worker is configured.
+# Do not set these values on valhalla-auth. Do not store a raw password.
+# After the preview worker exists, set secrets on valhalla-auth-preview only:
+#   DEMO_AUTH_MODE=preview and AUTH_PREVIEW=1 as plain vars
+#   DEMO_USERNAME as a secret. Set it to DaisyGrace.
+#   DEMO_VERIFIER as a secret printed by: node workers/demo-verifier.mjs
+# The tool reads the password from stdin. It does not take the password as an argument.
 name = "valhalla-auth"
 main = "auth.js"
 compatibility_date = "2026-11-03"

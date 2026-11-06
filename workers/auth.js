@@ -8,6 +8,7 @@
  */
 import { browserName, needSecondFactor, validEmail } from "./auth-logic.js";
 import { AuthDurableObject } from "./auth-durable-object.mjs";
+import { demoConfigured, demoIdentity, demoMailbox, normalizeUsername, verifyPassword } from "./demo-auth.mjs";
 
 export { AuthDurableObject };
 
@@ -395,8 +396,9 @@ function leaderEmail(env) {
 }
 
 async function isLeader(env, session) {
+  if (!session || session.role === "demo") return false;
   var email = leaderEmail(env);
-  if (!email || !session || session.code !== true || session.google !== true) return false;
+  if (!email || session.code !== true || session.google !== true) return false;
   var expected = await sha256(email);
   return safeEqual(String(session.eh || ""), expected);
 }
@@ -488,6 +490,75 @@ function mailStatus(error) {
   return 503;
 }
 
+async function demoLogin(request, env, body) {
+  var username = normalizeUsername(body && body.username);
+  var password = String(body && body.password || "");
+  var configured = normalizeUsername(env.DEMO_USERNAME);
+  var now = Date.now();
+  var ip = request.headers.get("CF-Connecting-IP") || "none";
+  var ipStub = accountStub(env, "demo-ip:" + await sha256(ip));
+  var userStub = accountStub(env, "demo-user:" + await sha256(username || "invalid"));
+  if (!ipStub || !userStub) return json({ ok: false, error: "denied" }, 401, request);
+  var ipState = await ipStub.demoStrike("check", now);
+  var userState = await userStub.demoStrike("check", now);
+  var passwordOk = false;
+  try {
+    passwordOk = await verifyPassword(password, env.DEMO_VERIFIER);
+  } catch (err) {
+    passwordOk = false;
+  }
+  var nameOk = Boolean(username) && username.length === configured.length && safeEqual(username, configured);
+  if (!passwordOk || !nameOk || ipState.locked || userState.locked) {
+    if (!ipState.locked) await ipStub.demoStrike("fail", now);
+    if (!userState.locked) await userStub.demoStrike("fail", now);
+    return json({ ok: false, error: "denied" }, 401, request);
+  }
+  await ipStub.demoStrike("clear", now);
+  await userStub.demoStrike("clear", now);
+  var eh = await sha256(demoMailbox(configured));
+  var stub = accountStub(env, eh);
+  if (!stub) return json({ ok: false, error: "denied" }, 401, request);
+  var did = crypto.randomUUID();
+  var accessSid = crypto.randomUUID();
+  var cookieSid = crypto.randomUUID();
+  var browser = browserName(request.headers.get("User-Agent"));
+  var city = place(request);
+  var accessExp = now + 12 * 60 * 60 * 1000;
+  var cookieExp = now + 30 * 24 * 60 * 60 * 1000;
+  var saved = await stub.putSession({
+    eh: eh,
+    single: true,
+    account: {
+      devices: [{ id: did, created: now, last: now, city: city, browser: browser, revoked: false }],
+      ips: [],
+      signins: [{ at: now, city: city, browser: browser, ok: true }],
+      alwaysAsk: false,
+      role: "demo",
+      demoId: demoIdentity(eh),
+      plan: "pro"
+    },
+    sessions: [
+      { sid: accessSid, eh: eh, uid: "", did: did, exp: accessExp, v: 1, code: false, google: false, use: "access" },
+      { sid: cookieSid, eh: eh, uid: "", did: did, exp: cookieExp, v: 1, code: false, google: false, use: "device" }
+    ]
+  });
+  if (!saved || saved.ok !== true) return json({ ok: false, error: "denied" }, 401, request);
+  var session = await issue(env.DEVICE_COOKIE_SECRET, {
+    eh: eh, uid: "", did: did, exp: accessExp, code: false, google: false, sid: accessSid, sv: 1, use: "access", role: "demo"
+  });
+  var cookie = await issue(env.DEVICE_COOKIE_SECRET, {
+    eh: eh, uid: "", did: did, exp: cookieExp, code: false, google: false, sid: cookieSid, sv: 1, use: "device", role: "demo"
+  });
+  return json({
+    ok: true,
+    needCode: false,
+    role: "demo",
+    username: configured,
+    session: session,
+    redirect: "/dashboard/analytics/"
+  }, 200, request, { "set-cookie": deviceCookie(cookie) });
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(request) });
@@ -544,6 +615,10 @@ export default {
     if (url.pathname === "/auth/google" && request.method === "POST") {
       return json({ ok: false, error: "incomplete" }, 400, request);
     }
+    if (url.pathname === "/auth/demo" && request.method === "POST") {
+      if (!demoConfigured(env) || !storeReady(env)) return json({ ok: false, error: "not-found" }, 404, request);
+      return demoLogin(request, env, body);
+    }
     if (url.pathname === "/auth/email/start" && request.method === "POST") {
       if (!storeReady(env)) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       var email = String(body.email || "").toLowerCase().trim();
@@ -587,8 +662,9 @@ export default {
       var accessStub = accountStub(env, session.eh);
       var accessAccount = accessStub ? await accessStub.getAccount(session.eh) : null;
       if (!accessAccount || accessAccount.eh !== session.eh) return json({ ok: false, error: "session" }, 401, request);
-      var subscriber = accessAccount.plan === "pro";
-      var accessLeader = await isLeader(env, session);
+      var demoAccount = session.role === "demo" || accessAccount.role === "demo";
+      var subscriber = demoAccount ? false : accessAccount.plan === "pro";
+      var accessLeader = demoAccount ? false : await isLeader(env, session);
       return json({
         ok: true,
         plan: subscriber ? "pro" : "free",

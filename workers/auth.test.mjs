@@ -3,6 +3,7 @@ import { createHash, createHmac } from "node:crypto";
 import test from "node:test";
 import worker from "./auth.js";
 import { AuthDurableObject } from "./auth-durable-object.mjs";
+import { createVerifier } from "./demo-auth.mjs";
 import { namespace } from "./auth-memory-sql.mjs";
 
 var secret = "test-device-cookie-secret";
@@ -414,4 +415,117 @@ test("Supabase checks the fixed host, the user id, the callback, and the nonce",
     }), once.env);
     assert.equal(replay.status, 401);
   });
+});
+
+var demoPassword = "correct-horse-preview";
+
+async function armDemo(env) {
+  env.DEMO_AUTH_MODE = "preview";
+  env.AUTH_PREVIEW = "1";
+  env.DEMO_USERNAME = "DaisyGrace";
+  env.DEMO_VERIFIER = await createVerifier(demoPassword);
+}
+
+function demoRequest(body, ip) {
+  return new Request("https://auth.test/auth/demo", {
+    method: "POST",
+    headers: {
+      origin: "https://valhalla-app.xyz",
+      "content-type": "application/json",
+      "cf-connecting-ip": ip
+    },
+    body: JSON.stringify(body)
+  });
+}
+
+test("preview demo login is hidden until the preview flags are set", async () => {
+  var state = setup();
+  var hidden = await worker.fetch(demoRequest({ username: "DaisyGrace", password: demoPassword }, "203.0.113.8"), state.env);
+  assert.equal(hidden.status, 404);
+});
+
+test("preview demo login accepts the username in any case and grants no owner rights", async () => {
+  var state = setup();
+  await armDemo(state.env);
+  var customer = await grant(state.env, {
+    eh: leaderHash,
+    code: true,
+    google: true,
+    plan: "pro",
+    sid: "12121212-1212-4121-8121-121212121212",
+    did: "13131313-1313-4131-8131-131313131313"
+  });
+  var wrong = await worker.fetch(demoRequest({
+    username: "DaisyGrace",
+    password: "not-the-preview-secret",
+    email: leaderEmail
+  }, "203.0.113.9"), state.env);
+  assert.equal(wrong.status, 401);
+  assert.equal((await wrong.json()).error, "denied");
+  var signed = await worker.fetch(demoRequest({
+    username: "daisygrace",
+    password: demoPassword,
+    email: leaderEmail
+  }, "203.0.113.9"), state.env);
+  var body = await signed.json();
+  assert.equal(signed.status, 200);
+  assert.equal(body.role, "demo");
+  assert.equal(body.email, undefined);
+  assert.equal(body.redirect, "/dashboard/analytics/");
+  var access = await worker.fetch(request("/auth/access", "GET", undefined, body.session), state.env);
+  var view = await access.json();
+  assert.equal(view.leader, false);
+  assert.equal(view.subscriber, false);
+  assert.equal(view.plan, "free");
+  var role = await worker.fetch(request("/auth/leader", "POST", {}, body.session), state.env);
+  assert.equal((await role.json()).role, "member");
+  var chat = await worker.fetch(request("/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, body.session), state.env);
+  assert.equal(chat.status, 403);
+  var revoke = await worker.fetch(request("/auth/devices/revoke", "POST", {
+    id: "13131313-1313-4131-8131-131313131313"
+  }, body.session), state.env);
+  assert.equal(revoke.status, 403);
+  var owner = await worker.fetch(request("/auth/leader", "POST", {}, customer), state.env);
+  assert.equal((await owner.json()).role, "leader");
+  var ownerAccess = await worker.fetch(request("/auth/access", "GET", undefined, customer), state.env);
+  assert.equal((await ownerAccess.json()).subscriber, true);
+});
+
+test("preview demo locks the username and the IP after repeated failures", async () => {
+  var byName = setup();
+  await armDemo(byName.env);
+  for (var i = 0; i < 5; i += 1) {
+    var failed = await worker.fetch(demoRequest({
+      username: "DaisyGrace",
+      password: "not-the-preview-secret"
+    }, "203.0.113." + (20 + i)), byName.env);
+    assert.equal(failed.status, 401);
+  }
+  var named = await worker.fetch(demoRequest({
+    username: "DaisyGrace",
+    password: demoPassword
+  }, "203.0.113.50"), byName.env);
+  assert.equal(named.status, 401);
+  assert.equal((await named.json()).error, "denied");
+
+  var byIp = setup();
+  await armDemo(byIp.env);
+  for (var j = 0; j < 5; j += 1) {
+    var spray = await worker.fetch(demoRequest({
+      username: "othername" + j,
+      password: "not-the-preview-secret"
+    }, "198.51.100.20"), byIp.env);
+    assert.equal(spray.status, 401);
+  }
+  var blocked = await worker.fetch(demoRequest({
+    username: "DaisyGrace",
+    password: demoPassword
+  }, "198.51.100.20"), byIp.env);
+  assert.equal(blocked.status, 401);
+  var otherIp = await worker.fetch(demoRequest({
+    username: "DaisyGrace",
+    password: demoPassword
+  }, "198.51.100.21"), byIp.env);
+  assert.equal(otherIp.status, 200);
+  assert.equal((await otherIp.json()).role, "demo");
 });

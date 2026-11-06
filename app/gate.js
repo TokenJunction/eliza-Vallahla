@@ -270,6 +270,37 @@
     });
   }
 
+  function mountDemo(note) {
+    var form = document.getElementById("demoForm");
+    if (!form) return;
+    if (cfg.DEMO_AUTH_PREVIEW !== true) {
+      form.hidden = true;
+      return;
+    }
+    form.hidden = false;
+    if (form.dataset.bound) return;
+    form.dataset.bound = "1";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var userBox = document.getElementById("demoUsername");
+      var passBox = document.getElementById("demoPassword");
+      var username = userBox ? userBox.value : "";
+      var password = passBox ? passBox.value : "";
+      if (passBox) passBox.value = "";
+      postAuth("/auth/demo", { username: username, password: password }).then(function (body) {
+        if (!body.ok || body.role !== "demo" || !body.session || body.redirect === "/admin/master-control/") {
+          if (note) note.textContent = "That preview sign-in was not accepted.";
+          return;
+        }
+        sessionStorage.setItem("valhalla-auth-token", body.session);
+        sessionStorage.setItem("valhalla-auth", "1");
+        if (body.redirect === "/dashboard/analytics/") window.location.assign(body.redirect);
+      }).catch(function () {
+        if (note) note.textContent = "That preview sign-in was not accepted.";
+      });
+    });
+  }
+
   function startGoogle(note) {
     if (!termsOk()) return;
     import("/valhalla/google-auth.js").then(function (mod) {
@@ -392,6 +423,7 @@
       });
     }
     resumeGoogle(note);
+    mountDemo(note);
     if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
       google.hidden = false;
       google.onclick = function () { startGoogle(note); };

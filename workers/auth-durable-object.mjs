@@ -58,6 +58,7 @@ export class AuthDurableObject {
     sql.exec("CREATE TABLE IF NOT EXISTS nonces (id TEXT PRIMARY KEY, exp INTEGER NOT NULL, used INTEGER NOT NULL)");
     sql.exec("CREATE TABLE IF NOT EXISTS humans (id TEXT PRIMARY KEY, eh TEXT NOT NULL, provider TEXT NOT NULL)");
     sql.exec("CREATE TABLE IF NOT EXISTS revoked_devices (did TEXT PRIMARY KEY, eh TEXT NOT NULL)");
+    sql.exec("CREATE TABLE IF NOT EXISTS demo_lock (id TEXT PRIMARY KEY, fails INTEGER NOT NULL, locked_until INTEGER NOT NULL)");
   }
 
   async tx(fn) {
@@ -89,6 +90,8 @@ export class AuthDurableObject {
       var body = JSON.parse(row.body);
       body.eh = row.eh;
       body.alwaysAsk = body.alwaysAsk === true;
+      body.role = body.role === "demo" ? "demo" : "";
+      body.demoId = body.role === "demo" && String(body.demoId || "").indexOf("demo:") === 0 ? String(body.demoId) : "";
       body.devices = Array.isArray(body.devices) ? body.devices : [];
       body.ips = Array.isArray(body.ips) ? body.ips : [];
       body.signins = Array.isArray(body.signins) ? body.signins : [];
@@ -104,7 +107,9 @@ export class AuthDurableObject {
       ips: (account.ips || []).slice(0, 10),
       signins: (account.signins || []).slice(0, 20),
       alwaysAsk: account.alwaysAsk === true,
-      plan: typeof account.plan === "string" ? account.plan : ""
+      role: account.role === "demo" ? "demo" : "",
+      demoId: account.role === "demo" && String(account.demoId || "").indexOf("demo:") === 0 ? String(account.demoId) : "",
+      plan: account.role === "demo" ? "" : (typeof account.plan === "string" ? account.plan : "")
     };
     var json = JSON.stringify(body);
     var row = this.accountRow();
@@ -174,6 +179,7 @@ export class AuthDurableObject {
     this.requireEh(eh);
     if (record.account) this.writeBody(eh, record.account);
     else if (!this.accountRow()) this.writeBody(eh, blankAccount());
+    if (record.single === true) this.sql().exec("DELETE FROM sessions WHERE eh = ?", eh);
     var replaced = {};
     var stored = [];
     for (var i = 0; i < sessions.length; i += 1) {
@@ -255,6 +261,9 @@ export class AuthDurableObject {
     if (String(record.purpose) !== String(claims.use || "")) return null;
     if (String(record.uid || "") !== String(claims.uid || "")) return null;
     if (record.google === 1 && !UID.test(String(record.uid || ""))) return null;
+    var account = this.readBody(rowAccount);
+    var role = account.role === "demo" ? "demo" : "";
+    if (String(claims.role || "") !== role) return null;
     var revoked = this.first("SELECT did FROM revoked_devices WHERE did = ? AND eh = ?", record.did, eh);
     if (revoked) return null;
     if (Number(record.exp) < now) {
@@ -275,8 +284,38 @@ export class AuthDurableObject {
       sv: Number(record.v),
       code: record.code === 1,
       google: record.google === 1,
+      role: role,
       use: record.purpose
     };
+  }
+
+  async demoStrike(action, now) {
+    var self = this;
+    return this.enqueue(async function () {
+      await self.ready;
+      var clock = Number.isFinite(now) ? now : Date.now();
+      return self.tx(async function () {
+        var row = self.first("SELECT fails, locked_until FROM demo_lock WHERE id = ?", "lock");
+        var fails = row ? Number(row.fails) : 0;
+        var until = row ? Number(row.locked_until) : 0;
+        var locked = until > clock;
+        if (action === "clear") {
+          self.sql().exec("DELETE FROM demo_lock WHERE id = ?", "lock");
+          return { locked: false, fails: 0 };
+        }
+        if (action === "fail") {
+          if (!locked) {
+            fails += 1;
+            if (fails >= 5) until = clock + 15 * 60 * 1000;
+            if (!row) self.sql().exec("INSERT INTO demo_lock (id, fails, locked_until) VALUES ('lock', ?, ?)", fails, until);
+            else self.sql().exec("UPDATE demo_lock SET fails = ?, locked_until = ? WHERE id = ?", fails, until, "lock");
+            locked = fails >= 5;
+          }
+          return { locked: locked, fails: fails };
+        }
+        return { locked: locked, fails: fails };
+      });
+    });
   }
 
   async revokeDevice(eh, did) {
