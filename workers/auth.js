@@ -395,8 +395,15 @@ async function googleInfo(env, credential) {
   if (iss !== "https://accounts.google.com" && iss !== "accounts.google.com") return null;
   if (Number(info.exp) * 1000 < Date.now()) return null;
   if (!verified || !validEmail(info.email)) return null;
-  if (/gmail|drive/i.test(scope)) return null;
-  return { email: String(info.email).toLowerCase(), name: String(info.name || ""), picture: String(info.picture || "") };
+  if (/googleapis\.com\/auth\/(gmail|drive)/i.test(scope)) return null;
+  if (!/^\d+$/.test(String(info.sub || ""))) return null;
+  return {
+    email: String(info.email).toLowerCase(),
+    sub: String(info.sub),
+    nonce: String(info.nonce || ""),
+    name: String(info.name || ""),
+    picture: String(info.picture || "")
+  };
 }
 
 export default {
@@ -407,14 +414,28 @@ export default {
     }
     var url = new URL(request.url);
     var body = request.method === "POST" ? await request.json().catch(function () { return {}; }) : {};
+    if (url.pathname === "/auth/google/nonce" && request.method === "POST") {
+      if (ALLOWED.indexOf(request.headers.get("Origin") || "") < 0) return json({ ok: false, error: "origin" }, 403, request);
+      if (!env.AUTH_DO) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
+      var nonce = crypto.randomUUID().replace(/-/g, "");
+      await env.AUTH_DO.putCode("google-nonce:" + nonce);
+      return json({ ok: true, nonce: nonce }, 200, request);
+    }
     if (url.pathname === "/auth/google" && request.method === "POST") {
+      if (ALLOWED.indexOf(request.headers.get("Origin") || "") < 0) return json({ ok: false, error: "origin" }, 403, request);
       var info = await googleInfo(env, String(body.credential || ""));
       if (!info) return json({ ok: false, error: "google" }, 401, request);
+      if (!env.AUTH_DO) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
+      var postedNonce = String(body.nonce || "");
+      if (!postedNonce || info.nonce !== postedNonce || !(await env.AUTH_DO.consumeCode("google-nonce:" + postedNonce))) {
+        return json({ ok: false, error: "nonce" }, 401, request);
+      }
       var emailHash = await sha256(info.email);
       if (!(await turnstileOk(env, body.turnstile, emailHash))) return json({ ok: false, error: "turnstile" }, 403, request);
       var account = await accountOf(env, emailHash);
       await saveAccount(env, emailHash, account);
-      var next = await sessionFor(env, emailHash, request, false, true);
+      var leaderMailbox = info.email === leaderEmail(env);
+      var next = await sessionFor(env, emailHash, request, leaderMailbox ? false : true, true);
       if (next.disabled) return json({ ok: false, error: "auth-store-disabled" }, 503, request);
       if (next.needCode) {
         var sent = await startCode(env, info.email, request, true);
@@ -426,6 +447,8 @@ export default {
         needCode: false,
         email: maskEmail(info.email),
         session: next.session,
+        googleSub: info.sub,
+        supabaseAuthUid: null,
         redirect: await loginRedirect(env, emailHash, true)
       }, 200, request, { "set-cookie": [next.cookie].concat(next.apiCookies || []) });
     }
