@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#008080">
+  <meta name="description" content="ValhallaOS desktop: read-only system status and tools.">
+  <title>ValhallaOS Web98</title>
+  <link rel="stylesheet" href="/os/os.css">
+  <script src="/os/app.js" defer></script>
+</head>
+<body>
+  <svg class="icon-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="icon-computer" viewBox="0 0 32 32">
+      <path fill="#d4d0c8" stroke="#222" d="M3 4h26v19H3z"/><path fill="#000080" d="M5 6h22v14H5z"/>
+      <path fill="#fff" d="M8 9h6v1H8zm0 3h12v1H8zm0 3h9v1H8z"/>
+      <path fill="#d4d0c8" stroke="#222" d="M12 23h8v4h4v2H8v-2h4z"/>
+    </symbol>
+    <symbol id="icon-network" viewBox="0 0 32 32">
+      <path fill="none" stroke="#111" stroke-width="2" d="M9 10 16 6l7 4v11l-7 5-7-5zM9 10l7 5 7-5M16 15v11"/>
+      <path fill="#00a" stroke="#111" d="M13 3h6v6h-6zM5 18h7v7H5zm15 0h7v7h-7z"/>
+    </symbol>
+    <symbol id="icon-notepad" viewBox="0 0 32 32">
+      <path fill="#fff" stroke="#222" d="M7 3h19v26H7z"/><path fill="#000080" d="M7 3h19v5H7z"/>
+      <path stroke="#555" d="M11 12h11M11 16h11M11 20h11M11 24h8"/>
+    </symbol>
+    <symbol id="icon-browser" viewBox="0 0 32 32">
+      <path fill="#d4d0c8" stroke="#222" d="M3 5h26v22H3z"/><path fill="#000080" d="M5 7h22v5H5z"/>
+      <path fill="#fff" stroke="#777" d="M6 14h20v10H6z"/><path fill="#0a7" d="m11 18 5-3 5 3-5 4z"/>
+    </symbol>
+    <symbol id="icon-wallet" viewBox="0 0 32 32">
+      <path fill="#a0522d" stroke="#222" d="M5 8h21v19H5z"/><path fill="#c08040" stroke="#222" d="M5 8V5h17v4"/>
+      <path fill="#d4d0c8" stroke="#222" d="M19 14h11v8H19z"/><circle cx="23" cy="18" r="1.5" fill="#222"/>
+    </symbol>
+  </svg>
+
+  <main class="desktop" id="desktop">
+    <header class="desktop-heading">
+      <h1>ValhallaOS</h1>
+      <p>Web98 desktop · monitoring is read-only</p>
+    </header>
+
+    <nav class="desktop-icons" aria-label="Desktop applications">
+      <button class="desktop-icon" type="button" data-open="status">
+        <svg aria-hidden="true"><use href="#icon-computer"></use></svg><span>System Status</span>
+      </button>
+      <button class="desktop-icon" type="button" data-open="swarm">
+        <svg aria-hidden="true"><use href="#icon-network"></use></svg><span>A2A Monitor</span>
+      </button>
+      <button class="desktop-icon" type="button" data-open="memory">
+        <svg aria-hidden="true"><use href="#icon-notepad"></use></svg><span>Memory Inspector</span>
+      </button>
+      <button class="desktop-icon" type="button" data-open="browser">
+        <svg aria-hidden="true"><use href="#icon-browser"></use></svg><span>Web Shell</span>
+      </button>
+      <button class="desktop-icon" type="button" data-open="wallet">
+        <svg aria-hidden="true"><use href="#icon-wallet"></use></svg><span>Wallet Bridge</span>
+      </button>
+    </nav>
+
+    <section class="window" id="window-status" data-window="status" aria-labelledby="title-status"
+      style="left:clamp(150px, 24vw, 320px);top:76px;width:min(460px, calc(100vw - 32px));">
+      <header class="title-bar" data-drag-handle>
+        <h2 id="title-status">System Status</h2>
+        <div class="window-controls">
+          <button type="button" data-action="minimize" aria-label="Minimize System Status">_</button>
+          <button type="button" data-action="close" aria-label="Close System Status">×</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <p class="status-banner"><span class="status-light" aria-hidden="true"></span> Read-only service probe</p>
+        <dl class="status-list">
+          <div><dt>Backend</dt><dd id="backend-status" role="status">Checking…</dd></div>
+          <div><dt>Probe</dt><dd><code>/health</code></dd></div>
+          <div><dt>Last checked</dt><dd id="checked-at">—</dd></div>
+        </dl>
+        <button class="classic-button" type="button" data-refresh>Check again</button>
+        <p class="fine-print">This page does not start workers, trading, or remote tasks.</p>
+      </div>
+    </section>
+
+    <section class="window" id="window-swarm" data-window="swarm" aria-labelledby="title-swarm" hidden
+      style="left:clamp(190px, 34vw, 440px);top:128px;width:min(420px, calc(100vw - 32px));">
+      <header class="title-bar" data-drag-handle>
+        <h2 id="title-swarm">A2A Swarm Monitor</h2>
+        <div class="window-controls">
+          <button type="button" data-action="minimize" aria-label="Minimize A2A Swarm Monitor">_</button>
+          <button type="button" data-action="close" aria-label="Close A2A Swarm Monitor">×</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <p class="inset-panel" role="status">No live event connection is configured.</p>
+        <p>The message bus uses server-side Redis Pub/Sub. This browser view does not connect to Redis or display fabricated events.</p>
+        <p class="fine-print">A server-authenticated event stream is required to enable live telemetry.</p>
+      </div>
+    </section>
+
+    <section class="window" id="window-memory" data-window="memory" aria-labelledby="title-memory" hidden
+      style="left:clamp(220px, 40vw, 520px);top:178px;width:min(420px, calc(100vw - 32px));">
+      <header class="title-bar" data-drag-handle>
+        <h2 id="title-memory">Reflexion Memory Inspector</h2>
+        <div class="window-controls">
+          <button type="button" data-action="minimize" aria-label="Minimize Reflexion Memory Inspector">_</button>
+          <button type="button" data-action="close" aria-label="Close Reflexion Memory Inspector">×</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <p class="inset-panel" role="status">Procedural memory service is not connected.</p>
+        <pre class="memory-output">No memory data loaded.</pre>
+        <p class="fine-print">No local or cloud memory is read or changed by this page.</p>
+      </div>
+    </section>
+
+    <section class="window browser-window" id="window-browser" data-window="browser" aria-labelledby="title-browser" hidden
+      style="left:clamp(32px, 12vw, 170px);top:76px;width:min(760px, calc(100vw - 32px));">
+      <header class="title-bar" data-drag-handle>
+        <h2 id="title-browser">Valhalla Web Shell</h2>
+        <div class="window-controls">
+          <button type="button" data-action="minimize" aria-label="Minimize Valhalla Web Shell">_</button>
+          <button type="button" data-action="close" aria-label="Close Valhalla Web Shell">×</button>
+        </div>
+      </header>
+      <div class="window-body browser-body">
+        <div class="address-row">
+          <label for="browser-page">Address</label>
+          <select id="browser-page">
+            <option value="/">Valhalla home</option>
+            <option value="/status/">Service status</option>
+          </select>
+          <a class="classic-button" href="/" target="_blank" rel="noopener noreferrer">Open separately</a>
+        </div>
+        <iframe title="Valhalla site preview" src="/" loading="lazy"
+          sandbox="allow-forms allow-scripts" referrerpolicy="no-referrer"></iframe>
+      </div>
+    </section>
+
+    <section class="window" id="window-wallet" data-window="wallet" aria-labelledby="title-wallet" hidden
+      style="left:clamp(210px, 38vw, 480px);top:100px;width:min(390px, calc(100vw - 32px));">
+      <header class="title-bar" data-drag-handle>
+        <h2 id="title-wallet">Web3 Wallet Bridge</h2>
+        <div class="window-controls">
+          <button type="button" data-action="minimize" aria-label="Minimize Web3 Wallet Bridge">_</button>
+          <button type="button" data-action="close" aria-label="Close Web3 Wallet Bridge">×</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <p class="inset-panel">Wallet actions are unavailable in this read-only preview.</p>
+        <p>No transaction, signature request, key access, or wallet connection is initiated here.</p>
+      </div>
+    </section>
+
+    <div class="start-menu" id="start-menu" hidden>
+      <strong>ValhallaOS</strong>
+      <button type="button" data-open="status">System Status</button>
+      <button type="button" data-open="swarm">A2A Monitor</button>
+      <button type="button" data-open="memory">Memory Inspector</button>
+      <button type="button" data-open="browser">Web Shell</button>
+      <button type="button" data-open="wallet">Wallet Bridge</button>
+      <hr>
+      <p>Administrative controls require a verified server session and are not available here.</p>
+    </div>
+
+    <footer class="taskbar">
+      <button class="start-button" id="start-button" type="button" aria-expanded="false" aria-controls="start-menu">
+        <svg aria-hidden="true" viewBox="0 0 20 20"><path fill="#f33" d="M1 2 9 1v8H1z"/><path fill="#2a4" d="M11 1 19 0v9h-8z"/><path fill="#26c" d="M1 11h8v8l-8-1z"/><path fill="#fc3" d="M11 11h8v9l-8-1z"/></svg>
+        Start
+      </button>
+      <div class="taskbar-apps" id="taskbar-apps" aria-label="Open applications"></div>
+      <time class="taskbar-clock" id="clock"></time>
+    </footer>
+    <p class="sr-only" id="desktop-announcement" aria-live="polite"></p>
+  </main>
+</body>
+</html>

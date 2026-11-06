@@ -45,6 +45,8 @@ window.VALHALLA_SITE = {
   AGENT_API_URL: "",
   /* Public status only. Leave empty until the keeper is deployed. An empty value must show Status unavailable. */
   STATUS_URL: "",
+  /* Optional HTTPS JSON feed: {checkedAt: epoch_ms, state: QUEUED|BUILDING|TESTING|DEPLOYING|LIVE|FAILED, progress: 0..100, message?: string}. Empty means not reported. */
+  DEPLOYMENT_STATUS_URL: "",
   /* Leader turns the Hive on from the API. The site stays off while this is false. */
   HIVE_ENABLED: false,
   HIVE_URL: "",

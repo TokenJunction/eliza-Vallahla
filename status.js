@@ -19,6 +19,110 @@
     return item;
   }
 
+  function deploymentAge(checkedAt) {
+    var seconds = Math.max(0, Math.round((Date.now() - checkedAt) / 1000));
+    if (seconds < 60) return "updated just now";
+    return "updated " + Math.floor(seconds / 60) + "m ago";
+  }
+
+  function renderDeployment(host, data) {
+    var checkedAt = Number(data && data.checkedAt);
+    var progress = data && data.progress;
+    var state = data && data.state;
+    var states = ["QUEUED", "BUILDING", "TESTING", "DEPLOYING", "LIVE", "FAILED"];
+    var valid = Number.isFinite(checkedAt) &&
+      checkedAt > 0 &&
+      checkedAt <= Date.now() + 60000 &&
+      Date.now() - checkedAt <= 5 * 60 * 1000 &&
+      Number.isInteger(progress) &&
+      progress >= 0 &&
+      progress <= 100 &&
+      states.indexOf(state) >= 0 &&
+      ((state === "LIVE" && progress === 100) || (state !== "LIVE" && progress < 100));
+
+    while (host.firstChild) host.removeChild(host.firstChild);
+    host.className = "deployment-status";
+
+    var header = document.createElement("div");
+    header.className = "deployment-status-heading";
+    var label = addText(header, "strong", "", "DEPLOYMENT");
+    var value = addText(header, "span", "deployment-status-value", valid ? state : "NOT REPORTED");
+    host.appendChild(header);
+
+    var meter = document.createElement("div");
+    meter.className = "deployment-status-track";
+    meter.setAttribute("role", "progressbar");
+    meter.setAttribute("aria-label", "Deployment progress");
+    meter.setAttribute("aria-valuemin", "0");
+    meter.setAttribute("aria-valuemax", "100");
+
+    var fill = document.createElement("span");
+    fill.className = "deployment-status-fill";
+    meter.appendChild(fill);
+    host.appendChild(meter);
+
+    var detail = addText(host, "span", "deployment-status-detail",
+      valid ? (progress + "% · " + deploymentAge(checkedAt)) :
+        "No current deployment update is available.");
+
+    if (valid) {
+      meter.setAttribute("aria-valuenow", String(progress));
+      meter.setAttribute("aria-valuetext", progress + "% · " + state.toLowerCase());
+      fill.style.width = progress + "%";
+      host.classList.add("deployment-status-" + state.toLowerCase());
+      if (typeof data.message === "string" && data.message.trim()) {
+        detail.textContent = data.message.trim().slice(0, 140) + " · " +
+          progress + "% · " + deploymentAge(checkedAt);
+      }
+    } else {
+      meter.setAttribute("aria-valuetext", "No deployment progress reported");
+      meter.classList.add("deployment-status-track-unreported");
+      label.setAttribute("aria-label", "Deployment status not reported");
+      value.setAttribute("title", "Configure DEPLOYMENT_STATUS_URL to show verified deployment updates.");
+    }
+  }
+
+  function mountDeployment(target) {
+    if (!target || target.dataset.deploymentBound === "1") return;
+    target.dataset.deploymentBound = "1";
+    var host = document.createElement("div");
+    host.className = "deployment-status";
+    target.appendChild(host);
+
+    async function pull() {
+      var url = String((root.VALHALLA_SITE || {}).DEPLOYMENT_STATUS_URL || "").trim();
+      if (!url) {
+        renderDeployment(host, null);
+        return;
+      }
+      if (!/^https:\/\//i.test(url)) {
+        renderDeployment(host, null);
+        console.warn("valhalla", "V-DEPLOYMENT", "Deployment status URL must use HTTPS.");
+        return;
+      }
+
+      var controller = typeof AbortController === "function" ? new AbortController() : null;
+      var timeout = controller ? window.setTimeout(function () { controller.abort(); }, 8000) : 0;
+      try {
+        var response = await fetch(url, {
+          cache: "no-store",
+          credentials: "omit",
+          signal: controller ? controller.signal : undefined
+        });
+        if (!response.ok) throw new Error("status " + response.status);
+        renderDeployment(host, await response.json());
+      } catch (err) {
+        renderDeployment(host, null);
+        console.debug("valhalla", "V-DEPLOYMENT", String(err && err.message || err));
+      } finally {
+        if (timeout) window.clearTimeout(timeout);
+      }
+    }
+
+    pull();
+    window.setInterval(pull, 30000);
+  }
+
   function unavailable(host, message) {
     clear(host);
     host.className = "system-status system-status-unavailable";
@@ -122,11 +226,15 @@
 
   function boot() {
     document.querySelectorAll("[data-status-slot]").forEach(mount);
+    document.querySelectorAll("[data-status-slot]").forEach(mountDeployment);
     var board = document.getElementById("statusBoard");
-    if (board) mount(board);
+    if (board) {
+      mount(board);
+      mountDeployment(board);
+    }
   }
 
-  root.ValhallaStatus = { mount: mount };
+  root.ValhallaStatus = { mount: mount, mountDeployment: mountDeployment };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })(typeof globalThis !== "undefined" ? globalThis : this);

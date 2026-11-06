@@ -199,6 +199,30 @@ body[data-page="app"] .system-status-hive {
   color: var(--muted);
 }
 
+body[data-page="app"] .deployment-status {
+  grid-template-columns: minmax(74px, auto) minmax(60px, 1fr);
+  gap: 4px 8px;
+  margin-top: 4px;
+  padding: 5px 8px;
+  border-color: rgba(255, 179, 71, .16);
+  border-radius: 7px;
+  background: rgba(7, 8, 10, .72);
+  color: var(--text);
+  font-size: 8px;
+}
+
+body[data-page="app"] .deployment-status-heading strong {
+  color: #69ffc0;
+}
+
+body[data-page="app"] .deployment-status-track {
+  height: 6px;
+}
+
+body[data-page="app"] .deployment-status-detail {
+  color: var(--muted);
+}
+
 body[data-page="app"] .badge,
 body[data-page="app"] .btn,
 body[data-page="app"] button {
