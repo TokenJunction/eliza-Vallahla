@@ -1,4 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
+import { createBudgetLedger } from "./budget.js";
+import { classifyAction, executionDecision } from "./constitution.js";
 
 // Client role, budget, localPcAwake, transportHint, and allowCloud are preferences.
 // This module overwrites them. A forged role does not change the session.
@@ -17,27 +19,37 @@ const CAPS = new Set(CAPABILITIES);
 const TOOL_SET = new Set(TOOLS);
 
 export function createTaskCache() {
-  return { byKey: new Map(), byId: new Map(), tenants: new Map(), conversations: {} };
+  return { byKey: new Map(), byId: new Map(), tenants: new Map(), conversations: {}, budget: createBudgetLedger() };
 }
 
 export function serverPolicy(session, env = {}) {
   const remaining = Number(env.VALHALLA_BUDGET_USD || 0);
+  const decision = executionDecision(session, env);
   const cloudKey = Boolean(env.DEEPSEEK_API_KEY || env.GEMINI_API_KEY || env.GOOGLE_GENERATIVE_AI_API_KEY);
   const cloudModel = Boolean(env.DEEPSEEK_MODEL || env.GEMINI_MODEL);
   return {
     subject: session.userId,
     tenantId: session.userId,
     sessionRole: session.owner === true ? "owner" : "member",
-    localRelay: String(env.VALHALLA_LOCAL_RELAY) === "1",
-    allowCloud: cloudKey && cloudModel && remaining > 0,
+    localRelay: decision.environment === "local",
+    allowCloud: decision.environment === "cloud",
+    available: decision.available === true,
+    environment: decision.environment,
+    fallback: decision.fallback === true,
+    policyId: decision.policyId || "nominal",
+    spendCeilingUsd: decision.spendCeilingUsd || 0,
+    liveTrading: false,
+    ownerEmail: null,
+    distributed: false,
+    atomic: false,
     remainingUsd: Number.isFinite(remaining) && remaining > 0 ? remaining : 0,
     cloudEstimateUsd: CLOUD_ESTIMATE_USD,
     production: env.NODE_ENV === "production",
     durable: env.VALHALLA_STORE_DURABLE === "1",
     models: [
-      env.VALHALLA_LOCAL_RELAY === "1" ? (env.OLLAMA_MODEL || "qwen2.5-coder:14b") : "",
-      env.DEEPSEEK_MODEL || "",
-      env.GEMINI_MODEL || "",
+      decision.environment === "local" ? (env.OLLAMA_MODEL || "qwen2.5-coder:14b") : "",
+      cloudKey && cloudModel ? (env.DEEPSEEK_MODEL || "") : "",
+      cloudKey && cloudModel ? (env.GEMINI_MODEL || "") : "",
     ].filter(Boolean),
   };
 }
@@ -45,6 +57,7 @@ export function serverPolicy(session, env = {}) {
 const KNOWN_FIELDS = new Set([
   "capability", "app", "text", "source", "conversationId", "provider", "model",
   "tool", "query", "taskId", "parentTaskId", "role", "callUsd", "allowCloud", "localPcAwake",
+  "effect", "environment",
 ]);
 const QUERY_FIELDS = new Set(["inputMint", "outputMint", "amount"]);
 
@@ -98,27 +111,30 @@ function freshId() {
   return randomBytes(16).toString("hex");
 }
 
-function bucket(cache, tenantId, capUsd) {
-  if (!cache.tenants) cache.tenants = new Map();
-  if (!cache.tenants.has(tenantId)) cache.tenants.set(tenantId, { capUsd, reserved: 0 });
-  const row = cache.tenants.get(tenantId);
-  row.capUsd = capUsd;
-  return row;
-}
-
 export function reserve(cache, tenantId, amount, capUsd) {
-  if (!(amount > 0)) return { ok: true, reserved: 0 };
-  const row = bucket(cache, tenantId, capUsd);
-  if (row.reserved + amount > row.capUsd) return { ok: false, reserved: 0 };
-  row.reserved += amount;
-  return { ok: true, reserved: amount };
+  if (!cache.budget) cache.budget = createBudgetLedger();
+  const result = cache.budget.select({
+    tenantId,
+    jobId: randomBytes(8).toString("hex"),
+    amount: amount > 0 ? amount : 0,
+    capUsd,
+  });
+  return { ok: result.ok === true, reserved: result.ok ? result.reserved : 0, atomic: false, distributed: false };
 }
 
-export function release(cache, tenantId, amount) {
-  if (!(amount > 0) || !cache.tenants) return;
-  const row = cache.tenants.get(tenantId);
-  if (!row) return;
-  row.reserved = Math.max(0, row.reserved - amount);
+function settleSpend(cache, record, actualUsd) {
+  if (!cache || !cache.budget || !record || !record.jobId || record.settled === true) return;
+  const settled = cache.budget.settle(record.jobId, actualUsd);
+  if (!settled.ok) return;
+  record.settled = true;
+  record.spentUsd = settled.spentUsd;
+  record.billing = {
+    localCpuUsd: 0,
+    cloudHoldUsd: 0,
+    cloudCostUsd: record.environment === "cloud" ? settled.spentUsd : 0,
+    disclosed: true,
+    invoice: false,
+  };
 }
 
 function publicRecord(record) {
@@ -134,6 +150,11 @@ function publicRecord(record) {
     text: record.text,
     chargeUsd: record.chargeUsd,
     chargeLabel: "server-usage-cap",
+    effect: record.effect || null,
+    environment: record.environment || null,
+    fallback: record.fallback === true,
+    liveTrading: false,
+    billing: record.billing || null,
     replay: record.replay === true,
     reason: record.reason || null,
     trace: record.trace || null,
@@ -204,12 +225,28 @@ export function admit(cache, session, body, policy, membership = { installed: []
     if (!parent.stopped) return { ok: false, status: 409, reason: "parent_open" };
     parentTaskId = parent.taskId;
   }
-  const local = policy.localRelay === true;
-  const chargeUsd = local ? 0 : policy.cloudEstimateUsd;
-  if (!local && !policy.allowCloud) {
-    return { ok: false, status: 503, reason: "unavailable", text: null, chargeUsd: 0 };
+  const classified = classifyAction(body);
+  if (!classified.ok || classified.execute === true) {
+    return { ok: false, status: 400, reason: classified.reason || "effect_rejected" };
   }
-  const held = reserve(cache, session.userId, chargeUsd, policy.remainingUsd);
+  if (policy.liveTrading === true) return { ok: false, status: 403, reason: "live_trading_disabled" };
+  const local = Object.prototype.hasOwnProperty.call(policy, "environment")
+    ? policy.environment === "local"
+    : policy.localRelay === true;
+  const available = Object.prototype.hasOwnProperty.call(policy, "available")
+    ? policy.available === true
+    : (local || policy.allowCloud === true);
+  const chargeUsd = local ? 0 : policy.cloudEstimateUsd;
+  if (!available) {
+    return { ok: false, status: 503, reason: "unavailable", text: null, chargeUsd: 0, fallback: false };
+  }
+  if (!cache.budget) cache.budget = createBudgetLedger();
+  const held = cache.budget.select({
+    tenantId: session.userId,
+    jobId: key,
+    amount: chargeUsd,
+    capUsd: local ? 0 : policy.remainingUsd,
+  });
   if (!held.ok) {
     return {
       ok: false,
@@ -234,6 +271,18 @@ export function admit(cache, session, body, policy, membership = { installed: []
     tool: body.tool || "none",
     provider: body.provider || "",
     chargeUsd,
+    jobId: key,
+    effect: classified.effect,
+    environment: local ? "local" : "cloud",
+    fallback: local ? false : policy.fallback === true,
+    liveTrading: false,
+    billing: {
+      localCpuUsd: 0,
+      cloudHoldUsd: local ? 0 : chargeUsd,
+      cloudCostUsd: 0,
+      disclosed: true,
+      invoice: false,
+    },
     text: null,
     completed: false,
     stopped: false,
@@ -268,7 +317,7 @@ export function finish(cache, record, generated) {
     record.ok = false;
     record.text = null;
     record.reason = "cancelled";
-    release(cache, record.tenantId, record.chargeUsd);
+    settleSpend(cache, record, 0);
   } else if (text) {
     record.state = "done";
     record.completed = true;
@@ -283,8 +332,13 @@ export function finish(cache, record, generated) {
     record.reason = record.tool === "paper-quote" && !quoteOk
       ? "tool_unauthorized"
       : (generated && generated.reason) || "unavailable";
-    release(cache, record.tenantId, record.chargeUsd);
+    settleSpend(cache, record, 0);
   }
+  if (text && record.environment === "cloud") {
+    const actual = Number(generated && generated.actualUsd);
+    settleSpend(cache, record, Number.isFinite(actual) ? actual : 0);
+  }
+  if (text && record.environment !== "cloud") settleSpend(cache, record, 0);
   if (generated && (generated.provider || generated.model)) {
     record.trace = {
       route: generated.provider || null,
