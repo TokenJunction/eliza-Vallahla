@@ -1,4 +1,5 @@
 import { accessRequest, healthReady, normalizeAccess } from "./access.js";
+import { serviceOrigin } from "./origins.js";
 
 var desktop = document.getElementById("desktop");
 var gate = document.getElementById("session-gate");
@@ -32,8 +33,8 @@ function showAscent() {
     return;
   }
   var site = window.VALHALLA_SITE || {};
-  var base = String(site.AGENT_API_URL || "").replace(/\/$/, "");
-  if (base.indexOf("https://") !== 0) {
+  var base = serviceOrigin(site.AGENT_API_URL, location.hostname);
+  if (!base) {
     if (ready) ready.textContent = "Not configured. No service was called.";
     return;
   }
@@ -76,6 +77,8 @@ function enterDesk() {
   shown.textContent = label;
   if (ascent) ascent.hidden = true;
   if (desktop) desktop.hidden = false;
+  var trading = document.querySelector('[data-open="trading"]');
+  if (trading) trading.click();
 }
 
 var skip = document.getElementById("ascent-skip");
@@ -101,7 +104,7 @@ if (localPreview()) {
   } catch (error) {
     token = "";
   }
-  var request = accessRequest(window.VALHALLA_SITE || {}, token);
+  var request = accessRequest(window.VALHALLA_SITE || {}, token, location.hostname);
   if (!request) {
     if (status) {
       status.textContent =

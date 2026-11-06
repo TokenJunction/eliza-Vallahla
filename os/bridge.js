@@ -52,7 +52,7 @@
 
   async function connect(name) {
     if (busy) return;
-    var provider = name === 'solflare' ? window.solflare : ethereumProvider();
+    var provider = name === 'solflare' ? window.solflare : (ethereumProvider() && ethereumProvider().solana ? ethereumProvider() : null);
     if (!provider) {
       status.textContent = (name === 'solflare' ? 'Solflare' : 'MetaMask') + ' was not detected. Install or enable its browser extension, then try again.';
       return;
@@ -66,8 +66,14 @@
         var result = await provider.connect();
         address = String(result && result.publicKey || provider.publicKey || '');
       } else {
-        var accounts = await provider.request({ method: 'eth_requestAccounts' });
-        address = Array.isArray(accounts) ? String(accounts[0] || '') : '';
+        var solana = provider.solana;
+        if (!solana || typeof solana.connect !== 'function') {
+          status.textContent = 'MetaMask Solana was not detected. Nothing was signed.';
+          return;
+        }
+        var solanaResult = await solana.connect();
+        var key = solanaResult && solanaResult.publicKey || solana.publicKey;
+        address = key && typeof key.toString === 'function' ? key.toString() : String(key || '');
       }
       if (!address) throw new Error('The wallet returned no account.');
       removeListeners();
@@ -185,14 +191,35 @@
         body: taskCall.body,
         signal: controller.signal
       });
-      var body = await response.json();
-      var reply = access.replyText(body);
-      if (!reply) {
-        chatStatus.textContent = 'Command unavailable. No reply was returned.';
+      var body = await response.json().catch(function () { return {}; });
+      var outcome = access.taskState(response.status, body);
+      var started = Date.now();
+      while (outcome.state === 'pending' && outcome.taskId && Date.now() - started < access.TASK_POLL_MAX_MS) {
+        taskId = outcome.taskId;
+        chatStatus.textContent = 'Pending. This command is not finished.';
+        await new Promise(function (resolve) { window.setTimeout(resolve, access.TASK_POLL_MS); });
+        var readCall = access.taskReadRequest(window.VALHALLA_SITE || {}, sessionToken, outcome.taskId, location.hostname);
+        if (!readCall) break;
+        var readResponse = await fetch(readCall.url, {
+          method: 'GET',
+          credentials: readCall.credentials,
+          headers: readCall.headers,
+          signal: controller.signal
+        });
+        var readBody = await readResponse.json().catch(function () { return {}; });
+        outcome = access.taskState(readResponse.status, readBody);
+      }
+      taskId = outcome.taskId || taskId;
+      if (typeof body.conversationId === 'string' && body.conversationId && body.conversationId !== '0') {
+        taskConversation = body.conversationId;
+      }
+      if (outcome.state !== 'done' || payload.app !== 'ai-workspace') {
+        chatStatus.textContent = outcome.state === 'pending'
+          ? 'Still pending. Retry with a new request. Nothing was marked finished.'
+          : 'Command failed. HTTP ' + outcome.code + '.';
         return;
       }
-      taskId = typeof body.taskId === 'string' ? body.taskId : '';
-      if (typeof body.conversationId === 'string' && body.conversationId) taskConversation = body.conversationId;
+      var reply = outcome.text;
       message('YOU', text);
       message('COMMAND', reply);
       input.value = '';
@@ -245,10 +272,12 @@
         headers: taskCall.headers,
         body: access.serializeTaskBody({ taskId: taskId })
       });
-      var body = await response.json();
-      chatStatus.textContent = response.ok && body && body.ok === true
-        ? 'Stop completed.'
-        : 'Stop was not confirmed.';
+      var body = await response.json().catch(function () { return {}; });
+      var stopped = access.stopState(response.status, body);
+      if (stopped.taskId) taskId = stopped.taskId;
+      chatStatus.textContent = stopped.state === 'cancel_requested'
+        ? 'Stop requested. The server cancelled this task.'
+        : 'Stop was not confirmed. HTTP ' + stopped.code + '.';
     } catch {
       chatStatus.textContent = 'Stop was not confirmed.';
     }

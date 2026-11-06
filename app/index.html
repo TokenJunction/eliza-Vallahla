@@ -71,11 +71,8 @@
       <label>Email <input id="createEmail" type="email" autocomplete="email" required></label>
       <label>Preferred wallet
         <select id="createWallet">
-          <option value="phantom">Phantom</option>
           <option value="solflare">Solflare</option>
-          <option value="backpack">Backpack</option>
-          <option value="walletconnect">WalletConnect</option>
-          <option value="phantom-google">Google via Phantom</option>
+          <option value="metamask">MetaMask</option>
         </select>
       </label>
       <button type="submit">Create account</button>
@@ -87,7 +84,7 @@
     <button id="googleBtn" type="button">Sign in with Google</button>
     <div id="googleSlot"></div>
     <p><a class="btn" href="/os/">Open the ValhallaOS Workspace</a></p>
-    <button id="openPaper" type="button">Open the paper desk</button>
+    <button id="openPaper" type="button">Look around without a wallet</button>
     <p id="accountNote" class="note" role="status"></p>
     <p class="note">We email a 6-digit code to confirm it is you. To recover access, sign in with the email associated with your account.</p>
   </div>
@@ -121,14 +118,14 @@
 <section id="desk" class="hud" hidden>
   <header class="topbar">
     <img class="logo-mech" src="/assets/mark.svg" alt="ValhallaOS">
-    <div class="word"><strong>ValhallaOS</strong><span>Workspace · paper-first</span></div>
+    <div class="word"><strong>ValhallaOS</strong><span>Trading · ValhallaOS</span></div>
     <span class="badge" id="leaderBadge" hidden>Leader</span>
     <button id="leaderOpen" type="button" aria-controls="leadership" aria-expanded="false" hidden>Leadership</button>
     <span class="badge" id="tierBadge">FREE</span>
     <button id="upgradeBtn" type="button">Upgrade</button>
     <span class="badge" id="modeBadge">DEMO</span>
     <div class="system-status-slot" data-status-slot></div>
-    <div class="tape" id="tape">PAPER MODE · no orders are sent from this website</div>
+    <div class="tape" id="tape">JUPITER TERMINAL · no order is sent until you sign</div>
     <div class="chip" id="walletChip"></div>
     <img id="googleAvatar" alt="" width="32" height="32" hidden>
     <a class="btn" href="/os/" aria-label="Open ValhallaOS">ValhallaOS</a>

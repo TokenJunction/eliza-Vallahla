@@ -447,7 +447,7 @@
       paperBtn.dataset.bound = "1";
       paperBtn.addEventListener("click", function () {
         if (!termsOk()) return;
-        saveSession({ kind: "paper", name: "Paper desk" });
+        saveSession({ kind: "paper", name: "Workspace" });
         var account = readAccount() || {};
         account.plan = account.plan || "free";
         account.paper = true;
@@ -698,9 +698,9 @@
       paste.hidden = false;
       document.getElementById("modeBadge").textContent = "READ ONLY";
     } else if (session.kind === "paper") {
-      who.textContent = "Paper desk";
+      who.textContent = "Workspace";
       var mode = document.getElementById("modeBadge");
-      if (mode) mode.textContent = "PAPER";
+      if (mode) mode.textContent = "VIEW";
     } else if (session.pubkey) {
       who.textContent = "…" + session.pubkey.slice(-4);
       if (window.ValhallaSite) {
@@ -787,7 +787,7 @@
       signature: packed.signature || ""
     }));
     account.wallet = packed.pubkey;
-    if (!account.walletPref) account.walletPref = "phantom";
+    if (!account.walletPref) account.walletPref = "solflare";
     writeAccount(account);
     saveSession({ kind: "wallet", pubkey: packed.pubkey, email: account.email || "" });
     sessionStorage.setItem("valhalla-wallet-ok", "1");

@@ -1,3 +1,5 @@
+import { serviceOrigin } from "./origins.js";
+
 export function normalizeAccess(body) {
   if (!body || body.ok !== true) return { ok: false };
   return {
@@ -8,9 +10,9 @@ export function normalizeAccess(body) {
   };
 }
 
-export function accessRequest(site, token) {
-  var base = String((site && site.AUTH_URL) || "").replace(/\/$/, "");
-  if (!token || base.indexOf("https://") !== 0) return null;
+export function accessRequest(site, token, pageHost) {
+  var base = serviceOrigin(site && site.AUTH_URL, pageHost);
+  if (!token || !base) return null;
   return {
     url: base + "/auth/access",
     credentials: "omit",
@@ -21,8 +23,9 @@ export function accessRequest(site, token) {
 export var LIVE_TASK_CAPABILITIES = ["voice", "reasoning", "paper", "view"];
 
 export function taskContractBlock(payload) {
-  if (!payload || !payload.conversationId) {
-    return "The server has not issued a conversation id. The command was not sent.";
+  if (!payload) return "The command was not sent.";
+  if (payload.conversationId === "0" || payload.conversationId === "LOCAL_CURATED") {
+    return "That conversation id is not from the server. The command was not sent.";
   }
   if (LIVE_TASK_CAPABILITIES.indexOf(payload.capability) < 0) {
     return "Capability chat is not in the current server allow-list. It was not sent as view or reasoning.";
@@ -34,9 +37,9 @@ export function serializeTaskBody(payload) {
   return JSON.stringify(payload);
 }
 
-export function tasksRequest(site, token, payload) {
-  var base = String((site && site.AGENT_API_URL) || "").replace(/\/$/, "");
-  if (!token || base.indexOf("https://") !== 0 || taskContractBlock(payload)) return null;
+export function tasksRequest(site, token, payload, pageHost) {
+  var base = serviceOrigin(site && site.AGENT_API_URL, pageHost);
+  if (!token || !base || taskContractBlock(payload)) return null;
   return {
     url: base + "/api/v1/tasks",
     credentials: "omit",
@@ -45,6 +48,78 @@ export function tasksRequest(site, token, payload) {
       "content-type": "application/json",
     },
     body: serializeTaskBody(payload),
+  };
+}
+
+export var TASK_POLL_MS = 3000;
+export var TASK_POLL_MAX_MS = 120000;
+
+export function taskIdOf(body) {
+  var record = body && body.task && typeof body.task === "object" ? body.task : body;
+  var id = record && record.taskId;
+  return /^[0-9a-f]{32}$/.test(String(id || "")) ? String(id) : "";
+}
+
+export function taskState(httpStatus, body) {
+  var record = body && body.task && typeof body.task === "object" ? body.task : body;
+  var id = taskIdOf(record);
+  if (httpStatus === 202) return { state: "pending", taskId: id, text: "", code: 202 };
+  if (!(httpStatus >= 200 && httpStatus < 300)) {
+    return { state: "failed", taskId: id, text: "", code: httpStatus };
+  }
+  if (!record || record.ok !== true) {
+    var rejected = record && (record.state || record.status);
+    if (rejected === "cancelled" || rejected === "cancel_requested") {
+      return { state: "cancel_requested", taskId: id, text: "", code: httpStatus };
+    }
+    return { state: "failed", taskId: id, text: "", code: httpStatus };
+  }
+  var state = record.state || record.status;
+  if (state === "running" || state === "pending") {
+    return { state: "pending", taskId: id, text: "", code: httpStatus };
+  }
+  if (state === "cancelled" || state === "cancel_requested") {
+    return { state: "cancel_requested", taskId: id, text: "", code: httpStatus };
+  }
+  if (state === "done") {
+    var text = typeof record.text === "string" ? record.text.trim() : "";
+    if (!text) return { state: "failed", taskId: id, text: "", code: httpStatus };
+    return { state: "done", taskId: id, text: text, code: httpStatus };
+  }
+  return { state: "failed", taskId: id, text: "", code: httpStatus };
+}
+
+export function stopState(httpStatus, body) {
+  var id = body && /^[0-9a-f]{32}$/.test(String(body.taskId || "")) ? String(body.taskId) : "";
+  if (!(httpStatus >= 200 && httpStatus < 300) || !body || body.ok !== true) {
+    return { state: "failed", taskId: id, code: httpStatus };
+  }
+  if (body.state === "cancelled" || body.reason === "cancelled") {
+    return { state: "cancel_requested", taskId: id || String(body.taskId || ""), code: httpStatus };
+  }
+  if (body.state === "done") return { state: "done", taskId: id || String(body.taskId || ""), code: httpStatus };
+  return { state: "failed", taskId: id, code: httpStatus };
+}
+
+export function taskReadRequest(site, token, taskId, pageHost) {
+  var base = serviceOrigin(site && site.AGENT_API_URL, pageHost);
+  if (!token || !base || !/^[0-9a-f]{32}$/.test(String(taskId || ""))) return null;
+  return {
+    url: base + "/api/v1/tasks/" + taskId,
+    credentials: "omit",
+    headers: { authorization: "Bearer " + token, accept: "application/json" },
+  };
+}
+
+export function taskHistoryRequest(site, token, conversationId, pageHost) {
+  var id = String(conversationId || "");
+  if (!id || id === "0" || id === "LOCAL_CURATED") return null;
+  var base = serviceOrigin(site && site.AGENT_API_URL, pageHost);
+  if (!token || !base) return null;
+  return {
+    url: base + "/api/v1/tasks?conversationId=" + encodeURIComponent(id),
+    credentials: "omit",
+    headers: { authorization: "Bearer " + token, accept: "application/json" },
   };
 }
 
@@ -60,9 +135,8 @@ export function commandPayload(text, conversationId) {
 }
 
 export function replyText(body) {
-  if (!body || body.ok !== true || body.status !== "completed") return null;
-  if (typeof body.text !== "string" || !body.text.trim()) return null;
-  return body.text;
+  var parsed = taskState(200, body);
+  return parsed.state === "done" ? parsed.text : null;
 }
 
 export function healthReady(body) {

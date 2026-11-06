@@ -57,6 +57,8 @@ window.VALHALLA_SITE = {
   NOWPAYMENTS_URL: "",
   /* Live-money trading stays off until TokenJunction turns this on. */
   LIVE_TRADING: false,
+  /* Quote uses GET /api/jupiter/quote only when this is true and AGENT_API_URL is https. Submit is not mounted. */
+  TRADING_ENABLED: false,
   /* Thales uses the OpenAI chat Worker; credentials remain server-side Cloudflare secrets. */
   CHAT_URL: "https://valhalla-chat.valhalla-app.workers.dev",
   /* Cached public price Worker. Empty until it is deployed. The ticker hides if this is empty. */

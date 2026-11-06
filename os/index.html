@@ -14,12 +14,14 @@
   <script type="module" src="/valhalla/gate.js"></script>
   <script type="module" src="/valhalla/theme.js"></script>
   <script type="module" src="/valhalla/browser.js"></script>
+  <script type="module" src="/valhalla/terminal.js"></script>
 </head>
 <body>
   <section id="session-gate" class="session-gate" role="status" aria-labelledby="session-gate-title">
     <p class="session-kicker">ValhallaOS</p>
     <h1 id="session-gate-title">Sign-in</h1>
     <p id="session-gate-status">Checking the existing sign-in.</p>
+    <p><a href="/#access">Access ValhallaOS</a></p>
     <p id="session-note"></p>
   </section>
   <section id="ascent" class="ascent" hidden aria-labelledby="ascent-title">
@@ -48,6 +50,10 @@
     <symbol id="icon-browser" viewBox="0 0 32 32">
       <path fill="#d4d0c8" stroke="#222" d="M3 5h26v22H3z"/><path fill="#000080" d="M5 7h22v5H5z"/>
       <path fill="#fff" stroke="#777" d="M6 14h20v10H6z"/><path fill="#0a7" d="m11 18 5-3 5 3-5 4z"/>
+    </symbol>
+    <symbol id="icon-trade" viewBox="0 0 32 32">
+      <circle cx="11" cy="16" r="6" fill="#E3C27C" stroke="#222"/>
+      <circle cx="21" cy="16" r="6" fill="#0C1421" stroke="#E3C27C"/>
     </symbol>
     <symbol id="icon-wallet" viewBox="0 0 32 32">
       <path fill="#a0522d" stroke="#222" d="M5 8h21v19H5z"/><path fill="#c08040" stroke="#222" d="M5 8V5h17v4"/>
@@ -82,6 +88,9 @@
       <button class="desktop-icon" type="button" data-open="browser">
         <svg aria-hidden="true"><use href="#icon-browser"></use></svg><span>Valhalla Browser</span>
       </button>
+      <button class="desktop-icon" type="button" data-open="trading">
+        <svg aria-hidden="true"><use href="#icon-trade"></use></svg><span>Trading</span>
+      </button>
       <button class="desktop-icon" type="button" data-open="wallet">
         <svg aria-hidden="true"><use href="#icon-wallet"></use></svg><span>Wallet Bridge</span>
       </button>
@@ -101,7 +110,7 @@
           </div>
           <img class="overview-mark" src="/assets/mark.svg" alt="" width="72" height="72">
         </div>
-        <div class="overview-footer"><span>EXECUTION <b>DISABLED</b></span><span>MODE <b>PAPER-FIRST</b></span></div>
+        <div class="overview-footer"><span>EXECUTION <b>OFF</b></span><span>MODE <b>JUPITER TERMINAL</b></span></div>
       </section>
 
       <section class="workspace-panel positions-panel" aria-labelledby="positions-title">
@@ -110,9 +119,15 @@
       </section>
       <section class="workspace-panel activity-panel" aria-labelledby="activity-title">
         <div class="panel-heading"><h2 id="activity-title">System / activity</h2><span>LOCAL SESSION</span></div>
-        <p>Live trading is disabled. Configure the simulated bot in the existing trading desk; sign-in may be required.</p>
+        <p>The Jupiter Terminal asks the configured server for a quote. No order is sent until you review one transaction and sign it in your wallet.</p>
+        <section id="automation-panel" aria-labelledby="automation-title">
+          <h3 id="automation-title">Automation</h3>
+          <p>Zeus oversees FLYWHEEL, then an ElizaOS model, then an approved Jupiter execution.</p>
+          <button type="button" class="classic-button" disabled>Automation off</button>
+          <p class="fine-print">Not active. Delegated execution is not implemented. This is not a trading certification.</p>
+        </section>
         <div class="tool-row">
-          <a class="classic-button accent-button" href="/app/#botPanel">Paper bot controls</a>
+          <button type="button" class="classic-button accent-button" data-open="trading">Jupiter Terminal</button>
           <button type="button" class="classic-button" data-open="status">Service status</button>
           <button type="button" class="classic-button" data-open="swarm">Halls</button>
           <button type="button" class="classic-button" data-open="memory">Sagas</button>
@@ -210,16 +225,96 @@
         </div>
       </header>
       <div class="window-body">
-        <p>Connect an installed wallet to share its public address. Your wallet controls permissions; this desk will not request a transaction or signature.</p>
+        <p>Connect wallet only identifies the account. You cannot trade without a later wallet confirmation. This signature is an account link, not a trading approval.</p>
         <div class="wallet-actions">
           <button type="button" class="classic-button" data-wallet="solflare">Connect Solflare</button>
           <button type="button" class="classic-button" data-wallet="metamask">Connect MetaMask</button>
-          <button type="button" class="classic-button" disabled>Privy unavailable</button>
         </div>
-        <p class="fine-print">Privy requires an application ID and a configured integration. MetaMask connects an Ethereum address; Solflare connects a Solana address.</p>
+        <p class="fine-print">Solflare and MetaMask on Solana only. A chooser appears when both are installed.</p>
         <p class="inset-panel" id="wallet-status" role="status">No wallet connected.</p>
         <button type="button" class="classic-button" id="wallet-disconnect" hidden>Disconnect</button>
         <p class="fine-print">Live trading is disabled. This bridge does not request, store, or transmit private keys.</p>
+      </div>
+    </section>
+
+    <section class="window trade-window" id="window-trading" data-window="trading" aria-labelledby="title-trading" hidden
+      style="left:clamp(28px, 8vw, 120px);top:64px;width:min(860px, calc(100vw - 24px));">
+      <header class="title-bar" data-drag-handle>
+        <h2 id="title-trading">Jupiter Terminal</h2>
+        <div class="window-controls">
+          <button type="button" data-action="maximize" aria-label="Maximize Jupiter Terminal">□</button>
+          <button type="button" data-action="minimize" aria-label="Minimize Jupiter Terminal">_</button>
+          <button type="button" data-action="close" aria-label="Close Jupiter Terminal">×</button>
+        </div>
+      </header>
+      <div class="window-body trade-body">
+        <p class="trade-kicker">Trading · ValhallaOS</p>
+        <p class="trade-power">Powered by Jupiter</p>
+        <p class="fine-print">This is not the official Jupiter trading platform. A quote is not an order. Your keys stay in your wallet.</p>
+        <div class="trade-grid">
+          <div>
+            <p class="panel-label">From</p>
+            <div class="trade-coins">
+              <button type="button" class="classic-button" data-mint="So11111111111111111111111111111111111111112" data-mint-target="trading-input">SOL</button>
+              <button type="button" class="classic-button" data-mint="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" data-mint-target="trading-input">USDC</button>
+            </div>
+            <label for="trading-input">Input mint</label>
+            <input id="trading-input" value="So11111111111111111111111111111111111111112" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="trade-swap-col">
+            <button type="button" class="classic-button accent-button" id="trading-swap">Swap</button>
+          </div>
+          <div>
+            <p class="panel-label">To</p>
+            <div class="trade-coins">
+              <button type="button" class="classic-button" data-mint="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" data-mint-target="trading-output">USDC</button>
+              <button type="button" class="classic-button" data-mint="So11111111111111111111111111111111111111112" data-mint-target="trading-output">SOL</button>
+            </div>
+            <label for="trading-output">Output mint</label>
+            <input id="trading-output" value="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+        <div class="trade-fields">
+          <label for="trading-amount">Amount</label>
+          <input id="trading-amount" inputmode="decimal" autocomplete="off" placeholder="Base units after decimals">
+          <label for="trading-decimals">Decimals</label>
+          <input id="trading-decimals" inputmode="numeric" value="9" autocomplete="off">
+          <label for="trading-slippage">Slippage, basis points</label>
+          <input id="trading-slippage" inputmode="numeric" value="50" autocomplete="off">
+        </div>
+        <div class="trade-wallet">
+          <button type="button" class="classic-button" id="trading-wallet">Find wallets</button>
+          <p id="trading-address">No wallet</p>
+          <ul id="trading-wallets"></ul>
+          <label for="trading-tail">Last 4 of this wallet</label>
+          <input id="trading-tail" maxlength="4" autocomplete="off" spellcheck="false">
+          <button type="button" class="classic-button" id="trading-link">Link this account</button>
+          <p class="fine-print" id="trading-link-note">A link signature is not a trading approval. The server must issue the message first.</p>
+        </div>
+        <div class="trade-actions">
+          <button type="button" class="classic-button" id="trading-quote" disabled>Quotes unavailable until the Jupiter and RPC connection is configured.</button>
+          <button type="button" class="classic-button" id="trading-sign" disabled>Sign and submit trade</button>
+        </div>
+        <p id="trading-status" role="status">Connecting services…</p>
+        <div class="trade-quote" aria-live="polite">
+          <p>In <span id="trading-in"></span></p>
+          <p>Out <span id="trading-out"></span></p>
+          <p>Impact <span id="trading-impact"></span></p>
+          <p>Route <span id="trading-routes"></span></p>
+          <p class="fine-print">No quote is shown until the server returns one. An empty line is not zero.</p>
+        </div>
+        <p class="trade-risk">A quote does not guarantee a fill, a price, or that a mint is safe. An unknown mint can be worthless. Signing happens only after you press Sign and submit trade, and only for the one transaction you just reviewed.</p>
+        <button type="button" class="classic-button" id="trading-note-toggle" aria-expanded="false" aria-controls="trading-note-pane">Route note</button>
+        <div id="trading-note-pane" hidden>
+          <p id="trading-note">Unavailable</p>
+        </div>
+        <div class="trade-watch">
+          <label for="trading-watch-mint">Watch a mint</label>
+          <input id="trading-watch-mint" autocomplete="off" spellcheck="false">
+          <button type="button" class="classic-button" id="trading-watch-add">Save mint</button>
+          <ul id="trading-watch"></ul>
+        </div>
+        <a id="trading-solscan" hidden rel="noopener noreferrer"></a>
       </div>
     </section>
 
@@ -229,6 +324,7 @@
       <button type="button" data-open="swarm">Halls</button>
       <button type="button" data-open="memory">Sagas</button>
       <button type="button" data-open="browser">Valhalla Browser</button>
+      <button type="button" data-open="trading">Jupiter Terminal</button>
       <button type="button" data-open="wallet">Wallet Bridge</button>
       <hr>
       <p>Administrative controls require a verified server session and are not available here.</p>
@@ -237,7 +333,7 @@
     <section class="global-command chat-panel" aria-labelledby="chat-title">
       <div class="panel-heading"><h2 id="chat-title">Command</h2><span>SAME SIGN-IN</span></div>
       <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Assistant conversation">
-        <p class="chat-intro"><strong>Valhalla Guide</strong><br>Ask about the desk or paper trading. Chat cannot place trades or access your wallet.</p>
+        <p class="chat-intro"><strong>Valhalla Guide</strong><br>Ask about the desk. Command cannot place a trade or open your wallet.</p>
       </div>
       <form id="chat-form" class="chat-form">
         <label class="sr-only" for="chat-input">Message the assistant</label>
