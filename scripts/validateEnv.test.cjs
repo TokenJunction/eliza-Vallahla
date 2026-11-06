@@ -57,4 +57,14 @@ test('requires TLS Redis and a long server token when queues are enabled', () =>
     }),
     true,
   );
+  assert.throws(
+    () =>
+      validateEnv({
+        ...production,
+        VALHALLA_QUEUE_ENABLED: 'true',
+        REDIS_URL: 'rediss://cache.example.test',
+        VALHALLA_DISPATCH_TOKEN: `${'é'.repeat(15)}a`,
+      }),
+    /at least 32 bytes/,
+  );
 });

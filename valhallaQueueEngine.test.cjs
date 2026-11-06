@@ -54,10 +54,10 @@ test('rejects trading, arbitrary task names, and secret-shaped payload fields', 
 });
 
 test('requires a bearer service token and compares it safely', () => {
-  assert.equal(isAuthorizedDispatch('Bearer correct-token', 'correct-token'), true);
-  assert.equal(isAuthorizedDispatch('Bearer wrong-token', 'correct-token'), false);
-  assert.equal(isAuthorizedDispatch('Bearer correct-token', ''), false);
-  assert.equal(isAuthorizedDispatch(undefined, 'correct-token'), false);
+  assert.equal(isAuthorizedDispatch('Bearer correct-token-0123456789-abcdefghijklmnop', 'correct-token-0123456789-abcdefghijklmnop'), true);
+  assert.equal(isAuthorizedDispatch('Bearer wrong-token', 'correct-token-0123456789-abcdefghijklmnop'), false);
+  assert.equal(isAuthorizedDispatch('Bearer correct-token-0123456789-abcdefghijklmnop', ''), false);
+  assert.equal(isAuthorizedDispatch(undefined, 'correct-token-0123456789-abcdefghijklmnop'), false);
 });
 
 test('requires a Redis protocol URL and rejects insecure production Redis', async () => {

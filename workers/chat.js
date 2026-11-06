@@ -3,11 +3,21 @@
  * The Worker never sends a transaction and never accepts a seed phrase.
  */
 var ALLOWED = ["https://valhalla-app.xyz", "https://www.valhalla-app.xyz"];
+var OPENROUTER_FALLBACK_MODELS = [
+  "google/gemini-2.0-flash-exp:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "deepseek/deepseek-r1:free"
+];
 var CHAT_PROVIDERS = {
   openai: {
     url: "https://api.openai.com/v1/chat/completions",
     key: "OPENAI_API_KEY",
     model: "gpt-4o-mini"
+  },
+  openrouter: {
+    url: "https://openrouter.ai/api/v1/chat/completions",
+    key: "OPENROUTER_API_KEY",
+    model: OPENROUTER_FALLBACK_MODELS[0]
   },
   deepseek: {
     url: "https://api.deepseek.com/chat/completions",
@@ -292,28 +302,33 @@ async function handle(request, env) {
   messages.push({ role: "user", content: userContent });
 
   var upstream;
-  try {
-    var headers = {
-      authorization: "Bearer " + provider.key,
-      "content-type": "application/json",
-      accept: streaming ? "text/event-stream" : "application/json"
-    };
-    if (provider.name === "openrouter") {
-      headers["HTTP-Referer"] = "https://valhalla-app.xyz";
-      headers["X-Title"] = "Thales by Valhalla";
+  var models = provider.name === "openrouter" ? OPENROUTER_FALLBACK_MODELS : [provider.model];
+  for (var modelIndex = 0; modelIndex < models.length; modelIndex += 1) {
+    provider.model = models[modelIndex];
+    try {
+      var headers = {
+        authorization: "Bearer " + provider.key,
+        "content-type": "application/json",
+        accept: streaming ? "text/event-stream" : "application/json"
+      };
+      if (provider.name === "openrouter") {
+        headers["HTTP-Referer"] = "https://valhalla-app.xyz";
+        headers["X-Title"] = "Thales by Valhalla";
+      }
+      upstream = await fetch(provider.url, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          model: provider.model,
+          stream: streaming,
+          messages: messages
+        }),
+        signal: AbortSignal.timeout(45000)
+      });
+    } catch (error) {
+      return fail(request, 502, "V-CHAT-UPSTREAM", "The chat provider could not be reached.");
     }
-    upstream = await fetch(provider.url, {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify({
-        model: provider.model,
-        stream: streaming,
-        messages: messages
-      }),
-      signal: AbortSignal.timeout(45000)
-    });
-  } catch (error) {
-    return fail(request, 502, "V-CHAT-UPSTREAM", "The chat provider could not be reached.");
+    if (upstream.ok || (upstream.status !== 429 && upstream.status < 500)) break;
   }
 
   if (!upstream.ok) return fail(request, 502, "V-CHAT-UPSTREAM", "The chat provider is temporarily unavailable.");

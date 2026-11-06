@@ -42,8 +42,8 @@ function validateEnv(env = process.env) {
 
   if (env.VALHALLA_QUEUE_ENABLED === 'true') {
     if (!isSet(env, 'REDIS_URL')) errors.push('REDIS_URL is required when the queue is enabled.');
-    if (!isSet(env, 'VALHALLA_DISPATCH_TOKEN') || env.VALHALLA_DISPATCH_TOKEN.length < 32) {
-      errors.push('VALHALLA_DISPATCH_TOKEN must be at least 32 characters when the queue is enabled.');
+    if (!isSet(env, 'VALHALLA_DISPATCH_TOKEN') || Buffer.byteLength(env.VALHALLA_DISPATCH_TOKEN) < 32) {
+      errors.push('VALHALLA_DISPATCH_TOKEN must be at least 32 bytes when the queue is enabled.');
     }
   }
 

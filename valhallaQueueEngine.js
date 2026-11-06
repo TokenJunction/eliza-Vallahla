@@ -68,7 +68,11 @@ function executeSafeTask(targetEngine, taskName, payload) {
 }
 
 function isAuthorizedDispatch(authorization, expectedToken) {
-  if (!expectedToken || typeof authorization !== 'string') return false;
+  if (
+    typeof expectedToken !== 'string' ||
+    Buffer.byteLength(expectedToken) < 32 ||
+    typeof authorization !== 'string'
+  ) return false;
   const match = /^Bearer ([^\s]+)$/.exec(authorization);
   if (!match) return false;
 

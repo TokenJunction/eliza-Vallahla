@@ -178,6 +178,43 @@ test("supports another fixed OpenAI-compatible provider and a configured model",
   assert.equal(JSON.parse(apiRequest.options.body).model, "deepseek-ai/DeepSeek-V4.1-Flash");
 });
 
+test("falls through the fixed OpenRouter models on rate limits and server errors", async (t) => {
+  var requestedModels = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    requestedModels.push(JSON.parse(options.body).model);
+    if (requestedModels.length < 3) return jsonResponse({ error: "temporarily unavailable" }, requestedModels.length === 1 ? 429 : 503);
+    return jsonResponse({ choices: [{ message: { content: "Fallback response." } }] });
+  });
+
+  var response = await worker.fetch(request({ text: "Hello" }), env({
+    CHAT_PROVIDER: "openrouter",
+    OPENROUTER_API_KEY: "test-openrouter-key"
+  }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(requestedModels, [
+    "google/gemini-2.0-flash-exp:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "deepseek/deepseek-r1:free"
+  ]);
+  assert.equal(response.headers.get("x-valhalla-provider"), "openrouter");
+  assert.equal(response.headers.get("x-valhalla-model"), "deepseek/deepseek-r1:free");
+});
+
+test("does not fall through OpenRouter models on non-retryable errors", async (t) => {
+  var calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls += 1;
+    return jsonResponse({ error: "invalid request" }, 400);
+  });
+
+  var response = await worker.fetch(request({ text: "Hello" }), env({
+    CHAT_PROVIDER: "openrouter",
+    OPENROUTER_API_KEY: "test-openrouter-key"
+  }));
+  assert.equal(response.status, 502);
+  assert.equal(calls, 1);
+});
+
 test("fails closed for unsupported providers or missing provider keys", async (t) => {
   t.mock.method(globalThis, "fetch", async () => {
     throw new Error("unexpected provider call");
