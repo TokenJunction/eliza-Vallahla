@@ -66,3 +66,32 @@ test('requires a Redis protocol URL and rejects insecure production Redis', asyn
     /REDIS_URL must use rediss:\/\/ in production/,
   );
 });
+
+test('skips jobs already marked processed in Redis', async () => {
+  const store = new Map();
+  let handler;
+  class FakeRedis {
+    async ping() {}
+    async get(key) { return store.get(key) ?? null; }
+    async set(key, value, mode, ttl) { store.set(key, { value, mode, ttl }); }
+    async quit() {}
+    on() {}
+  }
+  class FakeQueue { on() {} async close() {} }
+  class FakeWorker {
+    constructor(name, fn) { if (name === 'valhalla-zeus') handler = fn; }
+    on() {}
+    async close() {}
+  }
+  const engine = await createValhallaQueueEngine({
+    redisUrl: 'redis://localhost:6379',
+    RedisClient: FakeRedis,
+    QueueClass: FakeQueue,
+    WorkerClass: FakeWorker,
+  });
+  const job = { id: '42', name: 'health-check', data: { payload: {} } };
+  assert.deepEqual(await handler(job), { status: 'observed', mode: 'paper' });
+  assert.equal(store.get('job:processed:zeus:42').ttl, 86400);
+  assert.deepEqual(await handler(job), { status: 'SKIPPED_DUPLICATE' });
+  await engine.close();
+});

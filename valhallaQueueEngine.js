@@ -10,6 +10,8 @@ const QUEUE_TASKS = Object.freeze({
   cerberus: new Set(['vault-check']),
 });
 const MAX_PAYLOAD_BYTES = 4096;
+const PROCESSED_PREFIX = 'job:processed:';
+const PROCESSED_TTL_SECONDS = 24 * 60 * 60;
 
 function validateDispatch(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -107,14 +109,22 @@ async function createValhallaQueueEngine({
   const queues = Object.fromEntries(
     Object.keys(QUEUE_TASKS).map((name) => [
       name,
-      new Queue(`valhalla-${name}`, { connection }),
+      new QueueClass(`valhalla-${name}`, { connection }),
     ]),
   );
   const workers = Object.keys(QUEUE_TASKS).map(
     (targetEngine) =>
-      new Worker(
+      new WorkerClass(
         `valhalla-${targetEngine}`,
-        async (job) => executeSafeTask(targetEngine, job.name, job.data.payload),
+        async (job) => {
+          const key = `${PROCESSED_PREFIX}${targetEngine}:${job.id}`;
+          if (job.id !== undefined && (await connection.get(key))) {
+            return { status: 'SKIPPED_DUPLICATE' };
+          }
+          const result = executeSafeTask(targetEngine, job.name, job.data.payload);
+          if (job.id !== undefined) await connection.set(key, '1', 'EX', PROCESSED_TTL_SECONDS);
+          return result;
+        },
         { connection, concurrency: 1 },
       ),
   );
