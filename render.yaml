@@ -1,11 +1,11 @@
 services:
   - type: web
     name: valhalla-elizaos
-    runtime: docker
+    runtime: node
     plan: free
     branch: docs/site
-    dockerfilePath: ./valhalla-elizaos/Dockerfile
-    dockerContext: ./valhalla-elizaos
+    buildCommand: npm install --legacy-peer-deps && cd valhalla-elizaos && npx --yes bun@1.4.4 install --frozen-lockfile && npx --yes bun@1.4.4 run build
+    startCommand: node start_native_engine.js
     healthCheckPath: /health
     autoDeploy: false
     envVars:
@@ -48,7 +48,7 @@ services:
     name: valhalla-worker
     runtime: node
     plan: starter
-    branch: feat/supabase-redis-health
+    branch: docs/site
     buildCommand: npm install --legacy-peer-deps
     startCommand: node valhallaWorker.js
     autoDeploy: false
