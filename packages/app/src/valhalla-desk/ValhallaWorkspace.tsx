@@ -13,17 +13,64 @@ import {
 } from "./workspace-preference.ts";
 
 export type AuthCheck =
-  | { state: "verified"; source: string }
+  | { state: "verified"; source: string; displayName: string }
   | { state: "unavailable"; message: string }
   | { state: "rejected"; message: string };
 
 export type AuthSource = () => Promise<AuthCheck>;
 
-export async function defaultAuthSource(): Promise<AuthCheck> {
+const SESSION_PATH = "/api/v1/session";
+
+export async function defaultAuthSource(
+  fetchImpl: typeof fetch = fetch,
+): Promise<AuthCheck> {
+  try {
+    const response = await fetchImpl(SESSION_PATH, {
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      return {
+        state: "unavailable",
+        message: `GET ${SESSION_PATH} returned HTTP ${String(response.status)}. You are not signed in and you are not an admin.`,
+      };
+    }
+    return readSessionBody(await response.json());
+  } catch {
+    return {
+      state: "unavailable",
+      message: `GET ${SESSION_PATH} could not be reached. You are not signed in and you are not an admin.`,
+    };
+  }
+}
+
+function readSessionBody(body: unknown): AuthCheck {
+  if (!body || typeof body !== "object") {
+    return {
+      state: "unavailable",
+      message: `GET ${SESSION_PATH} did not return a session record. You are not signed in and you are not an admin.`,
+    };
+  }
+  const record = body as Record<string, unknown>;
+  if (record.available === false) {
+    const reason =
+      typeof record.reason === "string" ? record.reason : "unavailable";
+    return {
+      state: "unavailable",
+      message: `Session service reported ${reason}. You are not signed in and you are not an admin.`,
+    };
+  }
+  if (typeof record.id !== "string" || record.id.length === 0) {
+    return {
+      state: "unavailable",
+      message: `GET ${SESSION_PATH} did not return a session id. You are not signed in and you are not an admin.`,
+    };
+  }
   return {
-    state: "unavailable",
-    message:
-      "The existing signup service is not connected. You are not signed in and you are not an admin.",
+    state: "verified",
+    source: `GET ${SESSION_PATH}`,
+    displayName:
+      typeof record.displayName === "string" ? record.displayName : "",
   };
 }
 
@@ -46,16 +93,15 @@ export function ValhallaWorkspace(props: ValhallaWorkspaceProps) {
   const saved = storage
     ? readWorkspacePreference(storage)
     : { displayName: "", bootSeen: false };
-  const [phase, setPhase] = useState<Phase>(
-    saved.bootSeen ? "desktop" : "auth",
-  );
+  const [phase, setPhase] = useState<Phase>("auth");
+  const [attempt, setAttempt] = useState(0);
   const [auth, setAuth] = useState<AuthCheck | null>(null);
   const [displayName, setDisplayName] = useState(saved.displayName);
   const [draftName, setDraftName] = useState(saved.displayName);
   const [health, setHealth] = useState<ServiceHealth | null>(null);
 
   useEffect(() => {
-    if (phase !== "auth" || saved.bootSeen) return;
+    if (phase !== "auth") return;
     let cancel = false;
     void authSource().then((result) => {
       if (!cancel) setAuth(result);
@@ -63,7 +109,7 @@ export function ValhallaWorkspace(props: ValhallaWorkspaceProps) {
     return () => {
       cancel = true;
     };
-  }, [authSource, phase, saved.bootSeen]);
+  }, [authSource, phase, attempt]);
 
   useEffect(() => {
     if (phase !== "prepare") return;
@@ -158,11 +204,20 @@ export function ValhallaWorkspace(props: ValhallaWorkspaceProps) {
               type="button"
               id="ascent-primary"
               disabled={auth === null}
-              onClick={() => setPhase("name")}
+              onClick={() => {
+                if (auth?.state === "verified") {
+                  if (auth.displayName) {
+                    setDraftName(auth.displayName);
+                    setDisplayName(auth.displayName);
+                  }
+                  setPhase("name");
+                  return;
+                }
+                setAuth(null);
+                setAttempt((value) => value + 1);
+              }}
             >
-              {auth?.state === "verified"
-                ? "Continue"
-                : "Continue as local preview"}
+              {auth?.state === "verified" ? "Continue" : "Retry session check"}
             </button>
           </>
         ) : null}

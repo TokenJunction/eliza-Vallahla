@@ -1,7 +1,11 @@
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, test } from "vitest";
-import { type AuthCheck, ValhallaWorkspace } from "./ValhallaWorkspace.tsx";
+import {
+  type AuthCheck,
+  defaultAuthSource,
+  ValhallaWorkspace,
+} from "./ValhallaWorkspace.tsx";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -84,7 +88,8 @@ function setControl(id: string, value: string) {
 
 const verified = async (): Promise<AuthCheck> => ({
   state: "verified",
-  source: "existing signup service",
+  source: "GET /api/v1/session",
+  displayName: "",
 });
 
 test("Ascent keeps a failed signup check visible and does not grant admin", async () => {
@@ -96,19 +101,26 @@ test("Ascent keeps a failed signup check visible and does not grant admin", asyn
   expect(document.getElementById("ascent-auth")?.textContent).toContain(
     "not an admin",
   );
-  click("ascent-primary");
-  click("ascent-primary");
-  await flush();
-  const services = document.querySelector(
-    "#ascent-readiness [data-ready='no']",
+  expect(document.getElementById("ascent-primary")?.textContent).toBe(
+    "Retry session check",
   );
-  expect(services?.textContent).toContain("Not ready");
-  expect(services?.textContent).toContain("Not online");
-  expect(document.body.textContent).not.toContain("100%");
-  click("ascent-primary");
-  expect(document.getElementById("workspace-heading")?.textContent).toBe(
-    "Valhalla Workspace",
-  );
+  expect(document.getElementById("workspace-heading")).toBeNull();
+});
+
+test("GET /api/v1/session failure is not a signed-in session", async () => {
+  const seen: string[] = [];
+  const result = await defaultAuthSource(async (input) => {
+    seen.push(String(input));
+    return new Response(JSON.stringify({ available: false, reason: "session_inventory_unavailable" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  expect(seen).toEqual(["/api/v1/session"]);
+  expect(result.state).toBe("unavailable");
+  if (result.state === "unavailable") {
+    expect(result.message).toContain("session_inventory_unavailable");
+  }
 });
 
 test("verified entry, local label, Guide, and Omni stay inside real boundaries", async () => {
