@@ -1,136 +1,65 @@
-<!DOCTYPE html>
-<html lang="en" class="landing-root">
+<!doctype html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Valhalla™ — the desk in your browser</title>
-<meta name="description" content="Valhalla™ is a non-custodial desk in the browser. Paper mode, a chat with your bot, and safety checks. Not financial advice.">
-<meta name="twitter:site" content="@ValhallaOS">
-<link rel="canonical" href="https://valhalla-app.xyz/">
-<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="stylesheet" href="valhalla-command.css">
-<link rel="stylesheet" href="landing.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090a0b">
+  <meta name="description" content="Enter ValhallaOS, a paper-first command desk for wallet connections and assistant chat.">
+  <meta name="twitter:site" content="@ValhallaOS">
+  <link rel="canonical" href="https://valhalla-app.xyz/">
+  <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="stylesheet" href="/home.css">
+  <title>ValhallaOS · Your command desk</title>
 </head>
-<body class="landing" data-marketing="1">
-<div class="land">
-  <header class="land-nav" data-nav="locked">
-    <a class="brand" href="/"><img src="assets/mark.svg" alt="Valhalla™ mech logo" width="32" height="32"> VALHALLA™</a>
-    <nav class="land-links" aria-label="Main navigation">
-      <a href="#how">How it works</a>
-      <a href="#features">Features</a>
-      <a href="#pricing">Pricing</a>
-    </nav>
-    <a class="btn solid" href="app/">Get started</a>
-  </header>
-  <div class="system-status-slot" data-status-slot></div>
-  <div data-ticker hidden class="ticker" aria-label="Live public market prices. Not financial advice." aria-live="off"></div>
-  <section class="hero-grid" data-motion-hero>
-    <div class="hero-copy">
-      <p class="kicker">ZEUS MASTER OVERSEER · V35</p>
-      <h1>Autonomous account governance for the next phase.</h1>
-      <p class="sub">Valhalla is evolving from a desk into an orchestration layer: the Quant Flywheel, the DeepSeek Repair Engine, and a multi-social dispatch system that keeps public updates moving without custody or hidden SaaS fees.</p>
-      <div class="cta-row">
-        <a class="btn solid" href="app/">Open the desk</a>
-        <a class="btn" href="#how">See the system</a>
+<body>
+  <div class="page">
+    <header class="topbar" data-nav="locked">
+      <a class="brand" href="/"><img src="/assets/mark.svg" alt="" width="42" height="42"><span>VALHALLA™<small>COMMAND DESK</small></span></a>
+      <nav aria-label="Main navigation"><a href="#about">The desk</a><a href="/faq/">Help</a><a href="/os/">Explore without an account</a></nav>
+    </header>
+
+    <main>
+      <div class="hero">
+        <section class="intro" aria-labelledby="home-title">
+          <div class="system-line"><span class="dot"></span> VALHALLAOS <span> / </span> PAPER-FIRST</div>
+          <h1 id="home-title">Your space to<br><em>think, connect,</em><br>and explore.</h1>
+          <p>Meet the Valhalla command desk: a place for your assistant, wallet connections, and paper trading tools. Your keys stay in your wallet.</p>
+          <div class="hero-links"><a href="/os/">Explore the public desk <span aria-hidden="true">→</span></a><a href="#about">See what's inside</a></div>
+          <div class="hero-status"><span>EXECUTION <b>DISABLED</b></span><span>MODE <b>PAPER-FIRST</b></span></div>
+        </section>
+
+        <section class="access" aria-labelledby="access-title">
+          <div class="panel-bar"><span>VALHALLAOS / ACCESS</span><span>SECURE SIGN-IN</span></div>
+          <div class="access-body">
+            <img class="access-mark" src="/assets/mark.svg" alt="" width="48" height="48">
+            <h2 id="access-title">Welcome to Valhalla</h2>
+            <p>Sign in or create an account. We'll guide you through the human check and terms, then send a code to your email.</p>
+            <form id="home-email" action="/app/" method="get">
+              <label for="home-email-address">Email address</label>
+              <input id="home-email-address" type="email" autocomplete="email" placeholder="you@example.com" required>
+              <button type="submit">Continue with email</button>
+            </form>
+            <div class="divider"><span>OR</span></div>
+            <a class="google-link" id="home-google" href="/app/">Continue with Google</a>
+            <p class="access-help">New here? Choose <strong>Create account</strong> on the next screen. Returning or recovering access? Use your email to receive a sign-in code.</p>
+            <p class="security-note">Never share a seed phrase or private key. Valhalla will not ask for one.</p>
+          </div>
+        </section>
       </div>
-    </div>
-    <a class="preview" href="app/" aria-label="Preview of the Zeus-driven Valhalla control surface.">
-      <span>MASTER CONTROL</span>
-      <img src="assets/promo/desk-frame.png" srcset="assets/promo/desk-frame-640.png 640w, assets/promo/desk-frame.png 1280w" sizes="(max-width: 800px) 100vw, 480px" alt="Preview of the Valhalla Zeus master control desk. Demo data only." width="1280" height="800">
-      <p class="note">Idle governance · live routing · paper-safe by default</p>
-    </a>
-  </section>
-  <section data-motion-group>
-    <p class="kicker">BENEFITS</p>
-    <h2>What the upgraded stack adds</h2>
-    <div class="blocks">
-      <article><h3>Zeus idle governance</h3><p>When the system is idle, Zeus watches network telemetry, volatility, and sub-agent health to route actions and reduce drift without exposing custody.</p></article>
-      <article><h3>Private admin routing</h3><p>Verified owner accounts reach a dedicated control console while ordinary users remain in sandboxed analytics and paper trading.</p></article>
-      <article><h3>Multi-channel automation</h3><p>X, Discord, and Telegram can share differentiated updates without expensive third-party automation stacks, keeping the public voice alive while staying lightweight.</p></article>
-      <article><h3>Real-time financial charts</h3><p>Built around public market data and in-browser charting, the desk surfaces P&amp;L, RSI, and risk overlays in a cleaner view for decision support.</p></article>
-    </div>
-  </section>
-  <section id="how" data-motion-group>
-    <p class="kicker">HOW IT WORKS</p>
-    <h2>Three layers of the system</h2>
-    <div class="steps">
-      <article><p class="kicker">01</p><h3>Route and isolate</h3><p>Google or email onboarding checks the verified account and sends the owner to the master command layer while everyone else stays in their private desk.</p></article>
-      <article><p class="kicker">02</p><h3>Monitor and audit</h3><p>The Quant Flywheel and DeepSeek repair engine watch market conditions, risk limits, and service health before any paper action is approved.</p></article>
-      <article><p class="kicker">03</p><h3>Dispatch and report</h3><p>Social updates, alerts, and operational summaries are pushed across channels with differentiated copy and safety labels that keep the bot transparent.</p></article>
-    </div>
-  </section>
-  <section id="features" data-motion-group>
-    <p class="kicker">FEATURES</p>
-    <h2>Core modules in the blueprint</h2>
-    <div class="features">
-      <article><h3>Quant Flywheel</h3><p>Risk, position logic, and public market checks in a paper-first workflow with hard safety boundaries and plain-language disclosures.</p></article>
-      <article><h3>DeepSeek repair</h3><p>Live debugging and analysis tools improve signal quality, service flow, and system recovery without exposing raw private keys.</p></article>
-      <article><h3>Social automation</h3><p>Multi-account posting to X, Discord, and Telegram is distributed through differentiated messages instead of boilerplate repetition.</p></article>
-      <article><h3>Python charting</h3><p>Risk matrices, P&amp;L histograms, and RSI overlays render in-browser for a cleaner visual read on the desk.</p></article>
-      <article><h3>Admin command layer</h3><p>Master admin controls are isolated for governance, network state, and operating visibility without broadening user access.</p></article>
-      <article><h3>One-time binding terms</h3><p>Initial acceptance gates legal onboarding once and keeps the product consistent with the stated liability and risk disclaimer.</p></article>
-    </div>
-  </section>
-  <section id="pricing" data-motion-group>
-    <p class="kicker">PRICING</p>
-    <h2>Free and Pro</h2>
-    <div class="prices">
-      <article class="price"><h3>Free</h3><p>The website desk and paper mode, with ads. Not a promise of profit.</p></article>
-      <article class="price"><h3>Pro</h3><p>$9.99 a month at the launch price. A 15 day trial is included. Ads come off. Not a promise of profit.</p><a class="btn" href="app/">Get started</a></article>
-    </div>
-  </section>
-  <section data-motion-group>
-    <p class="kicker">TRUST</p>
-    <h2>Safety</h2>
-    <article>
-      <p>Valhalla does not ask for a seed phrase. Support will not ask for one. Crypto is risky. You can lose money. Sample screens are demo data. Past or sample results do not predict future results.</p>
-      <p><a href="privacy/">Privacy</a> · <a href="terms/">Terms</a></p>
-    </article>
-  </section>
-  <section data-motion-group>
-    <p class="kicker">FAQ</p>
-    <h2>Before you start</h2>
-    <article>
-      <h3>What is first?</h3>
-      <p>The website desk. The Chrome extension is second.</p>
-      <p><a href="faq/">Read the FAQ</a></p>
-    </article>
-  </section>
-  <section data-motion-group>
-    <p class="kicker">START</p>
-    <h2>Open the desk when you are ready.</h2>
-    <a class="btn solid" href="app/">Get started</a>
-    <form id="emailCapture">
-      <label>Email <input id="captureEmail" type="email" autocomplete="email" required></label>
-      <button class="btn" type="submit">Email me updates</button>
-    </form>
-    <p id="captureNote" class="note">No list is connected yet. This form will not pretend you were added.</p>
-  </section>
-  <footer class="foot-links">
-    <p><a href="shop/">Shop</a> · <a href="faq/">FAQ</a> · <a href="contact/">Contact</a> · <a href="privacy/">Privacy</a> · <a href="extension/">Chrome extension</a></p>
-    <p>Crypto is risky, not financial advice.</p>
-    <p>Valhalla™ and the Valhalla mech logo are trademarks of TokenJunction LLC.</p>
-  </footer>
-</div>
-<script src="site-config.js"></script>
-<script src="ticker.js"></script>
-<script src="status.js"></script>
-<script src="site-motion.js"></script>
-<script src="site-chrome.js"></script>
-<script>
-  document.getElementById("emailCapture").addEventListener("submit", function (event) {
-    event.preventDefault();
-    var note = document.getElementById("captureNote");
-    var endpoint = (window.VALHALLA_SITE || {}).formspree || "";
-    var email = document.getElementById("captureEmail").value.trim();
-    if (!endpoint) {
-      note.textContent = "No list is connected yet. Nothing was sent.";
-      return;
-    }
-    fetch(endpoint, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ email: email }) })
-      .then(function (res) { note.textContent = res.ok ? "You are on the list." : "The list did not accept that address."; })
-      .catch(function () { note.textContent = "The list did not answer. Nothing was sent."; });
-  });
-</script>
+
+      <section class="about" id="about" aria-labelledby="about-title">
+        <div><h2 id="about-title">A command desk, built around you.</h2><p>Open the desk without an account, or sign in to use the existing paper desk and account features.</p><a href="/os/">Open ValhallaOS →</a></div>
+        <div class="module-list">
+          <article><span>01 / ASSISTANT</span><h3>Talk it through</h3><p>Ask the configured chat service about the desk and market concepts. Browser voice replies are optional.</p></article>
+          <article><span>02 / WALLET BRIDGE</span><h3>Stay in control</h3><p>Connect an available Solflare or MetaMask wallet. The public desk does not request a transaction.</p></article>
+          <article><span>03 / PAPER MODE</span><h3>Explore your strategy</h3><p>Adjust simulated bot settings in the existing desk. Live trading and autonomous execution are not connected.</p></article>
+        </div>
+      </section>
+    </main>
+    <footer><span>VALHALLA™ / TOKENJUNCTION</span><nav aria-label="Footer"><a href="/faq/">FAQ</a><a href="/contact/">Contact</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/shop/">Shop</a></nav><p>Crypto is risky. Not financial advice.</p></footer>
+  </div>
+  <script src="/site-config.js"></script>
+  <script src="/home.js"></script>
+  <script src="/site-chrome.js"></script>
 </body>
 </html>

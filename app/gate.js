@@ -225,7 +225,17 @@
     } else {
       sessionStorage.setItem("valhalla-code-ok", "1");
       saveSession(accountSession(account));
-      if (body.redirect === "/admin/master-control/" || body.redirect === "/dashboard/analytics/") {
+      if (body.redirect === "/admin/master-control/") {
+        sessionStorage.removeItem("valhalla-entry-desk");
+        window.location.assign(body.redirect);
+        return;
+      }
+      if (sessionStorage.getItem("valhalla-entry-desk") === "1") {
+        sessionStorage.removeItem("valhalla-entry-desk");
+        window.location.assign("/os/");
+        return;
+      }
+      if (body.redirect === "/dashboard/analytics/") {
         window.location.assign(body.redirect);
         return;
       }
@@ -307,6 +317,14 @@
   function mountAccount() {
     var google = document.getElementById("googleBtn");
     var note = document.getElementById("accountNote");
+    var entryEmail = sessionStorage.getItem("valhalla-entry-email");
+    if (entryEmail) {
+      var loginEmail = document.getElementById("magicEmail");
+      var createEmail = document.getElementById("createEmail");
+      if (loginEmail && !loginEmail.value) loginEmail.value = entryEmail;
+      if (createEmail && !createEmail.value) createEmail.value = entryEmail;
+      sessionStorage.removeItem("valhalla-entry-email");
+    }
     var box = document.getElementById("termsOk");
     var saved = readAccount();
     if (box && saved && saved.termsAccepted) box.checked = true;
@@ -657,6 +675,11 @@
         }
         return;
       }
+    }
+    if ((session.kind === "google" || session.kind === "account") && sessionStorage.getItem("valhalla-entry-desk") === "1") {
+      sessionStorage.removeItem("valhalla-entry-desk");
+      window.location.assign("/os/");
+      return;
     }
     show("desk");
     var banner = document.getElementById("connectBanner");
