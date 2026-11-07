@@ -117,7 +117,7 @@
     var controller = new AbortController();
     var timeout = window.setTimeout(function () { controller.abort(); }, 25000);
     try {
-      var endpoint = (base.endsWith('/v1') ? base.slice(0, -3) : base) + '/chat';
+      var endpoint = base + '/chat';
       var response = await fetch(endpoint, {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text: text, history: history, stream: false }), signal: controller.signal
