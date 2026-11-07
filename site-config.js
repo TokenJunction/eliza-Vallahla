@@ -42,7 +42,7 @@ window.VALHALLA_SITE = {
   COINBASE_COMMERCE_URL: "",
   NOWPAYMENTS_URL: "",
   LIVE_TRADING: false,
-  /* Direct Valhalla Brain API chat endpoint with dual Perplexity & Gemini grounding */
-  CHAT_URL: "https://valhalla-brain-api.valhalla-app.workers.dev/v1",
+  /* Public chat uses the deployed Cloudflare Workers AI service. Brain integration is separate. */
+  CHAT_URL: "https://valhalla-chat.valhalla-app.workers.dev",
   TICKER_URL: ""
 };
