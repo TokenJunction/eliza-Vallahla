@@ -1,14 +1,32 @@
 (function (root) {
   var LOG = "valhalla-debug-log";
+  var restartGoogle = false;
   function stash(code, detail) {
-    var rows = [];
-    try { rows = JSON.parse(sessionStorage.getItem(LOG) || "[]"); } catch (err) { rows = []; }
-    rows.unshift({ at: new Date().toISOString(), code: code, detail: String(detail || "").slice(0, 400) });
-    sessionStorage.setItem(LOG, JSON.stringify(rows.slice(0, 30)));
+    try {
+      var rows = JSON.parse(sessionStorage.getItem(LOG) || "[]");
+      if (!Array.isArray(rows)) rows = [];
+      rows.unshift({ at: new Date().toISOString(), code: code, detail: String(detail || "").slice(0, 400) });
+      sessionStorage.setItem(LOG, JSON.stringify(rows.slice(0, 30)));
+    } catch (err) {
+      // Error recovery must also work when storage is unavailable.
+    }
   }
+  function freshGoogle() {
+    restartGoogle = false;
+    root.location.reload();
+  }
+  document.addEventListener("click", function (event) {
+    if (!restartGoogle || !event.target || typeof event.target.closest !== "function") return;
+    if (!event.target.closest("#mechaRetry")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    freshGoogle();
+  }, true);
   function show(el, opts) {
     var code = opts && opts.code ? opts.code : "V-1";
     var detail = opts && opts.detail ? opts.detail : "";
+    var needsGoogle = code === "V-AUTH" && /^google worker (email(?:-not-configured)?|replay)$/.test(String(detail));
+    restartGoogle = needsGoogle;
     console.debug("valhalla", code, detail);
     stash(code, detail);
     var site = root.VALHALLA_SITE || {};
@@ -23,13 +41,13 @@
     if (!el) return;
     el.textContent = "";
     var text = document.createElement("span");
-    text.textContent = (opts && opts.public ? opts.public : "Something went wrong. Please try again shortly.") + " (" + code + ")";
+    text.textContent = (needsGoogle ? "Google sign-in must restart. Select Retry, then sign in with Google again." : opts && opts.public ? opts.public : "Something went wrong. Please try again shortly.") + " (" + code + ")";
     el.appendChild(text);
-    if (opts && opts.retry) {
+    if (needsGoogle || opts && opts.retry) {
       var button = document.createElement("button");
       button.type = "button";
       button.textContent = "Retry";
-      button.addEventListener("click", opts.retry);
+      button.addEventListener("click", needsGoogle ? freshGoogle : opts.retry);
       el.appendChild(document.createTextNode(" "));
       el.appendChild(button);
     }
