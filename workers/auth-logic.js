@@ -1,7 +1,11 @@
 /** Pure sign-in rules. No secrets and no codes. */
 
 export function needSecondFactor(input) {
-  return input.codeThisLogin !== true;
+  var source = input || {};
+  if (source.codeThisLogin === true) return false;
+  if (source.baseVerified !== true) return true;
+  if (source.alwaysAsk === true || source.leader === true || source.revoked === true) return true;
+  return source.knownDevice !== true;
 }
 
 export function codeDecision(record, now) {
@@ -28,4 +32,40 @@ export function maskEmail(email) {
 
 export function validEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").toLowerCase());
+}
+
+var OPAQUE = /^[0-9a-f]{32}$/;
+var SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+var EMAIL_HASH = /^[0-9a-f]{64}$/;
+
+export function opaqueId(value) {
+  var text = String(value || "");
+  return OPAQUE.test(text) ? text : "";
+}
+
+export function turnstileEnforced(secret) {
+  return String(secret || "").length > 0;
+}
+
+export function sensitiveSignIn(pathname, method) {
+  return method === "POST" && (
+    pathname === "/auth/google" ||
+    pathname === "/auth/email/start" ||
+    pathname === "/auth/email/verify"
+  );
+}
+
+export function sessionMatches(record, claims, now) {
+  if (!record || !claims) return "missing";
+  if (record.use !== "access" && record.use !== "device") return "mismatch";
+  if (claims.use !== record.use) return "mismatch";
+  if (!EMAIL_HASH.test(String(record.eh || "")) || String(record.eh) !== String(claims.eh || "")) return "mismatch";
+  if (!record.did || String(record.did) !== String(claims.did || "")) return "mismatch";
+  if (!SESSION_ID.test(String(claims.sid || "")) || String(claims.sid) !== String(record.sid || "")) return "mismatch";
+  if (Number(record.v) !== Number(claims.sv)) return "revoked";
+  if ((record.code === true) !== (claims.code === true)) return "mismatch";
+  if ((record.google === true) !== (claims.google === true)) return "mismatch";
+  if (Number(record.exp) !== Number(claims.exp)) return "mismatch";
+  if (Number(record.exp) < now) return "expired";
+  return "ok";
 }

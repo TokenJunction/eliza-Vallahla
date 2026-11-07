@@ -6,6 +6,7 @@ import worker from "./auth.js";
 var secret = "test-device-cookie-secret";
 var leaderEmail = "leader@example.test";
 var leaderHash = createHash("sha256").update(leaderEmail).digest("hex");
+var otherHash = createHash("sha256").update("other@example.test").digest("hex");
 
 function token(payload) {
   var encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -42,8 +43,30 @@ function setup() {
   };
 }
 
-function session(emailHash, code, google) {
-  return token({ eh: emailHash, did: "device", exp: Date.now() + 60000, code: code, google: google === true });
+function session(state, emailHash, code, google) {
+  var exp = Date.now() + 60000;
+  var sid = crypto.randomUUID();
+  var payload = {
+    eh: emailHash,
+    did: "device",
+    exp: exp,
+    code: code === true,
+    google: google === true,
+    sid: sid,
+    sv: 1,
+    use: "access"
+  };
+  state.values.set("sess:" + sid, JSON.stringify({
+    sid: sid,
+    v: 1,
+    eh: emailHash,
+    did: "device",
+    exp: exp,
+    code: code === true,
+    google: google === true,
+    use: "access"
+  }));
+  return token(payload);
 }
 
 test("chat configuration is public but restricted to approved OpenAI models", async () => {
@@ -60,34 +83,34 @@ test("chat configuration is public but restricted to approved OpenAI models", as
 test("only a Google-authenticated, code-verified session for the configured email gets manager access", async () => {
   var state = setup();
   var other = await worker.fetch(request(
-    "/auth/leader", "POST", { email: leaderEmail }, session("other-hash", true)
+    "/auth/leader", "POST", { email: leaderEmail }, session(state, otherHash, true)
   ), state.env);
   assert.equal((await other.json()).role, "member");
 
-  var unverified = await worker.fetch(request("/auth/leader", "POST", {}, session(leaderHash, false, true)), state.env);
+  var unverified = await worker.fetch(request("/auth/leader", "POST", {}, session(state, leaderHash, false, true)), state.env);
   assert.equal((await unverified.json()).role, "member");
 
-  var emailOnly = await worker.fetch(request("/auth/leader", "POST", {}, session(leaderHash, true)), state.env);
+  var emailOnly = await worker.fetch(request("/auth/leader", "POST", {}, session(state, leaderHash, true)), state.env);
   assert.equal((await emailOnly.json()).role, "member");
 
-  var owner = await worker.fetch(request("/auth/leader", "POST", {}, session(leaderHash, true, true)), state.env);
+  var owner = await worker.fetch(request("/auth/leader", "POST", {}, session(state, leaderHash, true, true)), state.env);
   assert.equal((await owner.json()).role, "leader");
 });
 
 test("model changes require the verified owner session and an approved model", async () => {
   var state = setup();
   var unauthorized = await worker.fetch(request(
-    "/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, session("other-hash", true)
+    "/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, session(state, otherHash, true)
   ), state.env);
   assert.equal(unauthorized.status, 403);
 
   var unsupported = await worker.fetch(request(
-    "/auth/chat-config", "POST", { model: "meta-llama" }, session(leaderHash, true, true)
+    "/auth/chat-config", "POST", { model: "meta-llama" }, session(state, leaderHash, true, true)
   ), state.env);
   assert.equal(unsupported.status, 400);
 
   var accepted = await worker.fetch(request(
-    "/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, session(leaderHash, true, true)
+    "/auth/chat-config", "POST", { model: "gpt-4.1-mini" }, session(state, leaderHash, true, true)
   ), state.env);
   assert.equal(accepted.status, 200);
   assert.equal(JSON.parse(await state.values.get("manager:chat-config")).model, "gpt-4.1-mini");
@@ -95,7 +118,7 @@ test("model changes require the verified owner session and an approved model", a
 
 test("engagement collection requires analytics consent and stores aggregate event counts", async () => {
   var state = setup();
-  var owner = session(leaderHash, true, true);
+  var owner = session(state, leaderHash, true, true);
   var denied = await worker.fetch(request(
     "/auth/engagement", "POST", { event: "page_view", analyticsConsent: false }, owner
   ), state.env);

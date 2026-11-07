@@ -32,11 +32,11 @@
     if (!box || !box.checked || !consent) return;
     var name = account.walletPref || "Wallet";
     localStorage.setItem("valhalla-remember", JSON.stringify({
-      mask: maskEmail(account.email),
+      mask: account.hint || maskEmail(account.email),
       method: method,
       walletName: name,
       last4: account.wallet ? String(account.wallet).slice(-4) : "",
-      initial: String(account.name || account.email || "V").slice(0, 1).toUpperCase(),
+      initial: String(account.hint || "V").slice(0, 1).toUpperCase(),
       tier: account.plan || "free"
     }));
   }
@@ -131,17 +131,51 @@
     script.onload = function () {
       window.turnstile.render("#turnstile", {
         sitekey: cfg.TURNSTILE_SITE_KEY,
+        action: "valhalla-signin",
         appearance: "interaction-only",
         callback: function (token) {
-          fetch(cfg.TURNSTILE_VERIFY_URL, {
+          function accept(body) {
+            if (body && body.human) sessionStorage.setItem("valhalla-human-proof", body.human);
+            markHuman();
+          }
+          function legacy() {
+            fetch(cfg.TURNSTILE_VERIFY_URL, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ token: token })
+            }).then(function (res) { return res.json(); }).then(function (body) {
+              if (body && body.ok) markHuman();
+              else if (note) note.textContent = "The human check was not confirmed.";
+            }).catch(function () {
+              if (note) ValhallaErrors.show(note, { code: "V-GATE", public: "The human check is temporarily unavailable. Please try again shortly.", detail: "turnstile verify failed", retry: function () { location.reload(); } });
+            });
+          }
+          if (!authBase()) {
+            legacy();
+            return;
+          }
+          fetch(authBase() + "/auth/human", {
             method: "POST",
+            credentials: "include",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ token: token })
-          }).then(function (res) { return res.json(); }).then(function (body) {
-            if (body && body.ok) markHuman();
-            else if (note) note.textContent = "The human check was not confirmed.";
+          }).then(function (res) {
+            return res.json().catch(function () { return { ok: false }; }).then(function (body) {
+              body.status = res.status;
+              return body;
+            });
+          }).then(function (body) {
+            if (body && body.ok) {
+              accept(body);
+              return;
+            }
+            if (body && body.status === 403) {
+              if (note) note.textContent = "The human check was not confirmed.";
+              return;
+            }
+            legacy();
           }).catch(function () {
-            if (note) ValhallaErrors.show(note, { code: "V-GATE", public: "The human check is temporarily unavailable. Please try again shortly.", detail: "turnstile verify failed", retry: function () { location.reload(); } });
+            legacy();
           });
         }
       });
@@ -189,39 +223,43 @@
     if (error === "rate") return "Please wait a moment, then ask for a new code.";
     if (error === "locked") return "That code was tried too many times. Ask for a new one.";
     if (error === "expired" || error === "code" || error === "missing") return "That code was not accepted.";
+    if (error === "nonce" || error === "replay") return "Please try that sign-in step again.";
+    if (error === "turnstile") return "The human check was not confirmed.";
     return "";
   }
 
-  function showCode(email, next) {
-    sessionStorage.setItem("valhalla-pending-email", email);
+  function showCode(hint, next, pending) {
+    sessionStorage.removeItem("valhalla-pending-email");
+    if (pending) sessionStorage.setItem("valhalla-pending", pending);
     sessionStorage.setItem("valhalla-code-next", next);
     var lead = document.getElementById("codeLead");
-    var local = email.indexOf("@");
-    var masked = local > 0 ? email.slice(0, 1) + "***" + email.slice(local) : "your email";
-    if (lead) lead.textContent = "Enter the 6-digit code sent to " + masked + ". It expires in 10 minutes.";
+    if (lead) lead.textContent = "Enter the 6-digit code sent to " + (hint || "your email") + ". It expires in 10 minutes.";
     show("gateCode");
+    var input = document.getElementById("emailCodeInput");
+    if (input) input.focus();
   }
 
   function acceptAccount(body) {
     var prior = readAccount() || {};
     var account = {
-      email: body.email || prior.email || "",
-      name: body.name || prior.name || "",
-      picture: body.picture || prior.picture || "",
+      hint: body.hint || prior.hint || "",
       wallet: prior.wallet || "",
+      walletPref: prior.walletPref || "",
       method: prior.method || body.method || "email",
       agentUrl: prior.agentUrl || "",
       bot: prior.bot || null,
       riskAccepted: prior.riskAccepted === true,
-      termsAccepted: true
+      termsAccepted: true,
+      plan: prior.plan || "free"
     };
     writeAccount(account);
     sessionStorage.setItem("valhalla-auth", "1");
-    saveRemember({ email: account.email, name: account.name, wallet: prior.wallet, walletPref: prior.walletPref, plan: prior.plan }, account.method);
+    sessionStorage.removeItem("valhalla-pending-email");
+    saveRemember(account, account.method);
     if (body.session) sessionStorage.setItem("valhalla-auth-token", body.session);
     if (body.needCode) {
       sessionStorage.removeItem("valhalla-code-ok");
-      showCode(account.email, "wallet");
+      showCode(body.hint || account.hint, "wallet", body.pending);
     } else {
       sessionStorage.setItem("valhalla-code-ok", "1");
       saveSession(accountSession(account));
@@ -260,11 +298,8 @@
           return;
         }
         var prior = readAccount() || {};
-        var email = String(info.email).toLowerCase();
         writeAccount({
-          email: email,
-          name: info.name || prior.name || "",
-          picture: info.picture || prior.picture || "",
+          hint: prior.hint || "",
           wallet: prior.wallet || "",
           walletPref: prior.walletPref || "",
           method: "google",
@@ -275,13 +310,12 @@
           plan: prior.plan || "free"
         });
         sessionStorage.setItem("valhalla-auth", "1");
-        saveRemember({ email: email, name: info.name || prior.name, wallet: prior.wallet, walletPref: prior.walletPref, plan: prior.plan || "free" }, "google");
         if (!authBase()) {
-          showCode(email, "wallet");
-          fail(document.getElementById("codeNote"), "V-MAIL", "code service unavailable", function () { location.reload(); });
+          showCode("your email", "wallet");
+          fail(document.getElementById("emailCodeError"), "V-MAIL", "code service unavailable", function () { location.reload(); });
           return;
         }
-        postAuth("/auth/google", { credential: credential, alwaysAsk: true }).then(function (body) {
+        postAuth("/auth/google", { credential: credential, alwaysAsk: alwaysAsk() }).then(function (body) {
           if (!body.ok) {
             var friendly = authNote(body.error);
             if (friendly) note.textContent = friendly;
@@ -298,18 +332,27 @@
   }
 
   function postAuth(path, payload) {
-    return fetch(authBase() + path, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "content-type": "application/json",
-        authorization: "Bearer " + (sessionStorage.getItem("valhalla-auth-token") || "")
-      },
-      body: JSON.stringify(payload)
-    }).then(function (res) {
-      return res.json().catch(function () { return { ok: false }; }).then(function (body) {
-        body.status = res.status;
-        return body;
+    return fetch(authBase() + "/auth/nonce", { method: "GET", credentials: "include" }).then(function (res) {
+      return res.json().catch(function () { return {}; });
+    }).then(function (issued) {
+      var next = {};
+      Object.keys(payload || {}).forEach(function (key) { next[key] = payload[key]; });
+      next.nonce = issued && issued.nonce ? issued.nonce : "";
+      var human = sessionStorage.getItem("valhalla-human-proof") || "";
+      if (human) next.human = human;
+      return fetch(authBase() + path, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer " + (sessionStorage.getItem("valhalla-auth-token") || "")
+        },
+        body: JSON.stringify(next)
+      }).then(function (res) {
+        return res.json().catch(function () { return { ok: false }; }).then(function (body) {
+          body.status = res.status;
+          return body;
+        });
       });
     });
   }
@@ -418,25 +461,27 @@
       createForm.addEventListener("submit", function (event) {
         event.preventDefault();
         if (!termsOk()) return;
+        var typedEmail = document.getElementById("createEmail").value.trim().toLowerCase();
         var account = readAccount() || {};
-        account.name = document.getElementById("createName").value.trim();
-        account.email = document.getElementById("createEmail").value.trim().toLowerCase();
         account.walletPref = document.getElementById("createWallet").value;
         account.method = "email";
         account.termsAccepted = true;
         account.plan = "free";
+        delete account.name;
+        delete account.email;
+        delete account.picture;
         writeAccount(account);
         if (!authBase()) {
           fail(note, "V-MAIL", "email code service unavailable", function () { createForm.requestSubmit(); });
           return;
         }
-        postAuth("/auth/email/start", { email: account.email, alwaysAsk: true }).then(function (body) {
+        postAuth("/auth/email/start", { email: typedEmail, alwaysAsk: alwaysAsk() }).then(function (body) {
           if (!body.ok) {
             var friendly = authNote(body.error);
             if (friendly) note.textContent = friendly;
             else fail(note, "V-MAIL", "create code " + (body.error || ""), function () { createForm.requestSubmit(); });
           }
-          else showCode(account.email, "wallet");
+          else showCode(body.hint, "wallet", body.pending);
         }).catch(function (err) {
           fail(note, "V-MAIL", "create code request failed: " + String(err && err.message || err), function () { createForm.requestSubmit(); });
         });
@@ -475,12 +520,14 @@
             return;
           }
           var prior = readAccount() || {};
-          prior.email = email;
           prior.method = "email";
           prior.termsAccepted = true;
+          delete prior.email;
+          delete prior.name;
+          delete prior.picture;
           writeAccount(prior);
           note.textContent = "The code was sent. It expires in 10 minutes.";
-          showCode(email, "wallet");
+          showCode(body.hint, "wallet", body.pending);
         }).catch(function () {
           fail(note, "V-MAIL", "email start request failed", function () { form.requestSubmit(); });
         });
@@ -491,17 +538,21 @@
       codeForm.dataset.bound = "1";
       codeForm.addEventListener("submit", function (event) {
         event.preventDefault();
-        var codeNote = document.getElementById("codeNote");
-        var email = sessionStorage.getItem("valhalla-pending-email") || (readAccount() || {}).email || "";
-        postAuth("/auth/email/verify", { email: email, code: document.getElementById("emailCode").value.trim() }).then(function (body) {
+        var codeError = document.getElementById("emailCodeError");
+        var codeInput = document.getElementById("emailCodeInput");
+        var pending = sessionStorage.getItem("valhalla-pending") || "";
+        postAuth("/auth/email/verify", { pending: pending, code: codeInput ? codeInput.value.trim() : "" }).then(function (body) {
           if (!body.ok) {
-            if (codeNote) codeNote.textContent = authNote(body.error);
+            if (codeError) codeError.textContent = authNote(body.error);
+            if (codeInput) codeInput.focus();
             return;
           }
           sessionStorage.setItem("valhalla-code-ok", "1");
+          sessionStorage.removeItem("valhalla-pending");
           acceptAccount(body);
         }).catch(function () {
-          if (codeNote) fail(codeNote, "V-MAIL", "email verify request failed", function () { codeForm.requestSubmit(); });
+          if (codeError) fail(codeError, "V-MAIL", "email verify request failed", function () { codeForm.requestSubmit(); });
+          if (codeInput) codeInput.focus();
         });
       });
     }
@@ -552,9 +603,7 @@
   function accountSession(account) {
     return {
       kind: account.method === "google" ? "google" : "account",
-      name: account.name || account.email || "Account",
-      email: account.email || "",
-      picture: account.picture || ""
+      hint: account.hint || ""
     };
   }
 
@@ -656,15 +705,15 @@
     var session = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
     if (!session) {
       var account = readAccount();
-      var verified = account && account.email &&
+      var verified = account && account.hint &&
         sessionStorage.getItem("valhalla-auth") === "1" &&
         sessionStorage.getItem("valhalla-code-ok") === "1";
       if (verified) {
         session = accountSession(account);
         saveSession(session);
       } else {
-        var pendingEmail = sessionStorage.getItem("valhalla-pending-email");
-        if (pendingEmail && sessionStorage.getItem("valhalla-code-ok") !== "1") {
+        var pendingCode = sessionStorage.getItem("valhalla-pending");
+        if (pendingCode && sessionStorage.getItem("valhalla-code-ok") !== "1") {
           show("gateCode");
         } else if (fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS)) {
           show("gateAccount");
@@ -689,12 +738,8 @@
     var avatar = document.getElementById("googleAvatar");
     var paste = document.getElementById("pasteForm");
     if (session.kind === "google" || session.kind === "account") {
-      who.textContent = session.name || session.email || "Account";
-      if (session.picture) {
-        avatar.hidden = false;
-        avatar.src = session.picture;
-        avatar.alt = "Google profile";
-      } else avatar.hidden = true;
+      who.textContent = session.hint || "Account";
+      if (avatar) avatar.hidden = true;
       paste.hidden = false;
       document.getElementById("modeBadge").textContent = "READ ONLY";
     } else if (session.kind === "paper") {
@@ -815,11 +860,11 @@
   var account = readAccount();
   var signed = sessionStorage.getItem("valhalla-wallet-ok") === "1";
   var authed = sessionStorage.getItem("valhalla-auth") === "1" && sessionStorage.getItem("valhalla-code-ok") === "1";
-  if (human && account && account.email && authed) {
+  if (human && account && account.hint && authed) {
     var savedSession = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
     if (!signed || !savedSession || savedSession.kind !== "wallet") saveSession(accountSession(account));
     openDesk();
-  } else if (human && sessionStorage.getItem("valhalla-pending-email") && sessionStorage.getItem("valhalla-code-ok") !== "1") {
+  } else if (human && sessionStorage.getItem("valhalla-pending") && sessionStorage.getItem("valhalla-code-ok") !== "1") {
     show("gateCode");
     mountAccount();
   } else if (human) {
