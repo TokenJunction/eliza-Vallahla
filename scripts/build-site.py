@@ -16,14 +16,8 @@ shutil.copytree(
     )
 )
 
-gate = out / 'app/gate.js'
-text = gate.read_text()
-a = '  function mountTurnstile() {'
-b = '  function termsOk() {'
-assert text.count(a) == text.count(b) == 1
-start, end = text.index(a), text.index(b)
-assert end > start and 'turnstile.render' in text[start:end]
-gate.write_text(text[:start] + '  function mountTurnstile() { markHuman(); }\n\n' + text[end:])
+# Authentication code is copied byte-for-byte, never weakened at build time.
+assert (out / 'app/gate.js').read_bytes() == Path('app/gate.js').read_bytes()
 errors = out / 'errors.js'
 text = errors.read_text()
 needle = "frame.title = 'Valhalla read-only preview';"
