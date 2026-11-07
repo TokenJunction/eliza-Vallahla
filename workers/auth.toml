@@ -18,7 +18,7 @@
 # domain is onboarded (Workers Paid). Before that, the EMAIL binding can send
 # only to verified destination addresses. Resend is the fallback.
 name = "valhalla-auth"
-main = "auth.js"
+main = "auth-entry.js"
 compatibility_date = "2026-11-03"
 
 # Public client id. The Worker rejects a token whose aud is not this value.

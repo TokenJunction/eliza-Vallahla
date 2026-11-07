@@ -1,0 +1,25 @@
+name: Auth preview regression tests
+on:
+  push:
+    branches: [cursor/auth-session-hardening-18db]
+  pull_request:
+    paths: ['workers/auth*', 'app/gate.js', 'lib/customer-identity*', '.github/workflows/auth-preview-tests.yml']
+permissions:
+  contents: read
+jobs:
+  auth-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Worker entrypoint and frontend syntax
+        run: |
+          node --check workers/auth-entry.js
+          node --check workers/auth-boundary.js
+          node --check workers/auth.js
+          node --check app/gate.js
+      - name: Run mocked auth and existing regression suites
+        run: node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs valhallaQueueEngine.test.cjs scripts/validateEnv.test.cjs
