@@ -128,7 +128,7 @@
   });
 
   function secretLike(text) {
-    var words = text.trim().toLowerCase().split(/\s+/);
+    var words = text.trim().toLowerCase().split(/\\s+/);
     return (words.length >= 12 && words.length <= 24 && words.every(function (word) {
       return /^[a-z]+$/.test(word);
     })) || /[1-9A-HJ-NP-Za-km-z]{64,}/.test(text);
@@ -154,35 +154,36 @@
       chatStatus.textContent = 'Do not share a seed phrase or private key. Your message was not sent.';
       return;
     }
-    var base = String((window.VALHALLA_SITE || {}).CHAT_URL || '').replace(/\/+$/, '');
+    var base = String((window.VALHALLA_SITE || {}).CHAT_URL || '').replace(/\\/+$/, '');
     if (!base) {
-      chatStatus.textContent = 'Chat service is not configured.';
-      return;
+      base = 'https://valhalla-brain-api.valhalla-app.workers.dev';
     }
     submitting = true;
     form.querySelector('button').disabled = true;
     input.disabled = true;
     message('YOU', text);
     input.value = '';
-    chatStatus.textContent = 'Waiting for the chat service…';
+    chatStatus.textContent = 'Grounding query with Perplexity & Solana market context…';
     var controller = new AbortController();
-    var timeout = window.setTimeout(function () { controller.abort(); }, 145000);
+    var timeout = window.setTimeout(function () { controller.abort(); }, 25000);
     try {
-      var response = await fetch(base + '/chat', {
+      var endpoint = base.endsWith('/v1') ? base + '/chat' : base + '/v1/chat';
+      var response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: text, history: history.slice(-8), stream: false }),
+        body: JSON.stringify({ prompt: text, text: text, messages: history.concat([{ role: 'user', content: text }]) }),
         signal: controller.signal
       });
       var body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Chat request failed.');
-      if (typeof body.reply !== 'string' || !body.reply.trim()) throw new Error('The chat service returned an empty reply.');
-      message('ASSISTANT', body.reply);
+      var reply = body.reply || body.content || '';
+      if (typeof reply !== 'string' || !reply.trim()) throw new Error('The chat service returned an empty reply.');
+      message('ASSISTANT', reply);
       var speechFailed = false;
       if (voiceEnabled) {
         try {
           window.speechSynthesis.cancel();
-          window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(body.reply));
+          window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(reply));
         } catch (error) {
           speechFailed = true;
           voiceEnabled = false;
@@ -191,11 +192,11 @@
           chatStatus.textContent = 'Reply received, but browser speech failed. Try voice again.';
         }
       }
-      history.push({ role: 'user', content: text }, { role: 'assistant', content: body.reply.slice(0, 500) });
+      history.push({ role: 'user', content: text }, { role: 'assistant', content: reply.slice(0, 500) });
       history = history.slice(-8);
-      if (!speechFailed) chatStatus.textContent = 'Never share a seed phrase or private key. Not financial advice.';
+      if (!speechFailed) chatStatus.textContent = 'Grounded with ' + (body.provider || 'Valhalla OS') + '. Not financial advice.';
     } catch (error) {
-      chatStatus.textContent = error.name === 'AbortError' ? 'Chat timed out. Please try again.' : 'Chat unavailable: ' + (error.message || 'Please try again.');
+      chatStatus.textContent = error.name === 'AbortError' ? 'Chat timed out. Please try again.' : 'Chat: ' + (error.message || 'Please try again.');
     } finally {
       window.clearTimeout(timeout);
       submitting = false;
