@@ -14,6 +14,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+      - name: Install locked test dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
       - name: Run every auth check and record diagnostic evidence
         run: node scripts/run-auth-ci.mjs
       - name: Publish per-check diagnostic statuses
@@ -23,7 +26,7 @@ jobs:
           script: |
             const fs = require('node:fs');
             if (!fs.existsSync('auth-ci-results.json')) {
-              core.warning('No test results: runner setup or execution failed.');
+              core.warning('No test results: dependency installation, runner setup or execution failed.');
               return;
             }
             const rows = JSON.parse(fs.readFileSync('auth-ci-results.json', 'utf8'));
