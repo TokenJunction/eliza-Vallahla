@@ -117,10 +117,10 @@
     var controller = new AbortController();
     var timeout = window.setTimeout(function () { controller.abort(); }, 25000);
     try {
-      var endpoint = base.endsWith('/v1') ? base + '/chat' : base + '/v1/chat';
+      var endpoint = (base.endsWith('/v1') ? base.slice(0, -3) : base) + '/chat';
       var response = await fetch(endpoint, {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt: text, text: text, messages: history.concat([{ role: 'user', content: text }]) }), signal: controller.signal
+        body: JSON.stringify({ text: text, history: history, stream: false }), signal: controller.signal
       });
       var body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Chat request failed.');
@@ -138,7 +138,7 @@
         }
       }
       history.push({ role: 'user', content: text }, { role: 'assistant', content: reply.slice(0, 500) }); history = history.slice(-8);
-      if (!speechFailed) chatStatus.textContent = 'Reply received from ' + (body.provider || 'the configured service') + '. Not financial advice.';
+      if (!speechFailed) chatStatus.textContent = 'Reply received from ' + (body.provider || response.headers.get('x-valhalla-provider') || 'the configured service') + '. Not financial advice.';
     } catch (error) {
       chatStatus.textContent = error.name === 'AbortError' ? 'Chat timed out. Please try again.' : 'Chat: ' + (error.message || 'Please try again.');
     } finally {
