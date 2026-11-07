@@ -1,0 +1,55 @@
+name: Release blocker diagnosis
+on:
+  push:
+    branches: [docs/site]
+    paths: ['.github/workflows/release-blocker-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: write
+concurrency:
+  group: valhalla-release-diagnostic
+  cancel-in-progress: false
+jobs:
+  diagnose:
+    if: github.repository == 'TokenJunction/eliza-valhalla' && github.ref == 'refs/heads/docs/site'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Collect public chat and existing CI failure evidence
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            function safeMessage(value) {
+              return String(value || '').replace(/[A-Za-z0-9_-]{32,}/g,'[redacted-long-token]').replace(/`/g,'[backtick]').slice(0,1200);
+            }
+            async function diagnose(fetcher) {
+              const site='https://valhalla-app.xyz',chat='https://valhalla-chat.valhalla-app.workers.dev';
+              const checks=[];
+              const request=(url,options={})=>fetcher(url,{redirect:'manual',signal:AbortSignal.timeout(45000),...options});
+              async function check(name,fn){try{const result=await fn();checks.push({name,...result});return result.passed===true;}catch{checks.push({name,passed:false,reason:'Request or response processing failed'});return false;}}
+              await check('published configuration',async()=>{const r=await request(site+'/site-config.js?release-diagnostic=1');const text=await r.text();const m=text.match(/\bCHAT_URL\s*:\s*["']([^"']+)["']/);return {status:r.status,passed:r.status===200&&!!m&&m[1].replace(/\/$/,'')===chat};});
+              await check('public app wiring',async()=>{const r=await request(site+'/app/');const text=await r.text();return {status:r.status,passed:r.status===200&&text.includes('site-config.js')&&text.includes('desk-chat.js')};});
+              await check('browser preflight',async()=>{const r=await request(chat+'/chat',{method:'OPTIONS',headers:{Origin:site,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type,authorization'}});const h=(r.headers.get('access-control-allow-headers')||'').toLowerCase().split(',').map(x=>x.trim());return {status:r.status,passed:r.status===204&&r.headers.get('access-control-allow-origin')===site&&r.headers.get('access-control-allow-credentials')==='true'&&h.includes('content-type')&&h.includes('authorization')};});
+              const jsonOk=await check('anonymous JSON chat',async()=>{const r=await request(chat+'/chat',{method:'POST',headers:{Origin:site,'Content-Type':'application/json'},body:JSON.stringify({text:'Reply only with OK.',history:[],stream:false})});const b=await r.json().catch(()=>null);return {status:r.status,passed:r.status===200&&typeof b?.reply==='string'&&b.reply.trim().length>0&&r.headers.get('access-control-allow-origin')===site&&r.headers.get('x-valhalla-provider')==='workers-ai',error_code:typeof b?.error==='string'?b.error.match(/V-CHAT-[A-Z-]+/)?.[0]:undefined};});
+              if(jsonOk)await check('anonymous streaming chat',async()=>{const r=await request(chat+'/chat',{method:'POST',headers:{Origin:site,'Content-Type':'application/json'},body:JSON.stringify({text:'Reply only with OK.',history:[],stream:true})});const text=await r.text();return {status:r.status,passed:r.status===200&&(r.headers.get('content-type')||'').startsWith('text/plain')&&r.headers.get('access-control-allow-origin')===site&&r.headers.get('x-valhalla-provider')==='workers-ai'&&text.trim().length>0&&text.length<=8192};});
+              else checks.push({name:'anonymous streaming chat',passed:false,skipped:true,reason:'JSON failed; no second inference request made'});
+              return {checks,passed:checks.every(x=>x.passed===true),scope:'HTTP diagnostics, not actual browser or Android validation'};
+            }
+
+            if(context.repo.owner!=='TokenJunction'||context.repo.repo!=='eliza-valhalla'||context.ref!=='refs/heads/docs/site'){core.setFailed('Unexpected repository or branch');return;}
+            const report=await diagnose(fetch);
+            report.commit=context.sha;
+            report.run_url=context.serverUrl+'/TokenJunction/eliza-valhalla/actions/runs/'+context.runId;
+            try{const r=await github.rest.actions.listWorkflowRuns({owner:'TokenJunction',repo:'eliza-valhalla',workflow_id:'pages.yml',branch:'docs/site',per_page:5});report.pages_runs=r.data.workflow_runs.map(x=>({id:x.id,head_sha:x.head_sha,status:x.status,conclusion:x.conclusion}));}catch{report.pages_status='Unavailable';}
+            try{const r=await github.rest.actions.getJobForWorkflowRun({owner:'TokenJunction',repo:'eliza-valhalla',job_id:128477194948});report.v38_source_job={status:r.data.status,conclusion:r.data.conclusion,failed_steps:(r.data.steps||[]).filter(x=>x.conclusion==='failure').map(x=>({number:x.number,name:safeMessage(x.name)}))};}catch{report.v38_source_job='Unavailable';}
+            try{const r=await github.rest.checks.listAnnotations({owner:'TokenJunction',repo:'eliza-valhalla',check_run_id:128477194948,per_page:20});report.v38_source_annotations=r.data.map(x=>({path:safeMessage(x.path),start_line:x.start_line,level:x.annotation_level,message:safeMessage(x.message)}));}catch{report.v38_source_annotations='Unavailable';}
+            const rendered=JSON.stringify(report,null,2);
+            core.info(rendered);
+            await core.summary.addHeading('Release blocker receipt').addCodeBlock(rendered,'json').write();
+            const fence=String.fromCharCode(96,96,96);
+            const body=['Release blocker receipt: HTTP diagnostics do not prove browser success or authorize deployment.','',fence+'json',rendered,fence].join(String.fromCharCode(10));
+            await github.rest.issues.createComment({owner:'TokenJunction',repo:'eliza-valhalla',issue_number:29,body});
+            if(!report.passed)core.setFailed('Live delivery or chat diagnostic failed; use the receipt to choose the next fix');
