@@ -1,0 +1,497 @@
+:root {
+  color: #f2f3f6;
+  background: #0c1421;
+  color-scheme: dark;
+  --valhalla-navy: #0c1421;
+  --valhalla-surface: #172333;
+  --valhalla-raised: #223146;
+  --valhalla-edge: #6c7c93;
+  --valhalla-gold: #e3c27c;
+  --valhalla-text: #f2f3f6;
+  --valhalla-muted: #b5c0d0;
+  --valhalla-error: #f0a6a0;
+  font-family: system-ui, "Segoe UI", sans-serif;
+  font-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #0c1421;
+  color: #f2f3f6;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #e3c27c;
+  outline-offset: 2px;
+}
+
+.vd-desktop {
+  min-height: 100vh;
+  padding: 8px 8px 52px;
+}
+
+.vd-banner,
+.vd-license {
+  margin: 0 0 6px;
+  max-width: 920px;
+  background: #ffffe1;
+  border: 2px solid #000;
+  padding: 6px 8px;
+}
+
+.vd-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.vd-icon {
+  width: 84px;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  color: #fff;
+  border: 2px solid transparent;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.vd-icon span:first-child {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: #c0c0c0;
+  color: #000;
+  text-shadow: none;
+  border-top: 2px solid #fff;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #000;
+  border-bottom: 2px solid #000;
+  font-weight: 700;
+}
+
+.vd-windows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vd-window {
+  width: min(820px, 100%);
+  background: #c0c0c0;
+  border-top: 2px solid #fff;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #000;
+  border-bottom: 2px solid #000;
+  padding: 2px;
+}
+
+.vd-window[data-active="true"] {
+  outline: 2px solid #000080;
+  outline-offset: 1px;
+}
+
+.vd-window[hidden] {
+  display: none;
+}
+
+.vd-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px;
+}
+
+.vd-window[data-active="true"] .vd-titlebar {
+  background: linear-gradient(90deg, #000080, #1084d0);
+  color: #fff;
+}
+
+.vd-window[data-active="false"] .vd-titlebar {
+  background: #808080;
+  color: #fff;
+}
+
+.vd-titlebar h2 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.vd-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.vd-controls button,
+.vd-body button,
+.vd-taskbar button,
+.vd-menu button {
+  background: #c0c0c0;
+  color: #000;
+  border-top: 2px solid #fff;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #000;
+  border-bottom: 2px solid #000;
+  min-height: 24px;
+  padding: 2px 8px;
+}
+
+.vd-titlebar h2 button {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  padding: 0;
+  font-weight: 700;
+}
+
+button:disabled {
+  color: #606060;
+}
+
+.vd-body {
+  padding: 8px;
+}
+
+.vd-body h3 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+}
+
+.vd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.vd-field input,
+.vd-field select,
+.vd-inline select {
+  background: #fff;
+  border-top: 2px solid #000;
+  border-left: 2px solid #000;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  min-height: 24px;
+  padding: 2px 4px;
+}
+
+.vd-hint,
+.vd-note {
+  margin: 0 0 6px;
+}
+
+.vd-error {
+  margin: 0;
+  color: #800000;
+}
+
+.vd-secret {
+  margin-top: 12px;
+  padding: 8px;
+  background: #fff;
+  border-top: 2px solid #000;
+  border-left: 2px solid #000;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+}
+
+.vd-routes,
+.vd-cards,
+.vd-apps,
+.vd-services {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vd-routes li,
+.vd-cards li,
+.vd-apps li,
+.vd-services li,
+.vd-summary {
+  background: #fff;
+  border: 1px solid #808080;
+  padding: 6px;
+}
+
+.vd-summary {
+  margin: 0 0 8px;
+}
+
+.vd-summary > div {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 4px 8px;
+  margin-bottom: 4px;
+}
+
+.vd-summary dt {
+  font-weight: 700;
+}
+
+.vd-summary dd {
+  margin: 0;
+}
+
+.vd-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 4px;
+  background: #000080;
+  color: #fff;
+  font-size: 11px;
+}
+
+.vd-taskbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  min-height: 36px;
+  padding: 4px;
+  background: #c0c0c0;
+  border-top: 2px solid #fff;
+}
+
+.vd-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.vd-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 25%);
+  padding: 16px;
+}
+
+.vd-dialog {
+  width: min(420px, 100%);
+  background: #c0c0c0;
+  border-top: 2px solid #fff;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #000;
+  border-bottom: 2px solid #000;
+  padding: 8px;
+}
+
+.vd-dialog p {
+  margin-top: 0;
+}
+
+.vd-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+@media (max-width: 720px) {
+  .vd-desktop {
+    padding-bottom: 88px;
+  }
+
+  .vd-summary > div {
+    grid-template-columns: 1fr;
+  }
+
+  .vd-icon {
+    width: 72px;
+  }
+}
+
+.vd-desktop,
+.vd-window,
+.vd-taskbar,
+.vd-dialog,
+.vd-banner,
+.vd-license {
+  color: #f2f3f6;
+}
+
+.vd-window,
+.vd-taskbar,
+.vd-dialog,
+.vd-banner,
+.vd-license,
+.vd-secret,
+.vd-routes li,
+.vd-cards li,
+.vd-apps li,
+.vd-services li,
+.vd-summary {
+  background: #172333;
+  border-color: #6c7c93;
+}
+
+.vd-window[data-active="true"] .vd-titlebar {
+  background: #223146;
+  box-shadow: inset 0 -2px 0 #e3c27c;
+}
+
+.vd-window[data-active="false"] .vd-titlebar {
+  background: #101722;
+}
+
+.vd-field input,
+.vd-field select,
+.vd-inline select,
+#command-input,
+#ascent-name,
+#browser-url {
+  background: #0c1421;
+  color: #f2f3f6;
+  border: 1px solid #6c7c93;
+  min-height: 44px;
+}
+
+.vd-icon {
+  color: #f2f3f6;
+}
+
+.vd-overline {
+  margin: 0;
+  color: #e3c27c;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vd-workspace-bar,
+#setup-guide,
+#command-form {
+  margin: 0 0 16px;
+  padding: 16px;
+  background: #172333;
+  border: 1px solid #6c7c93;
+}
+
+.ascent {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #0b1120;
+  color: #f5f1e8;
+  position: relative;
+}
+
+.ascent-card {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  background: #172333;
+  border: 1px solid #6c7c93;
+  border-radius: 6px;
+}
+
+.ascent-arch {
+  position: absolute;
+  width: min(70vmin, 640px);
+  height: min(70vmin, 640px);
+  border: 2px solid #e3c27c;
+  border-radius: 50%;
+  border-bottom-color: transparent;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.ascent-halo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, #e3c27c22, transparent 60%);
+}
+
+.ascent-static .ascent-arch,
+.ascent-static .ascent-halo,
+.ascent[data-effects="low"] .ascent-arch,
+.ascent[data-effects="low"] .ascent-halo {
+  display: none;
+}
+
+#ascent-readiness {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+#ascent-readiness li {
+  display: grid;
+  gap: 4px;
+}
+
+#ascent-readiness li[data-ready="yes"] span:nth-child(2)::before {
+  content: "■ ";
+}
+
+#ascent-readiness li[data-ready="no"] span:nth-child(2)::before {
+  content: "○ ";
+}
+
+.vd-desktop[data-theme="light"] .vd-window,
+.vd-desktop[data-theme="light"] .vd-taskbar,
+.vd-desktop[data-theme="light"] .vd-banner,
+.vd-desktop[data-theme="light"] .vd-license,
+.vd-desktop[data-theme="light"] #setup-guide,
+.vd-desktop[data-theme="light"] #command-form,
+.vd-desktop[data-theme="light"] .vd-secret,
+.vd-desktop[data-theme="light"] .vd-routes li,
+.vd-desktop[data-theme="light"] .vd-cards li,
+.vd-desktop[data-theme="light"] .vd-apps li,
+.vd-desktop[data-theme="light"] .vd-services li {
+  background: #fffdf8;
+  color: #101722;
+  border-color: #6b4e16;
+}
+
+#ascent-primary,
+#command-send,
+#start-button,
+#voice-button,
+#setup-guide button {
+  min-height: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ascent-arch,
+  .ascent-halo {
+    display: none;
+  }
+}
