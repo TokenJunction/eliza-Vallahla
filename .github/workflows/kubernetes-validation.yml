@@ -1,0 +1,71 @@
+name: Kubernetes validation
+
+on:
+  pull_request:
+    branches: [docs/site]
+  push:
+    branches: [docs/site, config/kubernetes-production-manifests]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kubernetes-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kubernetes-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Detect Kubernetes configuration
+        id: configuration
+        shell: bash
+        run: |
+          if [[ -f deploy/k8s/base/kustomization.yaml && -f deploy/k8s/overlays/production/kustomization.yaml ]]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'Kubernetes configuration is absent on this revision.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Set up Go
+        if: steps.configuration.outputs.present == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Install pinned validation tools
+        if: steps.configuration.outputs.present == 'true'
+        shell: bash
+        run: |
+          go install sigs.k8s.io/kustomize/kustomize/v5@v5.6.0
+          go install github.com/yannh/kubeconform/cmd/kubeconform@v0.6.7
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Render base and production
+        if: steps.configuration.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p validation-results
+          kustomize build deploy/k8s/base > validation-results/base.yaml
+          kustomize build deploy/k8s/overlays/production > validation-results/production.yaml
+      - name: Validate Kubernetes resource schemas
+        if: steps.configuration.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubeconform -strict -summary -verbose -kubernetes-version 1.32.0 validation-results/base.yaml validation-results/production.yaml 2>&1 | tee validation-results/schema-validation.log
+          echo 'Rendered base and production; schema validation passed against Kubernetes 1.32.0. This is not cluster admission or runtime validation.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload available validation output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubernetes-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: validation-results/
+          retention-days: 7
+          if-no-files-found: ignore
