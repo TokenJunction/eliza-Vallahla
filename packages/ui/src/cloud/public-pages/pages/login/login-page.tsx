@@ -1,6 +1,6 @@
 /**
- * Login page (public) — Steward is the sole auth provider. Renders the lazy
- * Steward login section with the terms/privacy links. Listens for device-code
+ * Login page (public) — Steward is the default auth provider. An explicit
+ * Vite setting can select the lazy Clerk sign-in section. Listens for device-code
  * auth completion on same-origin tabs so an orphaned sign-in form does not
  * stay live after the session already finished (#18001).
  *
@@ -26,9 +26,11 @@ import {
 } from "../../../cloud-auth-complete-signal";
 import { useDocumentTitle } from "../../../lib/use-document-title";
 import { useCloudT } from "../../../shell/CloudI18nProvider";
+import { resolveHumanLoginProvider } from "./login-provider";
 import { LoginOptionsSkeleton } from "./login-section-skeleton";
 
 const StewardLoginSection = lazy(() => import("./steward-login-section"));
+const ClerkLoginSection = lazy(() => import("./clerk-login-section"));
 const LoopbackCloudLoginSection = lazy(
   () => import("./loopback-cloud-login-section"),
 );
@@ -41,6 +43,26 @@ function StewardLoginSectionFallback() {
     <div aria-busy="true" aria-hidden="true">
       <LoginOptionsSkeleton />
     </div>
+  );
+}
+
+function SelectedLoginSection(): React.JSX.Element {
+  const provider = resolveHumanLoginProvider(
+    import.meta.env.VITE_STEWARD_HUMAN_AUTH_PROVIDER,
+  );
+  if (provider === "steward") {
+    return isLoopbackStagingStewardDevelopment() ? (
+      <LoopbackCloudLoginSection />
+    ) : (
+      <StewardLoginSection />
+    );
+  }
+  if (provider === "clerk") return <ClerkLoginSection />;
+  return (
+    <p role="alert" className="text-center text-sm text-status-error">
+      Sign-in is unavailable because this environment has an unsupported
+      authentication provider.
+    </p>
   );
 }
 
@@ -213,11 +235,7 @@ function PublicLoginPage(): React.JSX.Element {
           </div>
         </div>
         <Suspense fallback={<StewardLoginSectionFallback />}>
-          {isLoopbackStagingStewardDevelopment() ? (
-            <LoopbackCloudLoginSection />
-          ) : (
-            <StewardLoginSection />
-          )}
+          <SelectedLoginSection />
         </Suspense>
         <p className="border-t border-border pt-5 text-center text-xs leading-relaxed text-muted">
           {t("cloud.login.agreePrefix", {

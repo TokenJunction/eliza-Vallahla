@@ -237,6 +237,84 @@ new login token, or database migration is added. Real delivery and Cloud account
 continuity still require separate testing with the existing authorized key and
 sender after review.
 
+## Staged Clerk web sign-in
+
+Clerk is an optional web identity provider. The default remains Steward. The
+integration accepts only the existing Clerk application
+`app_3Lo8rOPgUxtDI69EGZQBY34ArhN`. It does not create Clerk users or internal
+accounts, and it does not match accounts by email, wallet, or `external_id`.
+
+The login server enables the Clerk boundary only when
+`STEWARD_HUMAN_AUTH_PROVIDER=clerk` and all server settings are valid:
+
+| Server setting             | Purpose                                                                 |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `CLERK_APPLICATION_ID`     | Must equal the selected application ID above.                           |
+| `CLERK_SECRET_KEY`         | Server-only Clerk token verification. Keep it in the host secret store. |
+| `CLERK_ISSUER`             | Exact HTTPS issuer for the selected Clerk application.                  |
+| `CLERK_JWT_AUDIENCE`       | Audience expected from the Clerk session token template.                |
+| `CLERK_AUTHORIZED_PARTIES` | Comma-separated exact HTTPS browser origins. Wildcards are rejected.    |
+
+The web login remains Steward unless
+`VITE_STEWARD_HUMAN_AUTH_PROVIDER=clerk` is set at build time. Clerk also needs
+`VITE_CLERK_PUBLISHABLE_KEY` and `VITE_CLERK_JWT_TEMPLATE`; the publishable key
+and template name are not server credentials. Configure that named JWT template
+in the selected Clerk application so its `aud` claim matches
+`CLERK_JWT_AUDIENCE`. The page requests this template and checks server
+readiness before mounting Clerk; it also disables sign-up. A selected but
+unconfigured Clerk mode reports that sign-in is unavailable; it does not fall
+back to Steward. Unknown client modes also fail closed.
+
+To prepare account linking while Steward stays the default, set
+`VITE_CLERK_LINK_ENABLED=true` and configure the server boundary above. The
+existing account page then offers Clerk linking. A user must have a current
+Steward session and complete Steward MFA within five minutes. The server verifies
+the Clerk token, checks the existing tenant membership, stores a stable hash of
+the verified issuer and subject in the existing `accounts` table, rejects
+collisions, and writes an audit event. Clerk sign-in can create a Steward session
+only for an already-linked identity with membership in the server-selected
+`STEWARD_DEFAULT_TENANT_ID`. Browser fields cannot select a user or tenant.
+
+### Host-authenticated preparation and rollout
+
+1. On an authenticated host, open the Clerk Dashboard and select only
+   `app_3Lo8rOPgUxtDI69EGZQBY34ArhN`. Confirm the application ID in the
+   Dashboard before copying any setting. Do not run Clerk CLI login, init, link,
+   or environment-pull commands in this coding session.
+2. Configure the exact issuer, the audience claim for the selected JWT
+   template, and the HTTPS origins that may sign in. Set the template name in
+   `VITE_CLERK_JWT_TEMPLATE`. Keep sign-up disabled and keep existing
+   Google/OAuth settings intact. Store the server key only in the authenticated
+   host's secret store. Never place its value in a Vite variable, browser bundle,
+   log, test, or commit.
+3. Keep the web provider at Steward. Enable only the Clerk server boundary and
+   the account-link control in a non-production environment. Link one existing
+   account at a time after a fresh Steward MFA step-up. Check collisions and
+   account continuity before enabling Clerk sign-in.
+4. Validate protected routes, tenant membership, MFA, logout, and existing
+   provider callbacks with safe fixtures and an authorized browser session. Do
+   not treat fixture results as proof of a live Clerk application or production
+   account migration.
+5. After a separate approval, select Clerk for the web login build. Keep the
+   Steward path available for rollback. Native mobile, desktop, and extensions
+   remain on their existing host contracts; this does not enable universal login.
+6. To roll back, build the web login with Steward (unset or set
+   `VITE_STEWARD_HUMAN_AUTH_PROVIDER=steward`), disable
+   `VITE_CLERK_LINK_ENABLED`, then set the server provider to Steward to close
+   Clerk routes. Existing identity links do not change. Unlink only through the
+   existing MFA-protected account-unlink flow; it refuses to remove the last
+   login method and revokes sessions.
+
+No password hashes, passkeys, MFA factors, or real user records are imported by
+this integration. Plan explicit password recovery and passkey/MFA re-enrollment
+before any future migration. Existing Steward Google/OAuth grants stay in place;
+configure and test Clerk provider connections separately, and plan for
+reauthentication where a provider does not preserve its existing grant. Clerk
+human login does not replace wallet proofs, PKCE/acknowledgement flows, node keys,
+service accounts, SSH keys, API keys, inference credentials, or vault secrets.
+Production import, OAuth changes, deployment, and account cutover need separate
+approval.
+
 ## Cloudflare login service
 
 `cloudflare/wrangler.toml` runs the same Bun login server in a Cloudflare
