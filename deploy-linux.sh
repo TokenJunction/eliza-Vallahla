@@ -8,10 +8,10 @@ echo "=========================================================="
 # 1. Update and install basic runtime dependencies
 sudo apt-get update && sudo apt-get install -y curl unzip git build-essential
 
-# 2. Install Bun runtime if missing
-if ! command -v bun &> /dev/null; then
+# 2. Install the pinned Bun runtime if needed
+if ! command -v bun >/dev/null 2>&1 || [ "$(bun --version)" != "1.4.2" ]; then
   echo "[INSTALL] Installing Bun..."
-  curl -fsSL https://bun.sh/install | bash
+  curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.2"
   export PATH="$HOME/.bun/bin:$PATH"
 fi
 
