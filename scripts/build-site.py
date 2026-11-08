@@ -13,7 +13,8 @@ shutil.copytree(
         '.env', '.env.*', 'package.json', 'package-lock.json', 'bun.lock',
         'bun.lockb', 'render.yaml', 'valhalla-elizaos', 'supabase', 'lib',
         'valhallaQueueEngine.js', 'valhallaQueueEngine.test.cjs',
-        'valhallaWorker.js', 'valhallaWorker.test.cjs', 'setup.ps1', 'setup.sh'
+        'valhallaWorker.js', 'valhallaWorker.test.cjs', 'valhallaRedis.integration.test.cjs',
+        'setup.ps1', 'setup.sh'
     )
 )
 

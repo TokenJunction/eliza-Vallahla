@@ -75,7 +75,7 @@ Run `npm run validate:env` to check production secrets and the server-side owner
 
 ## Existing Render background worker: review only
 
-The reported `node valhallaWorker.js` failure was a missing root file at revision `737938505026614a8eb86dddb1d5f1116d6301b9`, not evidence of an Ollama, Clerk, or model failure. The root npm package is `valhalla-site`, not the ElizaOS Bun project. Its declared Node range is `>=22`; the root lockfile currently includes a dependency requiring Node >=24. Node 22.23.4 installed the lockfile with an engine warning and passed the root tests locally. Node 26.13.0 was reported in the incident but was not available for local verification. Do not treat a version downgrade as the missing-file fix or infer compatibility from installation alone.
+The reported `node valhallaWorker.js` failure was a missing root file at revision `737938505026614a8eb86dddb1d5f1116d6301b9`, not evidence of an Ollama, Clerk, or model failure. The root npm package is `valhalla-site`, not the ElizaOS Bun project. Its declared Node range is `>=22`; the root lockfile currently includes a dependency requiring Node >=24. Node 22.23.4 installed the lockfile with an engine warning and passed the root tests locally. Node 26.13.0 was tested locally with the locked dependencies and an isolated Redis fixture; that is not verification of the deployed environment. Do not treat a version downgrade as the missing-file fix or infer compatibility from installation alone.
 
 For owner review of the **already existing** worker, not a new blueprint service:
 
@@ -88,6 +88,8 @@ For owner review of the **already existing** worker, not a new blueprint service
 Rollback: after separately approved operational action, disable queue dispatch and restore the previously reviewed web configuration; stop the standalone consumer only after accounting for active jobs. Reverting the entrypoint alone reintroduces the known missing-file failure. Do not provision another worker or claim the existing worker is healthy without observing it.
 
 Queue outputs are synthetic paper/status results, not proof of machine, model, network, vault or trading health. `vault-check` is blocked, not a vault access check. Tenant-owned or paid jobs remain unsupported until a real authorization and ownership protocol exists. This change does not implement autonomous or model capabilities.
+
+For local integration coverage, point `VALHALLA_TEST_REDIS_SERVER` to an absolute path of a Redis server binary and run `node --test valhallaRedis.integration.test.cjs` from the root. The test starts its own loopback-only Redis instances in temporary directories, generates a temporary TLS certificate with OpenSSL, and shuts down its own processes. It never uses an existing `REDIS_URL`. Without the binary setting the Redis and TLS tests are skipped. The TLS fixture checks trust and hostname verification, not the actual production private network or provider certificate. Review the real target, network, configuration and candidate revision separately before any approved rollout.
 
 ## Not included in this deployment
 

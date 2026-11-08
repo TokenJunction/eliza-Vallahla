@@ -25,7 +25,7 @@ const types = {
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml',
   '.mp4': 'video/mp4', '.md': 'text/markdown; charset=utf-8',
 };
-const hidden = /(^|[\\/])(\.[^\\/]*|(node_modules|workers|supabase|scripts|lib|valhalla-elizaos)([\\/]|$)|valhallaWorker(?:\.test\.cjs|\.js)$)/;
+const hidden = /(^|[\\/])(\.[^\\/]*|(node_modules|workers|supabase|scripts|lib|valhalla-elizaos)([\\/]|$)|valhallaWorker(?:\.test\.cjs|\.js)$|valhallaRedis\.integration\.test\.cjs$)/;
 
 function resolve(urlPath) {
   const rel = path.normalize(decodeURIComponent(urlPath.split('?')[0])).replace(/^([\\/]|\.\.)+/, '');

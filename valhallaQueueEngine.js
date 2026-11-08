@@ -2,7 +2,7 @@
 
 const { timingSafeEqual } = require('node:crypto');
 const IORedis = require('ioredis');
-const { Queue, Worker } = require('bullmq');
+const { Queue, Worker, UnrecoverableError } = require('bullmq');
 
 const QUEUE_TASKS = Object.freeze({
   zeus: new Set(['health-check', 'policy-check']),
@@ -158,13 +158,18 @@ async function createValhallaQueueEngine({
           const worker = new WorkerClass(
             `valhalla-${targetEngine}`,
             async (job) => {
-              if (!job.data || typeof job.data !== 'object' || Array.isArray(job.data) ||
-                  Object.keys(job.data).some((key) => key !== 'payload') ||
-                  !Object.hasOwn(job.data, 'payload')) {
-                throw new Error('invalid_job');
+              let dispatch;
+              try {
+                if (!job.data || typeof job.data !== 'object' || Array.isArray(job.data) ||
+                    Object.keys(job.data).some((key) => key !== 'payload') ||
+                    !Object.hasOwn(job.data, 'payload')) {
+                  throw new Error('invalid_job');
+                }
+                dispatch = validateDispatch({ targetEngine, taskName: job.name, payload: job.data.payload });
+              } catch {
+                throw new UnrecoverableError('invalid_job');
               }
-              const { taskName, payload } = validateDispatch({ targetEngine, taskName: job.name, payload: job.data.payload });
-              return executeSafeTask(targetEngine, taskName, payload);
+              return executeSafeTask(targetEngine, dispatch.taskName, dispatch.payload);
             },
             { connection, concurrency: 1, autorun: false },
           );
