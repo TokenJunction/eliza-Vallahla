@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Run the separate ValhallaOS V38 educational x86-64 kernel in QEMU. Verified ISO, source, checksums, and build instructions.">
+<link rel="canonical" href="https://valhalla-app.xyz/kernel/">
+<title>Educational kernel · ValhallaOS</title>
+<style>
+:root { color-scheme: dark; font: 17px/1.65 system-ui,sans-serif; background:#121a27; color:#edf1f7; }
+* { box-sizing:border-box; } body { margin:0; } main { max-width:900px; margin:auto; padding:32px 24px 64px; }
+a { color:#f1c77b; text-underline-offset:4px; } a:focus-visible { outline:3px solid #f1c77b; outline-offset:5px; }
+nav { display:flex; gap:20px; flex-wrap:wrap; } h1 { font-size:clamp(2rem,6vw,3.1rem); line-height:1.15; }
+h2 { margin-top:2.2rem; font-size:1.4rem; } .label { color:#f1c77b; text-transform:uppercase; letter-spacing:.12em; font-size:.8rem; }
+.notice { border-left:4px solid #e8b65a; background:#1b2839; padding:16px 20px; }
+pre { padding:18px; background:#0b121d; border:1px solid #344056; border-radius:8px; overflow-x:auto; font-size:.83rem; }
+code { overflow-wrap:anywhere; } pre code { overflow-wrap:normal; } .downloads { display:flex; gap:12px; flex-wrap:wrap; margin:24px 0; }
+.downloads a { padding:10px 16px; border:1px solid #a98243; border-radius:6px; }
+li { margin:.45rem 0; } footer { margin-top:48px; border-top:1px solid #344056; padding-top:20px; color:#b7c4d5; }
+</style>
+</head>
+<body><main>
+<nav aria-label="Breadcrumb"><a href="/">ValhallaOS home</a><a href="https://github.com/TokenJunction/eliza-valhalla/releases/tag/educational-v38-20261108">Release and logs</a></nav>
+<p class="label">Separate educational experiment</p>
+<h1>Run the V38 kernel in QEMU</h1>
+<p class="notice"><strong>Not the trading application.</strong> This is an original, freestanding x86-64 educational kernel. It does not provide trading, wallets, login, or a browser desktop. It is not a production operating system. Run it in an emulator, not on a physical device.</p>
+<p>The BIOS ISO was boot-tested on 2026-11-08 under QEMU TCG 10.2.1 with one virtual CPU at 64 MiB and 128 MiB RAM. Both runs produced the required serial markers, three worker messages, and exit status 33. <a href="https://github.com/TokenJunction/eliza-valhalla/releases/tag/educational-v38-20261108">Inspect the actual logs and artifacts</a>.</p>
+<div class="downloads" aria-label="Verified release downloads">
+<a href="https://github.com/TokenJunction/eliza-valhalla/releases/download/educational-v38-20261108/valhalla-v38.iso">Bootable ISO</a><a href="https://github.com/TokenJunction/eliza-valhalla/releases/download/educational-v38-20261108/valhalla-v38-source.zip">Source ZIP</a><a href="https://github.com/TokenJunction/eliza-valhalla/releases/download/educational-v38-20261108/SHA256SUMS.txt">SHA-256 checksums</a>
+</div>
+<h2>Run the downloaded ISO</h2>
+<p>On Debian or Ubuntu, install QEMU. Put the ISO and checksum file in the same directory. Check the ISO checksum before booting.</p>
+<pre><code>sudo apt-get update
+sudo apt-get install qemu-system-x86
+# Download valhalla-v38.iso and SHA256SUMS.txt above.
+grep '  valhalla-v38.iso$' SHA256SUMS.txt | sha256sum --check -
+qemu-system-x86_64 -accel tcg -m 128M -smp 1 \
+  -cdrom valhalla-v38.iso -boot d -display none \
+  -serial mon:stdio -no-reboot -no-shutdown</code></pre>
+<p>Press <strong>Ctrl+A, then X</strong> to exit. The guest has no interactive shell. It writes to the serial console and continues scheduling after its demonstration.</p>
+<h2>Build and test from source</h2>
+<p>Use an <strong>x86-64 Linux host</strong> for the native GCC commands below. An ARM host needs an <code>x86_64-elf-</code> cross-toolchain instead. Extract the source ZIP first.</p>
+<pre><code>sudo apt-get install build-essential binutils grub-common grub-pc-bin \
+  xorriso mtools qemu-system-x86 python3 gdb
+cd valhalla-v38
+make CROSS= test
+make CROSS= run</code></pre>
+<p>The test builds <code>build/valhalla-v38.iso</code>, boots the actual ISO, and checks serial output plus QEMU exit status. Missing markers, a panic, or a timeout fail the test. Use <code>make CROSS= debug</code> and connect GDB to <code>:1234</code> for debugging.</p>
+<h2>What runs inside</h2>
+<ul>
+<li>Multiboot2 bootstrap and x86-64 long-mode transition.</li>
+<li>Firmware-map physical-page allocation below 1 GiB, four-level mapping, and a 256 KiB heap.</li>
+<li>Cooperative round-robin kernel threads and a logger/producer demonstration.</li>
+<li>Version-38 daemon messages with bounded FIFO mailboxes.</li>
+</ul>
+<h2>Limits and automation status</h2>
+<p>Interrupts stay disabled. There is no exception recovery, preemption, SMP, userspace isolation, filesystem, network, or authentication. Heap blocks, page-table pages, and dead thread stacks are not reclaimed. Kernel-resident services trust each other.</p>
+<p>A build-and-boot CI template is included in the source, but it is <strong>not an active workflow</strong>. Enabling it requires workflow-edit permission. This release is backed by the local QEMU checks described above, not a claim of hosted CI or physical-hardware qualification.</p>
+<footer><p>Source revision: <a href="https://github.com/TokenJunction/eliza-valhalla/tree/ffdd8cfaf826544ccf8c804c8630c143d0223945/experimental/valhalla-v38"><code>ffdd8cfaf826</code></a> · <a href="https://github.com/TokenJunction/eliza-valhalla/pull/39">Kernel change record</a></p><p>Existing application, sign-in, wallet, and service settings are unchanged.</p></footer>
+</main></body></html>
