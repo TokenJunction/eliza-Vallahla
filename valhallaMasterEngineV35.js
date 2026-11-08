@@ -212,7 +212,7 @@ async function start() {
     }
   }
   server.listen(port, '0.0.0.0', () =>
-    console.log(`Valhalla serving ${root} on :${port} (queues ${queueEngine ? 'active' : 'inactive'})`),
+    console.log(`Valhalla serving ${root} on :${port} (queues ${queueEngine?.getStatus().ready ? 'active' : 'inactive'})`),
   );
 }
 

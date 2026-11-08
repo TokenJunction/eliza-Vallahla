@@ -6,6 +6,8 @@ const { EventEmitter } = require('node:events');
 const { spawn, spawnSync } = require('node:child_process');
 const { once } = require('node:events');
 const { performance } = require('node:perf_hooks');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { createValhallaQueueEngine } = require('./valhallaQueueEngine');
 const { checkWorkerConfig } = require('./scripts/workerPreflight');
@@ -86,6 +88,18 @@ test('preflight detects wrong directory and worker disabled mode exits without r
   const wrong = spawnSync(process.execPath, [path.join(root, 'scripts/workerPreflight.js'), '--structure'], { cwd: path.dirname(root), env, encoding: 'utf8' });
   assert.equal(wrong.status, 1);
   assert.match(wrong.stderr, /wrong_working_directory/);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'valhalla-preflight-'));
+  try {
+    fs.mkdirSync(path.join(tmp, 'scripts'));
+    fs.copyFileSync(path.join(root, 'scripts/workerPreflight.js'), path.join(tmp, 'scripts/workerPreflight.js'));
+    fs.writeFileSync(path.join(tmp, 'package.json'), '{"name":"valhalla-site"}');
+    fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{}');
+    const missing = spawnSync(process.execPath, [path.join(tmp, 'scripts/workerPreflight.js'), '--structure'], { cwd: tmp, env, encoding: 'utf8' });
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /missing_worker_file/);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('consumer revalidates untrusted jobs and never creates producer queues', async () => {
@@ -163,7 +177,15 @@ test('unavailable Redis, startup deadline and cancellation clean up without leak
   assert.equal(cancelled.connections[0].options.retryStrategy(100), 15000);
 });
 
-test('SIGTERM cancels a real pending connection without reporting ready', async () => {
+test('cleanup failures are reported after disconnecting', async () => {
+  const f = fixture();
+  const engine = await createValhallaQueueEngine(options(f, { role: 'producer' }));
+  f.queues[0].close = () => Promise.reject(new Error('backend detail'));
+  await assert.rejects(engine.close(), /^Error: queue_cleanup_failed$/);
+  assert.equal(f.connections[0].status, 'end');
+});
+
+for (const signalName of ['SIGTERM', 'SIGINT']) test(`${signalName} cancels a real pending connection without reporting ready`, async () => {
   const child = spawn(process.execPath, [path.join(root, 'valhallaWorker.js')], {
     cwd: root,
     env: { PATH: process.env.PATH, ...config, REDIS_URL: 'redis://127.0.0.1:1' },
@@ -174,8 +196,12 @@ test('SIGTERM cancels a real pending connection without reporting ready', async 
   child.stderr.on('data', (data) => { output += data; });
   const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
   try {
-    await once(child.stderr, 'data');
-    child.kill('SIGTERM');
+    const started = await Promise.race([
+      once(child.stderr, 'data').then(() => true),
+      once(child, 'exit').then(() => false),
+    ]);
+    assert.equal(started, true);
+    child.kill(signalName);
     const [code, signal] = await once(child, 'exit');
     assert.equal(signal, null);
     assert.equal(code, 0);

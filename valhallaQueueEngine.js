@@ -105,6 +105,7 @@ async function createValhallaQueueEngine({
   let ready = null;
   let started = false;
   let stopped = false;
+  let closePromise;
   const state = (value) => {
     if (ready === value) return;
     ready = value;
@@ -121,14 +122,23 @@ async function createValhallaQueueEngine({
   connection.on('close', () => state(false));
   connection.on('ready', refresh);
 
-  async function close(force = false) {
-    if (closed) return;
+  function close(force = false) {
+    if (closePromise) return closePromise;
     closed = true;
     state(false);
     if (force) connection.disconnect();
-    await Promise.allSettled(workers.map((worker) => worker.close(force)));
-    await Promise.allSettled(Object.values(queues).map((queue) => queue.close()));
-    connection.disconnect();
+    closePromise = (async () => {
+      try {
+        const workerResults = await Promise.allSettled(workers.map((worker) => worker.close(force)));
+        const queueResults = await Promise.allSettled(Object.values(queues).map((queue) => queue.close()));
+        if ([...workerResults, ...queueResults].some((result) => result.status === 'rejected')) {
+          throw new Error('queue_cleanup_failed');
+        }
+      } finally {
+        connection.disconnect();
+      }
+    })();
+    return closePromise;
   }
 
   let timer;
@@ -197,7 +207,7 @@ async function createValhallaQueueEngine({
     });
     await Promise.race([startup, deadline]);
   } catch (error) {
-    void close(true);
+    void close(true).catch(() => console.error(JSON.stringify({ component: 'queue', error: 'cleanup_failed' })));
     if (error.message === 'startup_timeout' || error.message === 'startup_cancelled') throw error;
     throw new Error('redis_unavailable');
   } finally {
