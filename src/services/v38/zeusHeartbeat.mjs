@@ -13,7 +13,7 @@ export class ZeusHeartbeatOrchestrator extends ZeusOrchestrator {
     const policy = options.canDispatch;
     if (serverPrivateKey?.asymmetricKeyType !== "ed25519" || serverPrivateKey.type !== "private" || typeof policy !== "function") throw new Error("HEARTBEAT_POLICY_REQUIRED");
     if (!Number.isInteger(pingTimeoutMs) || pingTimeoutMs < 10 || pingTimeoutMs > 10000 || !Number.isInteger(staleAfterMs) || staleAfterMs < pingTimeoutMs || staleAfterMs > 300000) throw new Error("INVALID_HEARTBEAT_LIMITS");
-    super({ ...options, canDispatch: async (worker, task) => worker.heartbeat?.status === "online" && (await policy(worker, task)) === true && worker.heartbeat.status === "online" && Date.now() - worker.heartbeat.lastSeenAt <= staleAfterMs });
+    super({ ...options, canDispatch: async (worker, task) => worker.heartbeat?.status === "online" && (await policy(worker, task)) === true && !this.stopped && this.workers.get(worker.id) === worker && worker.heartbeat.status === "online" && Date.now() - worker.heartbeat.lastSeenAt <= staleAfterMs });
     this.#serverPrivateKey = serverPrivateKey;
     Object.assign(this, { pingTimeoutMs, staleAfterMs });
     this.pings = new Map();
@@ -27,12 +27,26 @@ export class ZeusHeartbeatOrchestrator extends ZeusOrchestrator {
     try {
       await super.registerWorker(record, transport);
       const worker = this.workers.get(record.id);
+      if (this.stopped) {
+        if (worker) {
+          worker.quarantined = true;
+          transport.removeEventListener("message", worker.message);
+          transport.removeEventListener("close", worker.close);
+          this.workers.delete(record.id);
+        }
+        throw new Error("ORCHESTRATOR_STOPPED");
+      }
       worker.heartbeat = { connectionId: randomUUID(), status: "unknown", lastProbeAt: 0, lastSeenAt: null, rttMs: null, misses: 0 };
       const priorClose = worker.close;
       transport.removeEventListener("close", priorClose);
       worker.close = () => { this.cancelPing(worker.id, "WORKER_DISCONNECTED"); worker.heartbeat.status = "disconnected"; priorClose(); };
       transport.addEventListener("close", worker.close);
     } finally { this.enrolling--; }
+  }
+
+  async dispatchTask(task) {
+    if (this.stopped) throw new Error("ORCHESTRATOR_STOPPED");
+    return super.dispatchTask(task);
   }
 
   pingNode(nodeId) {
@@ -91,7 +105,12 @@ export class ZeusHeartbeatOrchestrator extends ZeusOrchestrator {
 
   pingAll() { return Promise.allSettled([...this.workers.keys()].map((id) => this.pingNode(id))); }
   cancelPing(nodeId, code) { const pending = this.pings.get(nodeId); if (!pending) return; clearTimeout(pending.timer); this.pings.delete(nodeId); pending.reject(new Error(code)); }
-  close() { this.stopped = true; for (const id of this.pings.keys()) this.cancelPing(id, "ORCHESTRATOR_STOPPED"); super.close(); }
+  close() {
+    this.stopped = true;
+    for (const worker of this.workers.values()) worker.quarantined = true;
+    for (const id of this.pings.keys()) this.cancelPing(id, "ORCHESTRATOR_STOPPED");
+    super.close();
+  }
 }
 
 export function createHeartbeatResponder({ nodeId, privateKey, serverPublicKey, send }) {
