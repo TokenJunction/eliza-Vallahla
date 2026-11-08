@@ -188,9 +188,10 @@
   });
   document.getElementById('browser-page').addEventListener('change', function (event) {
     if (event.target.value !== '/' && event.target.value !== '/status/') return;
+    var page = event.target.value === '/status/' ? '/status/' : '/';
     var iframe = document.querySelector('#window-browser iframe');
-    iframe.src = event.target.value;
-    document.querySelector('#window-browser .address-row a').href = event.target.value;
+    iframe.src = page;
+    document.querySelector('#window-browser .address-row a').href = page;
   });
 
   function updateClock() {
