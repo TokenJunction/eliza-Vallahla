@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: valhalla
 resources:
   - ../../base
+  - api-hpa.yaml
 # ingress.yaml is deliberately excluded until its class, TLS and DNS are verified.
 replicas:
   - {name: valhalla-api, count: 0}
