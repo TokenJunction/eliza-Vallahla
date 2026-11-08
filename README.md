@@ -121,6 +121,13 @@ bun run cloud:mock  # local Eliza Cloud stack with mocks
 Package build/test commands are in each package's README. Use
 `bun run --cwd <package> <script>` to scope a command.
 
+The optional `./deploy-linux.sh` checks the pinned runtimes and beacon file.
+It does not install, build, start, or deploy anything. `valhalla-node.service`
+is an opt-in systemd user unit for host observations only. It expects the
+checkout at `~/eliza-valhalla` and Bun 1.4.2 at `~/.bun/bin/bun`; review and
+adapt these paths before installation. It does not start the overseer or verify
+model or relay health.
+
 ## Benchmark
 
 Use Python 3.11+ and install the dependencies required by the selected suite, then run from
