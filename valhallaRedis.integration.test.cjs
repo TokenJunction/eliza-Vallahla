@@ -10,6 +10,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 const { Queue, Worker, QueueEvents } = require('bullmq');
+const Redis = require('ioredis');
 const { createValhallaQueueEngine } = require('./valhallaQueueEngine');
 
 const binary = process.env.VALHALLA_TEST_REDIS_SERVER;
@@ -57,21 +58,26 @@ async function startRedis(dir, port, tls = false) {
   return child;
 }
 
-test('real client startup deadline and cancellation against a stalled loopback socket', { timeout: 5000 }, async () => {
+test('real client startup deadline and cancellation against a stalled loopback socket', { timeout: 15000 }, async () => {
     const sockets = new Set();
     const server = net.createServer((socket) => {
       sockets.add(socket);
+      socket.resume();
       socket.on('close', () => sockets.delete(socket));
     });
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const url = `redis://127.0.0.1:${server.address().port}`;
     try {
-      await assert.rejects(createValhallaQueueEngine({ redisUrl: url, role: 'consumer', startupTimeoutMs: 100 }), /startup_timeout/);
-      const controller = new AbortController();
-      const pending = createValhallaQueueEngine({ redisUrl: url, role: 'consumer', signal: controller.signal });
-      await until(() => sockets.size > 0);
-      controller.abort();
-      await assert.rejects(pending, /startup_cancelled/);
+      for (const role of ['producer', 'consumer', 'combined']) {
+        await assert.rejects(createValhallaQueueEngine({ redisUrl: url, role, startupTimeoutMs: 100 }), /startup_timeout/);
+        await until(() => sockets.size === 0);
+        const controller = new AbortController();
+        const pending = createValhallaQueueEngine({ redisUrl: url, role, signal: controller.signal });
+        await until(() => sockets.size === (role === 'combined' ? 2 : 1));
+        controller.abort();
+        await assert.rejects(pending, /startup_cancelled/);
+        await until(() => sockets.size === 0);
+      }
     } finally {
       for (const socket of sockets) socket.destroy();
       await new Promise((resolve) => server.close(resolve));
@@ -157,6 +163,109 @@ function workerProcess(url, extra = {}) {
     },
   });
 }
+
+test('producer rejects a disconnect after readiness and reconnects', { skip: !binary, timeout: 20000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'valhalla-redis-race-'));
+  const port = await unusedPort();
+  const url = `redis://127.0.0.1:${port}`;
+  let redis;
+  let engine;
+  let interrupt = true;
+  class DisconnectingQueue extends Queue {
+    add(...args) {
+      if (interrupt) {
+        interrupt = false;
+        this.opts.connection.connector.stream.destroy();
+      }
+      return super.add(...args);
+    }
+  }
+  try {
+    redis = await startRedis(dir, port);
+    engine = await createValhallaQueueEngine({ redisUrl: url, role: 'producer', QueueClass: DisconnectingQueue });
+    const start = performance.now();
+    await assert.rejects(engine.enqueue({ targetEngine: 'zeus', taskName: 'health-check' }));
+    assert.ok(performance.now() - start < 7000);
+    await until(() => !engine.getStatus().ready);
+    await until(() => engine.getStatus().ready, 15000);
+    assert.ok((await engine.enqueue({ targetEngine: 'zeus', taskName: 'health-check' })).id);
+  } finally {
+    if (engine) await engine.close();
+    await stopChild(redis);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('producer command timeout bounds enqueue to an unresponsive connected Redis', { skip: !binary, timeout: 20000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'valhalla-redis-stall-'));
+  const port = await unusedPort();
+  const url = `redis://127.0.0.1:${port}`;
+  let redis;
+  let engine;
+  let queue;
+  try {
+    redis = await startRedis(dir, port);
+    engine = await createValhallaQueueEngine({ redisUrl: url, role: 'producer' });
+    redis.kill('SIGSTOP');
+    const start = performance.now();
+    await assert.rejects(engine.enqueue({ targetEngine: 'zeus', taskName: 'health-check' }), /Command timed out/);
+    const elapsed = performance.now() - start;
+    assert.ok(elapsed >= 4500 && elapsed < 8000, `timeout took ${elapsed}ms`);
+    redis.kill('SIGCONT');
+    queue = new Queue('valhalla-zeus', { connection: { host: '127.0.0.1', port } });
+    queue.on('error', () => {});
+    await queue.waitUntilReady();
+    await until(async () => (await queue.getWaitingCount()) === 1);
+    assert.equal(await queue.getWaitingCount(), 1);
+    assert.ok((await engine.enqueue({ targetEngine: 'zeus', taskName: 'health-check' })).id);
+  } finally {
+    if (redis) redis.kill('SIGCONT');
+    if (queue) await queue.close();
+    if (engine) await engine.close();
+    await stopChild(redis);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('combined role separates clients and consumers persist through repeated reconnects', { skip: !binary, timeout: 30000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'valhalla-redis-combined-'));
+  const port = await unusedPort();
+  const url = `redis://127.0.0.1:${port}`;
+  const clients = [];
+  let redis;
+  let engine;
+  class TrackingRedis extends Redis {
+    constructor(...args) {
+      super(...args);
+      this.reconnects = 0;
+      this.on('reconnecting', () => { this.reconnects++; });
+      clients.push(this);
+    }
+  }
+  try {
+    redis = await startRedis(dir, port);
+    engine = await createValhallaQueueEngine({ redisUrl: url, role: 'combined', RedisClient: TrackingRedis });
+    assert.equal(clients.length, 2);
+    assert.notEqual(clients[0], clients[1]);
+    assert.equal(clients[0].options.maxRetriesPerRequest, 1);
+    assert.equal(clients[1].options.maxRetriesPerRequest, null);
+    assert.equal(engine.getStatus().ready, true);
+    await stopChild(redis);
+    redis = null;
+    await until(() => !engine.getStatus().ready);
+    await until(() => clients[1].reconnects >= 3, 10000);
+    redis = await startRedis(dir, port);
+    await until(() => engine.getStatus().ready, 15000);
+    assert.ok((await engine.enqueue({ targetEngine: 'zeus', taskName: 'health-check' })).id);
+    await engine.close();
+    engine = null;
+    await until(() => clients.every((client) => client.status === 'end'));
+  } finally {
+    if (engine) await engine.close();
+    await stopChild(redis);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('isolated real Redis integration, lifecycle and bounded load', { skip: !binary, timeout: 60000 }, async (t) => {
   assert.ok(path.isAbsolute(binary));
