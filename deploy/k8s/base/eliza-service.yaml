@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: valhalla-eliza
+  namespace: valhalla
+  labels:
+    app.kubernetes.io/name: valhalla-eliza
+    app.kubernetes.io/component: agent-backend
+    app.kubernetes.io/part-of: valhallaos
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: valhalla-eliza}
+  ports:
+    - {name: http, protocol: TCP, port: 10000, targetPort: http}
+  sessionAffinity: None

@@ -1,0 +1,53 @@
+name: Kubernetes validation
+
+on:
+  pull_request:
+    branches: [docs/site, config/kubernetes-production-manifests]
+  push:
+    branches: [docs/site, config/kubernetes-production-manifests]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kubernetes-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kubernetes-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned validation tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install sigs.k8s.io/kustomize/kustomize/v5@v5.6.0
+          go install github.com/yannh/kubeconform/cmd/kubeconform@v0.6.7
+          python3 -m pip install PyYAML==6.0.2
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Render and validate Kubernetes manifests
+        shell: bash
+        run: bash scripts/validate-kustomize.sh
+      - name: Upload available validation output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubernetes-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: validation-results/
+          retention-days: 7
+          if-no-files-found: ignore
