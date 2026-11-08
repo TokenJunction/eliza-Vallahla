@@ -8,7 +8,11 @@ export interface AgentPeer {
 export interface InterAgentMessage {
   from: string;
   to: string;
-  intent: "NETWORK_HEALTH" | "REPAIR_DISPATCH" | "TELEMETRY_SYNC" | "MARKET_GROUNDING";
+  intent:
+    | "NETWORK_HEALTH"
+    | "REPAIR_DISPATCH"
+    | "TELEMETRY_SYNC"
+    | "MARKET_GROUNDING";
   content: string;
   timestamp: string;
   signature?: string;
@@ -25,7 +29,9 @@ export class CrossSpeechNotReadyError extends Error {
   readonly code = "CROSS_SPEECH_NOT_READY";
 
   constructor() {
-    super("Cross-agent work requires authorized runtime adapters and budget controls.");
+    super(
+      "Cross-agent work requires authorized runtime adapters and budget controls.",
+    );
     this.name = "CrossSpeechNotReadyError";
   }
 }
@@ -66,7 +72,10 @@ export class CrossSpeechEngine {
     return Array.from(this.peers.values());
   }
 
-  async executeA2ACrossSpeech(_intent: InterAgentMessage["intent"], _diagnosticContext: string): Promise<InterAgentMessage[]> {
+  async executeA2ACrossSpeech(
+    _intent: InterAgentMessage["intent"],
+    _diagnosticContext: string,
+  ): Promise<InterAgentMessage[]> {
     throw new CrossSpeechNotReadyError();
   }
 
