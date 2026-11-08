@@ -40,6 +40,12 @@ import {
   checkAuthRateLimit,
   trustedClientIp,
 } from "../services/auth-rate-limit";
+import {
+  clerkIdentityKey,
+  getClerkAuthConfiguration,
+  isClerkRequestOriginAllowed,
+  verifyClerkSessionIdentity,
+} from "../services/clerk-auth";
 import { verifySolanaMessageSignature } from "../services/wallet-proof";
 import { buildOAuthAppErrorReturn } from "./oauth-app-error-return";
 /**
@@ -4121,6 +4127,207 @@ auth.get("/providers", async (c) => {
     oidc,
     captcha: publicAuthAbuseConfig(authAbuseConfig).captcha,
   });
+});
+
+auth.get("/clerk/status", (c) =>
+  c.json({ enabled: getClerkAuthConfiguration() !== null }),
+);
+
+auth.post("/clerk/link", async (c) => {
+  const config = getClerkAuthConfiguration();
+  if (!config) {
+    return c.json(
+      { ok: false, error: "Clerk identity linking is not configured" },
+      503,
+    );
+  }
+  if (!isClerkRequestOriginAllowed(c.req.header("origin"), config)) {
+    return c.json({ ok: false, error: "Origin is not authorized" }, 403);
+  }
+
+  const rateLimit = await checkAuthRateLimit(c, "clerk-link", 60_000, 10);
+  if (!rateLimit.allowed) {
+    return c.json({ ok: false, error: "Too many account-link attempts" }, 429);
+  }
+
+  const session = await requireSession(c);
+  if (!session.ok) return session.response;
+  const mfaVerifiedAt = session.payload.mfaVerifiedAt;
+  if (
+    typeof mfaVerifiedAt !== "number" ||
+    !Number.isFinite(mfaVerifiedAt) ||
+    Date.now() - mfaVerifiedAt < 0 ||
+    Date.now() - mfaVerifiedAt > FACTOR_ENROLLMENT_STEP_UP_MAX_AGE_MS
+  ) {
+    return c.json(
+      { ok: false, error: "Recent Steward MFA is required to link accounts" },
+      403,
+    );
+  }
+
+  const body = await safeJsonParse<{ token?: unknown }>(c);
+  if (typeof body?.token !== "string" || !body.token.trim()) {
+    return c.json({ ok: false, error: "Clerk session token is required" }, 400);
+  }
+  const identity = await verifyClerkSessionIdentity(body.token, config);
+  if (!identity) {
+    return c.json({ ok: false, error: "Invalid Clerk session token" }, 401);
+  }
+
+  const providerAccountId = clerkIdentityKey(identity.issuer, identity.subject);
+  const db = getDb();
+  const [user] = await db
+    .select({ id: users.id, deactivatedAt: users.deactivatedAt })
+    .from(users)
+    .where(eq(users.id, session.payload.userId))
+    .limit(1);
+  const tenantSubject = await authTenantSubject(
+    session.payload.tenantId,
+    session.payload.userId,
+  );
+  if (!user || user.deactivatedAt || !tenantSubject?.membership_role) {
+    return c.json({ ok: false, error: "Current account is unavailable" }, 403);
+  }
+
+  const [linked] = await db
+    .insert(accounts)
+    .values({
+      userId: session.payload.userId,
+      provider: "clerk",
+      providerAccountId,
+    })
+    .onConflictDoNothing({
+      target: [accounts.provider, accounts.providerAccountId],
+    })
+    .returning({ userId: accounts.userId });
+
+  if (!linked) {
+    const [existing] = await db
+      .select({ userId: accounts.userId })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.provider, "clerk"),
+          eq(accounts.providerAccountId, providerAccountId),
+        ),
+      )
+      .limit(1);
+    if (existing?.userId !== session.payload.userId) {
+      return c.json(
+        { ok: false, error: "Clerk identity is linked to another account" },
+        409,
+      );
+    }
+    return c.json({ ok: true, linked: true, alreadyLinked: true });
+  }
+
+  await writeAuditEvent({
+    tenantId: session.payload.tenantId,
+    actorType: "user",
+    actorId: session.payload.userId,
+    action: "auth.clerk.link",
+    resourceType: "user",
+    metadata: { provider: "clerk", providerAccountId },
+    ipAddress: c.req.header("x-forwarded-for") ?? null,
+    userAgent: c.req.header("user-agent") ?? null,
+    requestId: c.get("requestId") ?? null,
+  });
+  return c.json({ ok: true, linked: true, alreadyLinked: false });
+});
+
+auth.post("/clerk/exchange", async (c) => {
+  const config = getClerkAuthConfiguration();
+  if (!config) {
+    return c.json({ ok: false, error: "Clerk sign-in is not configured" }, 503);
+  }
+  if (!isClerkRequestOriginAllowed(c.req.header("origin"), config)) {
+    return c.json({ ok: false, error: "Origin is not authorized" }, 403);
+  }
+
+  const rateLimit = await checkAuthRateLimit(c, "clerk-exchange", 60_000, 20);
+  if (!rateLimit.allowed) {
+    return c.json({ ok: false, error: "Too many sign-in attempts" }, 429);
+  }
+
+  const body = await safeJsonParse<{ token?: unknown }>(c);
+  if (typeof body?.token !== "string" || !body.token.trim()) {
+    return c.json({ ok: false, error: "Clerk session token is required" }, 400);
+  }
+  const identity = await verifyClerkSessionIdentity(body.token, config);
+  if (!identity) {
+    return c.json({ ok: false, error: "Invalid Clerk session token" }, 401);
+  }
+
+  const providerAccountId = clerkIdentityKey(identity.issuer, identity.subject);
+  const db = getDb();
+  const [account] = await db
+    .select({ userId: accounts.userId })
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.provider, "clerk"),
+        eq(accounts.providerAccountId, providerAccountId),
+      ),
+    )
+    .limit(1);
+  if (!account) {
+    return c.json(
+      {
+        ok: false,
+        error: "Clerk identity is not linked to an internal account",
+      },
+      403,
+    );
+  }
+
+  const tenantId = defaultAuthTenantId();
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      walletAddress: users.walletAddress,
+      walletChain: users.walletChain,
+      deactivatedAt: users.deactivatedAt,
+    })
+    .from(users)
+    .where(eq(users.id, account.userId))
+    .limit(1);
+  const tenantSubject = await authTenantSubject(tenantId, account.userId);
+  if (!user || user.deactivatedAt || !tenantSubject?.membership_role) {
+    return c.json(
+      { ok: false, error: "Clerk account has no authorized default tenant" },
+      403,
+    );
+  }
+
+  const loginMethodError = loginMethodRefusal(
+    (await getTenantAuthAbuseConfig(tenantId)).loginMethods,
+    "oauth",
+    "clerk",
+  );
+  if (loginMethodError) {
+    return c.json({ ok: false, error: loginMethodError }, 403);
+  }
+
+  const response = await buildAuthOrMfaResponse(
+    user.id,
+    tenantId,
+    user.walletAddress ?? user.id,
+    {
+      userId: user.id,
+      ...(user.email ? { email: user.email } : {}),
+      authMethod: "oauth",
+      oauthProviderId: "clerk",
+    },
+    {
+      id: user.id,
+      email: user.email ?? "",
+      walletAddress: user.walletAddress ?? undefined,
+      walletChain: user.walletChain ?? undefined,
+    },
+    c,
+  );
+  return authExchangeJson(c, response);
 });
 
 type GoogleNativeChallenge = {

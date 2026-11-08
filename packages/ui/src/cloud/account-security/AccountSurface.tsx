@@ -4,7 +4,7 @@
  * Mounted by the `cloud-account` Settings section (`/settings#cloud-account`).
  */
 
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import { useAgentElement } from "../../agent-surface/useAgentElement";
 import { useSetPageHeader } from "../../cloud-ui/components/layout/page-header-context.hooks";
 import { ContentState } from "../../components/composites/page-panel/content-state";
@@ -14,6 +14,10 @@ import { useDocumentTitle } from "../lib/use-document-title";
 import { useCloudT } from "../shell/CloudI18nProvider";
 import { AccountPageClient } from "./components/account-page-client";
 import { useUserProfile } from "./data/user";
+
+const ClerkIdentityLink = lazy(
+  () => import("../public-pages/pages/login/clerk-login-section"),
+);
 
 export interface AccountSurfaceProps {
   onSignIn?: () => void;
@@ -209,5 +213,23 @@ export function AccountSurface({
     );
   }
 
-  return <AccountPageClient user={user} />;
+  return (
+    <>
+      <AccountPageClient user={user} />
+      {import.meta.env.VITE_CLERK_LINK_ENABLED === "true" ? (
+        <section className="mt-8 space-y-3 rounded-xl border border-border p-4">
+          <h2 className="text-lg font-semibold text-txt-strong">
+            Link Clerk sign-in
+          </h2>
+          <p className="text-sm text-muted">
+            Connect a Clerk login to this existing account. Recent Steward MFA
+            is required.
+          </p>
+          <Suspense fallback={<div aria-busy="true" className="min-h-32" />}>
+            <ClerkIdentityLink linkOnly />
+          </Suspense>
+        </section>
+      ) : null}
+    </>
+  );
 }
