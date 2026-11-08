@@ -1,5 +1,3 @@
-import { PerplexityAgentBridge } from "./perplexityBridge";
-
 export interface AgentPeer {
   id: string;
   name: string;
@@ -23,22 +21,19 @@ export interface NetworkHealthReport {
   insights: string[];
 }
 
-/**
- * CrossSpeechEngine: The internal dialogue and self-repair bus connecting
- * autonomous sub-agents across the Valhalla node network.
- * 
- * Agents exchange structured machine speech, analyze network drift,
- * and dispatch automatic remediation tasks without exposing custody.
- */
+export class CrossSpeechNotReadyError extends Error {
+  readonly code = "CROSS_SPEECH_NOT_READY";
+
+  constructor() {
+    super("Cross-agent work requires authorized runtime adapters and budget controls.");
+    this.name = "CrossSpeechNotReadyError";
+  }
+}
+
 export class CrossSpeechEngine {
   private peers = new Map<string, AgentPeer>();
-  private conversationHistory: InterAgentMessage[] = [];
-  private perpxBridge: PerplexityAgentBridge | null = null;
 
-  constructor(perpxApiKey?: string) {
-    if (perpxApiKey) {
-      this.perpxBridge = new PerplexityAgentBridge(perpxApiKey);
-    }
+  constructor() {
     this.registerDefaultPeers();
   }
 
@@ -71,50 +66,11 @@ export class CrossSpeechEngine {
     return Array.from(this.peers.values());
   }
 
-  /**
-   * Dispatches an autonomous inter-agent dialogue cycle to diagnose and repair network state.
-   */
-  async executeA2ACrossSpeech(intent: InterAgentMessage["intent"], diagnosticContext: string): Promise<InterAgentMessage[]> {
-    const fromPeer = this.peers.get("agent-zeus")!;
-    const toPeer = intent === "REPAIR_DISPATCH" ? this.peers.get("agent-gorgo")! : this.peers.get("agent-hermes")!;
-
-    // 1. Zeus initiates cross-speech diagnostic dispatch
-    const initialCall: InterAgentMessage = {
-      from: fromPeer.id,
-      to: toPeer.id,
-      intent,
-      content: `[DIAGNOSTIC QUERY]: ${diagnosticContext}. Inspect network health and propose resolution.`,
-      timestamp: new Date().toISOString(),
-    };
-    this.conversationHistory.push(initialCall);
-
-    // 2. Target Agent resolves and speaks back
-    let responseText = `[A2A RESPONSE]: Self-inspection complete for ${diagnosticContext}. Anomaly bounds verified safe.`;
-
-    if (this.perpxBridge && intent === "MARKET_GROUNDING") {
-      try {
-        responseText = await this.perpxBridge.queryAgent(
-          `Provide concise operational health context for Solana nodes: ${diagnosticContext}`,
-          { searchType: "fast" }
-        );
-      } catch (err: any) {
-        responseText = `[A2A LOCAL FALLBACK]: Hermes local ledger check verified. ${err.message}`;
-      }
-    }
-
-    const replyMsg: InterAgentMessage = {
-      from: toPeer.id,
-      to: fromPeer.id,
-      intent,
-      content: responseText,
-      timestamp: new Date().toISOString(),
-    };
-    this.conversationHistory.push(replyMsg);
-
-    return [initialCall, replyMsg];
+  async executeA2ACrossSpeech(_intent: InterAgentMessage["intent"], _diagnosticContext: string): Promise<InterAgentMessage[]> {
+    throw new CrossSpeechNotReadyError();
   }
 
-  getRecentA2ALogs(limit = 10): InterAgentMessage[] {
-    return this.conversationHistory.slice(-limit);
+  getRecentA2ALogs(_limit = 10): InterAgentMessage[] {
+    return [];
   }
 }
