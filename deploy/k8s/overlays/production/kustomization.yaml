@@ -1,0 +1,63 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: valhalla
+resources:
+  - ../../base
+# ingress.yaml is deliberately excluded until its class, TLS and DNS are verified.
+replicas:
+  - {name: valhalla-api, count: 0}
+  - {name: valhalla-worker, count: 0}
+  - {name: valhalla-eliza, count: 0}
+patches:
+  - target: {version: v1, kind: ConfigMap, name: valhalla-config}
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: valhalla-config
+      data:
+        NODE_ENV: "production"
+        PUBLIC_ORIGIN: "https://valhalla-app.xyz"
+        VALHALLA_EXECUTION_MODE: "paper"
+        VALHALLA_QUEUE_ENABLED: "false"
+        VALHALLA_TRADING_ENABLED: "false"
+        VALHALLA_SOCIAL_ENABLED: "false"
+        VALHALLA_KEY_STORAGE_ENABLED: "false"
+        ZEUS_IDLE_ENABLED: "false"
+  - target: {version: v1, kind: ConfigMap, name: valhalla-api-config}
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: valhalla-api-config
+      data:
+        ELIZA_URL: "http://valhalla-eliza:10000"
+  - target: {group: apps, version: v1, kind: Deployment, name: valhalla-api}
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: valhalla-api
+      spec:
+        template:
+          spec:
+            containers:
+              - name: api
+                env:
+                  - {name: VALHALLA_QUEUE_ENABLED, value: "true"}
+                  - {name: VALHALLA_QUEUE_ROLE, value: "producer"}
+  - target: {group: apps, version: v1, kind: Deployment, name: valhalla-worker}
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: valhalla-worker
+      spec:
+        template:
+          spec:
+            containers:
+              - name: worker
+                env:
+                  - {name: VALHALLA_QUEUE_ENABLED, value: "true"}
+                  - {name: VALHALLA_QUEUE_ROLE, value: "consumer"}
+# Add verified image repository/digest substitutions before raising replicas.

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: valhalla-api
+  namespace: valhalla
+  labels:
+    app.kubernetes.io/name: valhalla-api
+    app.kubernetes.io/component: api-producer
+    app.kubernetes.io/part-of: valhallaos
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: valhalla-api}
+  ports:
+    - {name: http, protocol: TCP, port: 10000, targetPort: http}
+  sessionAffinity: None

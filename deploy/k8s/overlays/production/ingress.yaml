@@ -1,0 +1,25 @@
+# Template only: excluded from kustomization.yaml until class/TLS/DNS verification.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: valhalla-api
+  namespace: valhalla
+  labels:
+    app.kubernetes.io/name: valhalla-api
+    app.kubernetes.io/component: api-producer
+    app.kubernetes.io/part-of: valhallaos
+spec:
+  ingressClassName: replace-with-installed-ingress-class
+  tls:
+    - hosts: [api.valhalla-app.xyz]
+      secretName: valhalla-api-tls
+  rules:
+    - host: api.valhalla-app.xyz
+      http:
+        paths:
+          - path: /api/valhalla
+            pathType: Prefix
+            backend:
+              service:
+                name: valhalla-api
+                port: {name: http}
