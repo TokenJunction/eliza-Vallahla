@@ -1,7 +1,11 @@
 # Kubernetes deployment templates
 
 These templates are inactive scaffolding, not a production-qualified release.
-All Deployments have zero replicas. Image references use registry.invalid.
+The base Deployments have zero replicas. The production overlay keeps the
+worker and backend at zero replicas, but removes the API replica count and
+includes an HPA. Applying the production overlay can start API Pods.
+Do not apply it until the activation gates below are satisfied.
+Image references use registry.invalid.
 No Secrets, image builds, cluster resources, DNS changes, or certificates are provisioned by this commit.
 
 ## Layout
@@ -35,6 +39,11 @@ Rendering is not runtime verification. Server-side dry-run requires an authorize
 5. Qualify health checks. API probes establish HTTP responsiveness only. Backend probes establish TCP reachability only. Worker has no application readiness probe. None establishes end-to-end queue or agent readiness.
 6. Review namespace Pod Security policy versions against the target Kubernetes minor version; latest follows cluster upgrades.
 7. Replace ingressClassName with the installed class, provision valhalla-api-tls, enforce HTTPS at the controller, and approve DNS for api.valhalla-app.xyz before adding ingress.yaml to production resources. Do not change the root GitHub Pages domain. Review auth, CORS preflight and rate limiting.
-8. Change replica counts only after these gates. Queue activation is true in API/worker production pod templates even though replicas remain zero. Paper mode does not guarantee offline or cost-free model usage.
+8. Apply the production overlay only after these gates. The overlay removes
+   the API replica count and includes an HPA; worker and backend replicas
+   remain zero. API and worker Pod templates enable their queue roles.
+   Confirm API bootstrap behavior, worker/backend activation, and end-to-end
+   queue processing before treating the deployment as operational.
+   Paper mode does not guarantee offline or cost-free model usage.
 
 No automatic apply workflow is included. Applying templates or scaling workloads is a separate deployment action requiring review.
