@@ -4,6 +4,7 @@ export interface ModelRouterConfig {
   perplexityApiKey?: string;
   geminiApiKey?: string;
   defaultModel?: string;
+  geminiModel?: string;
 }
 
 export interface RoutePromptOptions extends PerplexityAgentOptions {
@@ -12,7 +13,6 @@ export interface RoutePromptOptions extends PerplexityAgentOptions {
 
 export class ModelRoutingError extends Error {
   readonly code: string;
-
   constructor(code: string, message: string) {
     super(message);
     this.name = "ModelRoutingError";
@@ -22,13 +22,17 @@ export class ModelRoutingError extends Error {
 
 export class ModelStackRouter {
   private perplexityBridge: PerplexityAgentBridge | null = null;
-  private geminiKey: string | null = null;
+  private geminiKey: string | null;
+  private geminiModel: string | null;
+  private searchModel: string;
 
   constructor(config: ModelRouterConfig = {}) {
     const env = typeof process !== "undefined" ? process.env : undefined;
     const key = config.perplexityApiKey || env?.PERPLEXITY_API_KEY;
     if (key?.trim()) this.perplexityBridge = new PerplexityAgentBridge(key);
     this.geminiKey = (config.geminiApiKey || env?.GEMINI_API_KEY)?.trim() || null;
+    this.geminiModel = (config.geminiModel || env?.GEMINI_MODEL)?.trim() || null;
+    this.searchModel = config.defaultModel ?? env?.DEFAULT_SEARCH_MODEL ?? "sonar";
   }
 
   async routePrompt(prompt: string, options: RoutePromptOptions = {}): Promise<{ content: string; provider: string }> {
@@ -41,46 +45,48 @@ export class ModelStackRouter {
     if (options.tier !== undefined && options.tier !== "fast" && options.tier !== "deep") {
       throw new ModelRoutingError("INVALID_TIER", "The requested routing tier is not supported.");
     }
-    let attempted = false;
+    if (options.tier === "fast" && !this.perplexityBridge) {
+      throw new ModelRoutingError("PROVIDER_NOT_CONFIGURED", "The grounded research provider is not configured.");
+    }
     if (this.perplexityBridge && (options.tier === "fast" || options.tier === undefined)) {
-      attempted = true;
-      try {
-        const content = await this.perplexityBridge.queryAgent(prompt, {
-          model: options.model ?? "sonar",
-          temperature: options.temperature ?? 0.2,
-        });
-        if (typeof content === "string" && content.trim() && content !== "No content returned from Perplexity.") {
-          return { content, provider: "perplexity-sonar" };
-        }
-      } catch {
-        // Keep provider error bodies and credentials out of logs and user responses.
-      }
+      const content = await this.perplexityBridge.queryAgent(prompt, {
+        ...options, model: options.model ?? this.searchModel,
+      });
+      return { content, provider: "perplexity-agent" };
     }
-    if (this.geminiKey) {
-      attempted = true;
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(this.geminiKey)}`;
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 1024, temperature: options.temperature ?? 0.7 },
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (response.ok) {
-          const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-          const content = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
-          if (content.trim()) return { content, provider: "gemini-2.0-flash" };
-        }
-      } catch {
-        // Return a typed failure below, not a fabricated model answer.
-      }
+    if (!this.geminiKey || !this.geminiModel) {
+      throw new ModelRoutingError("PROVIDER_NOT_CONFIGURED", "Configure a provider key and an explicit model for this request.");
     }
-    throw new ModelRoutingError(
-      attempted ? "PROVIDER_UNAVAILABLE" : "PROVIDER_NOT_CONFIGURED",
-      attempted ? "The configured providers did not return a usable answer." : "No provider is configured for this request.",
-    );
+    const model = this.geminiModel.replace(/^models\//, "");
+    const timeoutMs = options.timeoutMs ?? 15000;
+    const maxOutputTokens = options.maxOutputTokens ?? 1024;
+    const temperature = options.temperature ?? 0.7;
+    if (!/^[A-Za-z0-9._-]+$/.test(model) || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000 || !Number.isInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 4096 || !Number.isFinite(temperature) || temperature < 0 || temperature > 2) {
+      throw new ModelRoutingError("INVALID_CONFIGURATION", "Invalid model, timeout, output-token budget, or temperature.");
+    }
+    const deadline = AbortSignal.timeout(timeoutMs);
+    const signal = options.signal ? AbortSignal.any([options.signal, deadline]) : deadline;
+    try {
+      signal.throwIfAborted();
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(this.geminiKey)}`;
+      const response = await fetch(endpoint, {
+        method: "POST", redirect: "error", signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens, temperature },
+        }),
+      });
+      if (!response.ok) throw new ModelRoutingError("PROVIDER_UNAVAILABLE", `Provider returned HTTP ${response.status}.`);
+      const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      const content = data.candidates?.[0]?.content?.parts?.map((part) => typeof part.text === "string" ? part.text : "").join("") ?? "";
+      if (!content.trim()) throw new ModelRoutingError("EMPTY_RESPONSE", "Provider returned no answer text.");
+      return { content, provider: `gemini:${model}` };
+    } catch (error) {
+      if (options.signal?.aborted) throw new ModelRoutingError("CANCELLED", "Provider request was cancelled.");
+      if (deadline.aborted) throw new ModelRoutingError("TIMEOUT", "Provider request exceeded its deadline.");
+      if (error instanceof ModelRoutingError) throw error;
+      throw new ModelRoutingError("PROVIDER_UNAVAILABLE", "Provider request failed without a usable answer.");
+    }
   }
 }
