@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { webcrypto } from "node:crypto";
 import vm from "node:vm";
 
 test("Hive consent alone does no network work; each click runs at most one job", async () => {
@@ -40,6 +41,7 @@ test("Hive consent alone does no network work; each click runs at most one job",
   };
   const context = {
     document,
+    crypto: webcrypto,
     localStorage: {
       getItem: (key) => storage.get(key) || null,
       setItem: (key, value) => storage.set(key, value)
