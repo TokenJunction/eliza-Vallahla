@@ -3,6 +3,10 @@ from pathlib import Path
 import functools
 import http.server
 import json
+import shutil
+import subprocess
+import sys
+import tempfile
 import threading
 import unittest
 import urllib.error
@@ -77,6 +81,25 @@ class SiteTests(unittest.TestCase):
         self.assertNotIn("Valhalla read-only preview", (OUT / "errors.js").read_text())
         for name in (".env", "scripts", "src", "experimental", "experiments"):
             self.assertFalse((OUT / name).exists())
+        self.assertIn('"/media/hero.mp4"', (OUT / "home-motion.js").read_text())
+
+    def test_build_rejects_missing_entry_points_and_assets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            shutil.copytree(ROOT / "website", root / "website")
+            (root / "website/.env").write_text("PRIVATE=fixture")
+            build = root / "website/scripts/build-site.py"
+            for name in ("index.html", "app/index.html", "app/gate.js",
+                         "assets/mark.svg", "media/hero.mp4"):
+                with self.subTest(missing=name):
+                    source = root / "website" / name
+                    backup = source.with_name(source.name + ".saved")
+                    source.rename(backup)
+                    result = subprocess.run([sys.executable, str(build)], capture_output=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    backup.rename(source)
+            subprocess.run([sys.executable, str(build)], check=True)
+            self.assertFalse((root / "site-build/.env").exists())
 
 
 if __name__ == "__main__":
