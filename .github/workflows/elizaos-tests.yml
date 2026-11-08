@@ -3,14 +3,8 @@ name: ElizaOS tests
 on:
   push:
     branches: [docs/site]
-    paths:
-      - 'valhalla-elizaos/**'
-      - '.github/workflows/elizaos-tests.yml'
   pull_request:
     branches: [docs/site]
-    paths:
-      - 'valhalla-elizaos/**'
-      - '.github/workflows/elizaos-tests.yml'
   workflow_dispatch:
 
 permissions:
@@ -21,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  elizaos-tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
