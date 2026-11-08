@@ -6,10 +6,15 @@ resources:
   - api-hpa.yaml
 # ingress.yaml is deliberately excluded until its class, TLS and DNS are verified.
 replicas:
-  - {name: valhalla-api, count: 0}
   - {name: valhalla-worker, count: 0}
   - {name: valhalla-eliza, count: 0}
 patches:
+  # Remove the inherited zero count; the HPA owns API replica management.
+  # Applying this overlay can start API Pods. Runtime prerequisites remain required.
+  - target: {group: apps, version: v1, kind: Deployment, name: valhalla-api}
+    patch: |-
+      - op: remove
+        path: /spec/replicas
   - target: {version: v1, kind: ConfigMap, name: valhalla-config}
     patch: |-
       apiVersion: v1
@@ -61,4 +66,5 @@ patches:
                 env:
                   - {name: VALHALLA_QUEUE_ENABLED, value: "true"}
                   - {name: VALHALLA_QUEUE_ROLE, value: "consumer"}
-# Add verified image repository/digest substitutions before raising replicas.
+# Add verified image repository/digest substitutions before applying.
+# Existing zero-scaled API deployments need an explicit nonzero bootstrap.
