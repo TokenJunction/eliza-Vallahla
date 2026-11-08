@@ -82,66 +82,166 @@ async function createValhallaQueueEngine({
   RedisClient = IORedis,
   QueueClass = Queue,
   WorkerClass = Worker,
+  role = 'combined',
+  startupTimeoutMs = 10000,
+  signal,
+  onState = () => {},
 } = {}) {
-  if (!redisUrl) throw new Error('REDIS_URL is required when the queue runtime is enabled');
-  const parsedUrl = new URL(redisUrl);
-  if (
-    !['redis:', 'rediss:'].includes(parsedUrl.protocol) ||
-    (process.env.NODE_ENV === 'production' && parsedUrl.protocol !== 'rediss:')
-  ) {
-    throw new Error('REDIS_URL must use rediss:// in production');
+  validateQueueConfig({ redisUrl, role });
+  if (!Number.isInteger(startupTimeoutMs) || startupTimeoutMs < 1 || startupTimeoutMs > 30000) {
+    throw new Error('invalid_startup_timeout');
+  }
+  if (signal?.aborted) throw new Error('startup_cancelled');
+
+  const connection = new RedisClient(redisUrl, {
+    maxRetriesPerRequest: null,
+    connectTimeout: Math.min(startupTimeoutMs, 5000),
+    retryStrategy: (attempt) => Math.min(1000 * 2 ** Math.min(attempt - 1, 4), 15000),
+  });
+  const queues = {};
+  const workers = [];
+  const blockingClients = [];
+  let closed = false;
+  let ready = null;
+  let started = false;
+  let stopped = false;
+  const state = (value) => {
+    if (ready === value) return;
+    ready = value;
+    onState({ ready: value, role, capabilities: ['paper-only', 'allowlisted-tasks'] });
+  };
+  const refresh = () => {
+    if (started && !closed) {
+      state(!stopped && connection.status === 'ready' &&
+        blockingClients.every((client) => client.status === 'ready') &&
+        workers.every((worker) => worker.isRunning()));
+    }
+  };
+  connection.on('error', () => console.error(JSON.stringify({ component: 'queue', error: 'redis_error' })));
+  connection.on('close', () => state(false));
+  connection.on('ready', refresh);
+
+  async function close(force = false) {
+    if (closed) return;
+    closed = true;
+    state(false);
+    if (force) connection.disconnect();
+    await Promise.allSettled(workers.map((worker) => worker.close(force)));
+    await Promise.allSettled(Object.values(queues).map((queue) => queue.close()));
+    connection.disconnect();
   }
 
-  const connection = new RedisClient(redisUrl, { maxRetriesPerRequest: null });
+  let timer;
+  let abort;
   try {
-    await connection.ping();
-  } catch {
-    await connection.quit().catch(() => {});
-    throw new Error('Configured Redis is unavailable');
-  }
-
-  const queues = Object.fromEntries(
-    Object.keys(QUEUE_TASKS).map((name) => [
-      name,
-      new Queue(`valhalla-${name}`, { connection }),
-    ]),
-  );
-  const workers = Object.keys(QUEUE_TASKS).map(
-    (targetEngine) =>
-      new Worker(
-        `valhalla-${targetEngine}`,
-        async (job) => executeSafeTask(targetEngine, job.name, job.data.payload),
-        { connection, concurrency: 1 },
-      ),
-  );
-
-  connection.on('error', () => console.error('[Valhalla queue] Redis connection error'));
-  for (const queue of Object.values(queues)) {
-    queue.on('error', () => console.error('[Valhalla queue] Queue error'));
-  }
-  for (const worker of workers) {
-    worker.on('error', () => console.error('[Valhalla queue] Worker error'));
+    const startup = (async () => {
+      await connection.ping();
+      if (closed) return;
+      if (role !== 'consumer') {
+        for (const name of Object.keys(QUEUE_TASKS)) {
+          queues[name] = new QueueClass(`valhalla-${name}`, { connection });
+          queues[name].on('error', () => console.error(JSON.stringify({ component: 'queue', error: 'queue_error' })));
+        }
+      }
+      if (role !== 'producer') {
+        for (const targetEngine of Object.keys(QUEUE_TASKS)) {
+          const worker = new WorkerClass(
+            `valhalla-${targetEngine}`,
+            async (job) => {
+              if (!job.data || typeof job.data !== 'object' || Array.isArray(job.data) ||
+                  Object.keys(job.data).some((key) => key !== 'payload') ||
+                  !Object.hasOwn(job.data, 'payload')) {
+                throw new Error('invalid_job');
+              }
+              const { taskName, payload } = validateDispatch({ targetEngine, taskName: job.name, payload: job.data.payload });
+              return executeSafeTask(targetEngine, taskName, payload);
+            },
+            { connection, concurrency: 1, autorun: false },
+          );
+          worker.on('error', () => {
+            state(false);
+            console.error(JSON.stringify({ component: 'queue', error: 'worker_error' }));
+          });
+          worker.on('ioredis:close', () => state(false));
+          workers.push(worker);
+        }
+      }
+      await Promise.all([
+        ...Object.values(queues).map((queue) => queue.waitUntilReady()),
+        ...workers.map((worker) => worker.waitUntilReady()),
+      ]);
+      if (closed) return;
+      for (const worker of workers) {
+        const client = await worker.getBackend().blockingConnection.client;
+        if (closed) return;
+        blockingClients.push(client);
+        client.on('close', () => state(false));
+        client.on('ready', refresh);
+      }
+      for (const worker of workers) {
+        void worker.run().catch(() => {
+          stopped = true;
+          state(false);
+          console.error(JSON.stringify({ component: 'queue', error: 'worker_stopped' }));
+        });
+      }
+      started = true;
+      refresh();
+    })();
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('startup_timeout')), startupTimeoutMs);
+      if (signal) {
+        abort = () => reject(new Error('startup_cancelled'));
+        signal.addEventListener('abort', abort, { once: true });
+      }
+    });
+    await Promise.race([startup, deadline]);
+  } catch (error) {
+    void close(true);
+    if (error.message === 'startup_timeout' || error.message === 'startup_cancelled') throw error;
+    throw new Error('redis_unavailable');
+  } finally {
+    clearTimeout(timer);
+    if (abort) signal.removeEventListener('abort', abort);
   }
 
   return {
+    getStatus: () => ({ ready: ready === true, role, capabilities: ['paper-only', 'allowlisted-tasks'] }),
     async enqueue(input) {
+      if (closed || !ready || role === 'consumer') throw new Error('queue_unavailable');
       const { targetEngine, taskName, payload } = validateDispatch(input);
       return queues[targetEngine].add(taskName, { payload }, {
         removeOnComplete: 100,
         removeOnFail: 100,
       });
     },
-    async close() {
-      await Promise.all(workers.map((worker) => worker.close()));
-      await Promise.all(Object.values(queues).map((queue) => queue.close()));
-      await connection.quit();
-    },
+    close,
   };
+}
+
+function validateQueueConfig({ redisUrl, role }) {
+  if (!['producer', 'consumer', 'combined'].includes(role)) throw new Error('invalid_queue_role');
+  if (!redisUrl) throw new Error('REDIS_URL is required when the queue runtime is enabled');
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(redisUrl);
+  } catch {
+    throw new Error('invalid_redis_url');
+  }
+  if (
+    !['redis:', 'rediss:'].includes(parsedUrl.protocol) ||
+    !parsedUrl.hostname ||
+    (process.env.NODE_ENV === 'production' && parsedUrl.protocol !== 'rediss:') ||
+    parsedUrl.search || parsedUrl.hash
+  ) {
+    throw new Error('REDIS_URL must use rediss:// in production');
+  }
 }
 
 module.exports = {
   createValhallaQueueEngine,
   executeSafeTask,
   isAuthorizedDispatch,
+  validateQueueConfig,
   validateDispatch,
 };

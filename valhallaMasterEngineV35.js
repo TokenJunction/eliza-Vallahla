@@ -25,7 +25,7 @@ const types = {
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml',
   '.mp4': 'video/mp4', '.md': 'text/markdown; charset=utf-8',
 };
-const hidden = /(^|[\\/])(\.[^\\/]*|(node_modules|workers|supabase|scripts|lib|valhalla-elizaos)([\\/]|$))/;
+const hidden = /(^|[\\/])(\.[^\\/]*|(node_modules|workers|supabase|scripts|lib|valhalla-elizaos)([\\/]|$)|valhallaWorker(?:\.test\.cjs|\.js)$)/;
 
 function resolve(urlPath) {
   const rel = path.normalize(decodeURIComponent(urlPath.split('?')[0])).replace(/^([\\/]|\.\.)+/, '');
@@ -155,7 +155,7 @@ app.use(async (req, res) => {
       redis: Boolean(integrations.upstashConfig()),
       supabase: Boolean(integrations.supabaseConfig()),
       eliza: Boolean(elizaBase),
-      queueWorkers: queueEngine !== null,
+      queueWorkers: Boolean(queueEngine && queueEngine.getStatus().ready && queueEngine.getStatus().role !== 'producer'),
       adminConfigured: Boolean(process.env.LEADER_EMAIL),
     });
   }
@@ -200,9 +200,14 @@ async function start() {
       console.error('[Valhalla queues] Not started: set REDIS_URL (rediss://) and a VALHALLA_DISPATCH_TOKEN of 32+ bytes.');
     } else {
       try {
-        queueEngine = await createValhallaQueueEngine();
-      } catch (error) {
-        console.error('[Valhalla queues] Not started:', error.message);
+        const role = process.env.VALHALLA_QUEUE_ROLE || 'combined';
+        if (!['producer', 'combined'].includes(role)) throw new Error('invalid_queue_role');
+        if (process.env.VALHALLA_EXECUTION_MODE && process.env.VALHALLA_EXECUTION_MODE !== 'paper') {
+          throw new Error('invalid_execution_mode');
+        }
+        queueEngine = await createValhallaQueueEngine({ role });
+      } catch {
+        console.error(JSON.stringify({ component: 'queue', error: 'startup_failed' }));
       }
     }
   }

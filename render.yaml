@@ -68,6 +68,8 @@ services:
         value: "false"
       - key: VALHALLA_QUEUE_ENABLED
         value: "false"
+      - key: VALHALLA_QUEUE_ROLE
+        value: producer
       - key: ELIZA_URL
         sync: false
       - key: VALHALLA_DISPATCH_TOKEN
