@@ -1,4 +1,4 @@
-import { PerplexityAgentBridge, PerplexityAgentOptions } from "./perplexityBridge";
+import { PerplexityAgentBridge, type PerplexityAgentOptions } from "./perplexityBridge.ts";
 
 export interface ModelRouterConfig {
   perplexityApiKey?: string;
@@ -10,64 +10,77 @@ export interface RoutePromptOptions extends PerplexityAgentOptions {
   tier?: "fast" | "deep" | "local";
 }
 
-/**
- * ModelStackRouter routes research, extraction, and reasoning prompts across
- * Perplexity's Sonar models for real-time web grounding and Gemini 2.0 Flash
- * for generative synthesis.
- */
+export class ModelRoutingError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "ModelRoutingError";
+    this.code = code;
+  }
+}
+
 export class ModelStackRouter {
   private perplexityBridge: PerplexityAgentBridge | null = null;
   private geminiKey: string | null = null;
 
   constructor(config: ModelRouterConfig = {}) {
-    const pKey = config.perplexityApiKey || (typeof process !== "undefined" ? process.env?.PERPLEXITY_API_KEY : "");
-    if (pKey) {
-      this.perplexityBridge = new PerplexityAgentBridge(pKey);
-    }
-    this.geminiKey = config.geminiApiKey || (typeof process !== "undefined" ? process.env?.GEMINI_API_KEY : "") || null;
+    const env = typeof process !== "undefined" ? process.env : undefined;
+    const key = config.perplexityApiKey || env?.PERPLEXITY_API_KEY;
+    if (key?.trim()) this.perplexityBridge = new PerplexityAgentBridge(key);
+    this.geminiKey = (config.geminiApiKey || env?.GEMINI_API_KEY)?.trim() || null;
   }
 
   async routePrompt(prompt: string, options: RoutePromptOptions = {}): Promise<{ content: string; provider: string }> {
-    // 1. Prioritize Perplexity Sonar with Fast Search for grounding & market extraction
-    if (this.perplexityBridge && (options.tier === "fast" || !options.tier)) {
+    if (options.tier === "local") {
+      throw new ModelRoutingError("LOCAL_PROVIDER_NOT_CONFIGURED", "This router has no local adapter. No cloud request was sent.");
+    }
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      throw new ModelRoutingError("INVALID_PROMPT", "A non-empty prompt is required.");
+    }
+    if (options.tier !== undefined && options.tier !== "fast" && options.tier !== "deep") {
+      throw new ModelRoutingError("INVALID_TIER", "The requested routing tier is not supported.");
+    }
+    let attempted = false;
+    if (this.perplexityBridge && (options.tier === "fast" || options.tier === undefined)) {
+      attempted = true;
       try {
         const content = await this.perplexityBridge.queryAgent(prompt, {
-          model: options.model || "sonar",
-          searchType: options.searchType || "fast",
-          temperature: options.temperature || 0.2,
+          model: options.model ?? "sonar",
+          temperature: options.temperature ?? 0.2,
         });
-        return { content, provider: "perplexity-sonar-fast" };
-      } catch (err: any) {
-        console.warn("[MODEL ROUTER] Perplexity Tier fell back:", err.message);
+        if (typeof content === "string" && content.trim() && content !== "No content returned from Perplexity.") {
+          return { content, provider: "perplexity-sonar" };
+        }
+      } catch {
+        // Keep provider error bodies and credentials out of logs and user responses.
       }
     }
-
-    // 2. Gemini 2.0 Flash Tier
     if (this.geminiKey) {
+      attempted = true;
       try {
-        const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.geminiKey}`;
-        const res = await fetch(geminiEndpoint, {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(this.geminiKey)}`;
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 1024, temperature: options.temperature || 0.7 },
+            generationConfig: { maxOutputTokens: 1024, temperature: options.temperature ?? 0.7 },
           }),
+          signal: AbortSignal.timeout(15000),
         });
-        if (res.ok) {
-          const data = (await res.json()) as any;
-          const content = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
-          return { content, provider: "gemini-2.0-flash" };
+        if (response.ok) {
+          const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+          const content = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+          if (content.trim()) return { content, provider: "gemini-2.0-flash" };
         }
-      } catch (err: any) {
-        console.warn("[MODEL ROUTER] Gemini Tier fell back:", err.message);
+      } catch {
+        // Return a typed failure below, not a fabricated model answer.
       }
     }
-
-    // 3. Fallback Context
-    return {
-      content: `[VALHALLA MODEL ROUTER]: Context for "${prompt}" — active DEX volume on Solana. Configure PERPLEXITY_API_KEY or GEMINI_API_KEY for dynamic generative synthesis.`,
-      provider: "valhalla-fallback",
-    };
+    throw new ModelRoutingError(
+      attempted ? "PROVIDER_UNAVAILABLE" : "PROVIDER_NOT_CONFIGURED",
+      attempted ? "The configured providers did not return a usable answer." : "No provider is configured for this request.",
+    );
   }
 }
