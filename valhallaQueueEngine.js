@@ -98,6 +98,8 @@ async function createValhallaQueueEngine({
   const queues = {};
   const workers = [];
   const blockingClients = [];
+  let producerConnection;
+  let producerResetting = false;
   let closed = false;
   let ready = null;
   let started = false;
@@ -110,7 +112,7 @@ async function createValhallaQueueEngine({
   };
   const refresh = () => {
     if (started && !closed) {
-      state(!stopped && connections.every((connection) => connection.status === 'ready') &&
+      state(!stopped && !producerResetting && connections.every((connection) => connection.status === 'ready') &&
         blockingClients.every((client) => client.status === 'ready') &&
         workers.every((worker) => worker.isRunning()));
     }
@@ -129,7 +131,10 @@ async function createValhallaQueueEngine({
     connections.push(connection);
     connection.on('error', () => console.error(JSON.stringify({ component: 'queue', error: 'redis_error' })));
     connection.on('close', () => state(false));
-    connection.on('ready', refresh);
+    connection.on('ready', () => {
+      if (producer) producerResetting = false;
+      refresh();
+    });
     return connection;
   }
 
@@ -156,7 +161,7 @@ async function createValhallaQueueEngine({
   let abort;
   try {
     const startup = (async () => {
-      const producerConnection = role !== 'consumer' ? createConnection(true) : null;
+      producerConnection = role !== 'consumer' ? createConnection(true) : null;
       const consumerConnection = role !== 'producer' ? createConnection(false) : null;
       await Promise.all(connections.map((connection) => RedisConnection.waitUntilReady(connection)));
       if (closed) return;
@@ -240,10 +245,19 @@ async function createValhallaQueueEngine({
     async enqueue(input) {
       if (closed || !ready || role === 'consumer') throw new Error('queue_unavailable');
       const { targetEngine, taskName, payload } = validateDispatch(input);
-      return queues[targetEngine].add(taskName, { payload }, {
-        removeOnComplete: 100,
-        removeOnFail: 100,
-      });
+      try {
+        return await queues[targetEngine].add(taskName, { payload }, {
+          removeOnComplete: 100,
+          removeOnFail: 100,
+        });
+      } catch (error) {
+        if (error.message === 'Command timed out' && !closed && !producerResetting) {
+          producerResetting = true;
+          state(false);
+          producerConnection.disconnect(true);
+        }
+        throw error;
+      }
     },
     close,
   };

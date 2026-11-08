@@ -211,12 +211,15 @@ test('producer command timeout bounds enqueue to an unresponsive connected Redis
     await assert.rejects(engine.enqueue({ targetEngine: 'zeus', taskName: 'health-check' }), /Command timed out/);
     const elapsed = performance.now() - start;
     assert.ok(elapsed >= 4500 && elapsed < 8000, `timeout took ${elapsed}ms`);
+    assert.equal(engine.getStatus().ready, false);
+    await assert.rejects(engine.enqueue({ targetEngine: 'zeus', taskName: 'health-check' }), /queue_unavailable/);
     redis.kill('SIGCONT');
     queue = new Queue('valhalla-zeus', { connection: { host: '127.0.0.1', port } });
     queue.on('error', () => {});
     await queue.waitUntilReady();
     await until(async () => (await queue.getWaitingCount()) === 1);
     assert.equal(await queue.getWaitingCount(), 1);
+    await until(() => engine.getStatus().ready, 15000);
     assert.ok((await engine.enqueue({ targetEngine: 'zeus', taskName: 'health-check' })).id);
   } finally {
     if (redis) redis.kill('SIGCONT');
