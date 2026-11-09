@@ -17,7 +17,11 @@ function storage(initial = {}) {
 
 function fixture({ restored = false, reject = false, human = true, noToken = false, access = 'valid',
   invalidSession = false, authUrl = 'https://auth.example.test', accessNetworkError = false } = {}) {
-  const now = Date.now();
+  let now = Date.now();
+  const timers = [];
+  class FixtureDate extends Date {
+    static now() { return now; }
+  }
   const localStorage = storage(restored ? {
     'valhalla-account': JSON.stringify({ hint: 'a***@example.test', method: 'email', termsAccepted: true }),
     'valhalla-session': JSON.stringify({ kind: 'account', hint: 'a***@example.test', at: now })
@@ -26,7 +30,7 @@ function fixture({ restored = false, reject = false, human = true, noToken = fal
     ...(human ? { 'valhalla-human': JSON.stringify({ ok: true, at: now }) } : {}),
     'valhalla-terms-session': '2026-11-03',
     ...(restored && !noToken ? { 'valhalla-auth-token': 'fixture-live-token' } : {}),
-    ...(restored ? { 'valhalla-auth': '1', 'valhalla-code-ok': '1' } : {})
+    ...(restored ? { 'valhalla-auth': '1', 'valhalla-code-ok': '1', 'valhalla-pending': 'stale-pending' } : {})
   });
   const nodes = {}, events = {}, calls = [];
   function node(id) {
@@ -54,14 +58,14 @@ function fixture({ restored = false, reject = false, human = true, noToken = fal
     addEventListener(type, fn) { (events[type] ||= []).push(fn); },
     dispatchEvent(event) { for (const fn of events[event.type] || []) fn(event); },
     setInterval() { return 1; },
-    setTimeout() { return 1; },
+    setTimeout(fn, delay) { timers.push({ fn, delay }); return timers.length; },
     location: { assign() {} }
   };
   const fetch = async (url, options) => {
     calls.push({ url, options });
     if (url.endsWith('/auth/access') && accessNetworkError) throw new Error('network unavailable');
     const body = url.endsWith('/auth/access') && access === 'valid'
-      ? { ok: true, expires: Date.now() + 60_000, plan: 'free' }
+      ? { ok: true, expires: now + 60_000, plan: 'free' }
       : url.endsWith('/auth/access') ? { ok: false, error: 'session' }
       : url.endsWith('/auth/nonce') ? { nonce: 'fixture' }
       : url.endsWith('/auth/email/start') ? { ok: true, pending: 'pending', hint: 'a***@example.test' }
@@ -71,14 +75,15 @@ function fixture({ restored = false, reject = false, human = true, noToken = fal
     return { ok: status === 200, status, json: async () => body };
   };
   const context = {
-    window, document, localStorage, sessionStorage, fetch, Date, Intl, Number, Math,
+    window, document, localStorage, sessionStorage, fetch, Date: FixtureDate, Intl, Number, Math,
     Event: function (type) { this.type = type; },
     ValhallaErrors: { show() {} }, location: window.location,
     IntersectionObserver: function () { this.observe = () => {}; }
   };
   vm.runInNewContext(source, context);
   return {
-    node, window, localStorage, sessionStorage, calls,
+    node, window, localStorage, sessionStorage, calls, timers,
+    advance(milliseconds) { now += milliseconds; },
     ready() { for (const fn of events['document:DOMContentLoaded'] || []) fn(); }
   };
 }
@@ -114,6 +119,21 @@ test('expired server session clears cached account session and returns to sign i
   const f = fixture({ restored: true, access: 'expired' });
   f.ready();
   await flush();
+  assert.equal(f.node('desk').hidden, true);
+  assert.equal(f.node('gateAccount').hidden, false);
+  assert.equal(f.sessionStorage.getItem('valhalla-auth-token'), null);
+  assert.equal(f.localStorage.getItem('valhalla-session'), null);
+  assert.equal(f.sessionStorage.getItem('valhalla-pending'), null);
+});
+
+test('active server session expires and closes the desk without a reload', async () => {
+  const f = fixture({ restored: true });
+  f.ready();
+  await flush();
+  const expiry = f.timers.find(timer => timer.delay === 60_000);
+  assert.ok(expiry, 'server expiry should schedule a session check');
+  f.advance(60_000);
+  expiry.fn();
   assert.equal(f.node('desk').hidden, true);
   assert.equal(f.node('gateAccount').hidden, false);
   assert.equal(f.sessionStorage.getItem('valhalla-auth-token'), null);

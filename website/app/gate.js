@@ -232,7 +232,23 @@
     sessionStorage.removeItem("valhalla-code-ok");
     sessionStorage.removeItem("valhalla-wallet-ok");
     sessionStorage.removeItem("valhalla-proof");
+    sessionStorage.removeItem("valhalla-pending");
+    sessionStorage.removeItem("valhalla-pending-email");
     localStorage.removeItem(SESSION_KEY);
+  }
+
+  function scheduleSessionExpiry(token, access) {
+    var expires = Number(access.expires);
+    function checkExpiry() {
+      if (sessionStorage.getItem("valhalla-auth-token") !== token) return;
+      if (!Number.isFinite(expires) || expires <= Date.now()) {
+        clearAuthState();
+        showSignIn();
+        return;
+      }
+      window.setTimeout(checkExpiry, Math.min(expires - Date.now(), 2147483647));
+    }
+    window.setTimeout(checkExpiry, Math.max(0, Math.min(expires - Date.now(), 2147483647)));
   }
 
   function showSignIn() {
@@ -314,6 +330,7 @@
     verifySession(body.session).then(function (access) {
       verifiedAccess = access;
       sessionStorage.setItem("valhalla-auth-token", body.session);
+      scheduleSessionExpiry(body.session, access);
       sessionStorage.setItem("valhalla-auth", "1");
       sessionStorage.setItem("valhalla-code-ok", "1");
       saveRemember(account, account.method);
@@ -922,6 +939,7 @@
     if (token) {
       verifySession(token).then(function (access) {
         verifiedAccess = access;
+        scheduleSessionExpiry(token, access);
         sessionStorage.setItem("valhalla-auth", "1");
         sessionStorage.setItem("valhalla-code-ok", "1");
         var account = readAccount() || {};
