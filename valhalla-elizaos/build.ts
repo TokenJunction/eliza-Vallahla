@@ -7,6 +7,13 @@ import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { $ } from 'bun';
 
+export function buildTasksSucceeded(
+  buildResult: { success: boolean },
+  tscResult: { success: boolean },
+) {
+  return buildResult.success && tscResult.success;
+}
+
 async function cleanBuild(outdir = 'dist') {
   if (existsSync(outdir)) {
     await rm(outdir, { recursive: true, force: true });
@@ -69,7 +76,7 @@ async function build() {
       (async () => {
         console.log('📝 Generating TypeScript declarations...');
         try {
-          await $`tsc --emitDeclarationOnly --incremental --project ./tsconfig.build.json`.quiet();
+          await $`tsc --emitDeclarationOnly --incremental --project ./tsconfig.build.json`;
           console.log('✓ TypeScript declarations generated');
           return { success: true };
         } catch (error) {
@@ -80,7 +87,7 @@ async function build() {
       })(),
     ]);
 
-    if (!buildResult.success) {
+    if (!buildTasksSucceeded(buildResult, tscResult)) {
       return false;
     }
 
@@ -93,14 +100,15 @@ async function build() {
   }
 }
 
-// Execute the build
-build()
-  .then((success) => {
-    if (!success) {
+if (import.meta.main) {
+  build()
+    .then((success) => {
+      if (!success) {
+        process.exit(1);
+      }
+    })
+    .catch((error) => {
+      console.error('Build script error:', error);
       process.exit(1);
-    }
-  })
-  .catch((error) => {
-    console.error('Build script error:', error);
-    process.exit(1);
-  });
+    });
+}
