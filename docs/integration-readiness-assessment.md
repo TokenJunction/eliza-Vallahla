@@ -207,6 +207,7 @@ Validation on the implementation commit, with exit code `0` unless noted:
 | `git diff --check` and secret scan of changed files | **PASS** — no whitespace errors or secrets detected. |
 
 No dedicated JS/CSS/HTML lint command is configured in this checkout; a formal accessibility audit was not run. Chromium checks use local fixtures only. These results do not verify external services, production routes, or live hosting.
+CodeQL was not run against this follow-up implementation; the earlier zero-alert result in the assessment applies to its previously named code revision only.
 
 GitHub Actions runs `42654189273` (`site-node22.yml`) and `42654189615` (`test-valhalla-deployment.yml`) on implementation commit `e8127da902188524898fbd9e7a4d050e7d2b667e` are `action_required`, each with zero jobs and no failed-job logs. Approval is required before GitHub Actions can validate this revision. No actual CI pass is claimed here.
 
