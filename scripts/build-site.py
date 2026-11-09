@@ -32,4 +32,6 @@ errors.write_text(text)
 
 assert (out / 'assets/mark.svg').is_file()
 assert (out / 'assets/mech.jpg').is_file()
+assert (out / 'desk.js').is_file()
+assert (out / 'desk.css').is_file()
 assert (out / 'app/index.html').read_bytes() == Path('app/index.html').read_bytes()
