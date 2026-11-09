@@ -97,10 +97,17 @@
     var output = document.getElementById('backend-status');
     if (output.textContent === 'Checking…') setHealth('Checking…', 'loading');
     var checkedAt = document.getElementById('checked-at');
+    var statusUrl = String((window.VALHALLA_SITE || {}).STATUS_URL || '');
+    if (!statusUrl) {
+      setHealth('Unavailable · status feed is not configured; service health is unknown.', 'error');
+      checkedAt.textContent = new Date().toLocaleTimeString();
+      return;
+    }
     var controller = new AbortController();
     var timeout = window.setTimeout(function () { controller.abort(); }, 6000);
     try {
-      var response = await fetch('/health', {
+      if (new URL(statusUrl).protocol !== 'https:') throw new Error('HTTPS required');
+      var response = await fetch(statusUrl, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         cache: 'no-store',
@@ -109,9 +116,19 @@
       });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       var result = await response.json();
-      if (!result || typeof result.status !== 'string') throw new Error('Unexpected health response');
-      setHealth(result.status + (result.engine ? ' · ' + result.engine : ''), 'ok');
-      checkedAt.textContent = new Date().toLocaleTimeString();
+      var names = ['VALHALLA CORE', 'MECHA BRAIN', 'ASK VALHALLA', 'ODIN FEED', 'FORGE LAB', 'HEIMDALL GATE', 'SENTINEL WATCH'];
+      var timestamp = Number(result && result.checkedAt);
+      var lines = result && result.lines;
+      if (!Number.isFinite(timestamp) || timestamp <= 0 || timestamp > Date.now() ||
+          Date.now() - timestamp > 15 * 60 * 1000 || !Array.isArray(lines) ||
+          lines.length !== names.length || lines.some(function (line, index) {
+            return !line || line.name !== names[index] ||
+              ['LIVE', 'DEGRADED', 'OFFLINE'].indexOf(line.state) < 0;
+          })) throw new Error('Invalid or stale status');
+      var state = lines.some(function (line) { return line.state === 'OFFLINE'; }) ? 'OFFLINE' :
+        lines.some(function (line) { return line.state === 'DEGRADED'; }) ? 'DEGRADED' : 'LIVE';
+      setHealth('Systems · ' + state + ' · checked ' + new Date(timestamp).toLocaleTimeString(), state === 'LIVE' ? 'ok' : state === 'OFFLINE' ? 'error' : 'degraded');
+      checkedAt.textContent = new Date(timestamp).toLocaleTimeString();
     } catch (error) {
       setHealth('Unavailable · ' + (error.name === 'AbortError' ? 'timed out' : 'probe failed'), 'error');
       checkedAt.textContent = new Date().toLocaleTimeString();
