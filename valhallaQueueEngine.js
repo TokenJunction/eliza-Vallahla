@@ -2,7 +2,7 @@
 
 const { timingSafeEqual } = require('node:crypto');
 const IORedis = require('ioredis');
-const { Queue, Worker, UnrecoverableError } = require('bullmq');
+const { Queue, Worker, RedisConnection, UnrecoverableError } = require('bullmq');
 
 const QUEUE_TASKS = Object.freeze({
   zeus: new Set(['health-check', 'policy-check']),
@@ -10,6 +10,7 @@ const QUEUE_TASKS = Object.freeze({
   cerberus: new Set(['vault-check']),
 });
 const MAX_PAYLOAD_BYTES = 4096;
+const PRODUCER_COMMAND_TIMEOUT_MS = 5000;
 
 function validateDispatch(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -93,14 +94,12 @@ async function createValhallaQueueEngine({
   }
   if (signal?.aborted) throw new Error('startup_cancelled');
 
-  const connection = new RedisClient(redisUrl, {
-    maxRetriesPerRequest: null,
-    connectTimeout: Math.min(startupTimeoutMs, 5000),
-    retryStrategy: (attempt) => Math.min(1000 * 2 ** Math.min(attempt - 1, 4), 15000),
-  });
+  const connections = [];
   const queues = {};
   const workers = [];
   const blockingClients = [];
+  let producerConnection;
+  let producerResetting = false;
   let closed = false;
   let ready = null;
   let started = false;
@@ -113,20 +112,37 @@ async function createValhallaQueueEngine({
   };
   const refresh = () => {
     if (started && !closed) {
-      state(!stopped && connection.status === 'ready' &&
+      state(!stopped && !producerResetting && connections.every((connection) => connection.status === 'ready') &&
         blockingClients.every((client) => client.status === 'ready') &&
         workers.every((worker) => worker.isRunning()));
     }
   };
-  connection.on('error', () => console.error(JSON.stringify({ component: 'queue', error: 'redis_error' })));
-  connection.on('close', () => state(false));
-  connection.on('ready', refresh);
+  function createConnection(producer) {
+    const connection = new RedisClient(redisUrl, {
+      maxRetriesPerRequest: producer ? 1 : null,
+      ...(producer ? {
+        enableOfflineQueue: false,
+        autoResendUnfulfilledCommands: false,
+        commandTimeout: PRODUCER_COMMAND_TIMEOUT_MS,
+      } : {}),
+      connectTimeout: Math.min(startupTimeoutMs, 5000),
+      retryStrategy: (attempt) => Math.min(1000 * 2 ** Math.min(attempt - 1, 4), 15000),
+    });
+    connections.push(connection);
+    connection.on('error', () => console.error(JSON.stringify({ component: 'queue', error: 'redis_error' })));
+    connection.on('close', () => state(false));
+    connection.on('ready', () => {
+      if (producer) producerResetting = false;
+      refresh();
+    });
+    return connection;
+  }
 
   function close(force = false) {
     if (closePromise) return closePromise;
     closed = true;
     state(false);
-    if (force) connection.disconnect();
+    if (force) connections.forEach((connection) => connection.disconnect());
     closePromise = (async () => {
       try {
         const workerResults = await Promise.allSettled(workers.map((worker) => worker.close(force)));
@@ -135,7 +151,7 @@ async function createValhallaQueueEngine({
           throw new Error('queue_cleanup_failed');
         }
       } finally {
-        connection.disconnect();
+        connections.forEach((connection) => connection.disconnect());
       }
     })();
     return closePromise;
@@ -145,11 +161,15 @@ async function createValhallaQueueEngine({
   let abort;
   try {
     const startup = (async () => {
-      await connection.ping();
+      producerConnection = role !== 'consumer' ? createConnection(true) : null;
+      const consumerConnection = role !== 'producer' ? createConnection(false) : null;
+      await Promise.all(connections.map((connection) => RedisConnection.waitUntilReady(connection)));
+      if (closed) return;
+      await Promise.all(connections.map((connection) => connection.ping()));
       if (closed) return;
       if (role !== 'consumer') {
         for (const name of Object.keys(QUEUE_TASKS)) {
-          queues[name] = new QueueClass(`valhalla-${name}`, { connection });
+          queues[name] = new QueueClass(`valhalla-${name}`, { connection: producerConnection });
           queues[name].on('error', () => console.error(JSON.stringify({ component: 'queue', error: 'queue_error' })));
         }
       }
@@ -171,7 +191,7 @@ async function createValhallaQueueEngine({
               }
               return executeSafeTask(targetEngine, dispatch.taskName, dispatch.payload);
             },
-            { connection, concurrency: 1, autorun: false },
+            { connection: consumerConnection, concurrency: 1, autorun: false },
           );
           worker.on('error', () => {
             state(false);
@@ -225,10 +245,19 @@ async function createValhallaQueueEngine({
     async enqueue(input) {
       if (closed || !ready || role === 'consumer') throw new Error('queue_unavailable');
       const { targetEngine, taskName, payload } = validateDispatch(input);
-      return queues[targetEngine].add(taskName, { payload }, {
-        removeOnComplete: 100,
-        removeOnFail: 100,
-      });
+      try {
+        return await queues[targetEngine].add(taskName, { payload }, {
+          removeOnComplete: 100,
+          removeOnFail: 100,
+        });
+      } catch (error) {
+        if (error.message === 'Command timed out' && !closed && !producerResetting) {
+          producerResetting = true;
+          state(false);
+          producerConnection.disconnect(true);
+        }
+        throw error;
+      }
     },
     close,
   };
