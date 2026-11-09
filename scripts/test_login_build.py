@@ -18,6 +18,8 @@ class LoginBuildTests(unittest.TestCase):
         (root / 'app/index.html').write_text('<main>Sign in</main>')
         (root / 'assets/mark.svg').write_text('<svg/>')
         (root / 'assets/mech.jpg').write_bytes(b'fixture')
+        (root / 'desk.js').write_text('fixture')
+        (root / 'desk.css').write_text('fixture')
         (root / 'errors.js').write_text('root.ValhallaErrors = {};')
         return root
 

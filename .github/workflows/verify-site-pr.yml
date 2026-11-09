@@ -1,0 +1,37 @@
+name: Verify production site PR
+on:
+  pull_request:
+    branches: [docs/site]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Build production source and verify desk and regressions
+        run: |
+          node --version
+          python3 --version
+          npm run build
+          node --check site-build/desk.js
+          node --check site-build/site-config.js
+          node --check site-build/os/bridge.js
+          node --check site-build/home-motion.js
+          node --check site-build/app/gate.js
+          node --check site-build/errors.js
+          node --check site-build/connect-core.js
+          node --check site-build/site-wallet.js
+          node --check site-build/app/performance.js
+          node --check site-build/app/leadership.js
+          node --test scripts/desk.test.cjs
+          python3 scripts/test_login_build.py -v
+          node scripts/test-wallet.cjs
+          node --test workers/*.test.mjs app/performance.test.cjs
+          python3 scripts/test_performance_report.py
