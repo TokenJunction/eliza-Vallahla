@@ -6,6 +6,7 @@
   var RPC = "https://api.mainnet-beta.solana.com";
   var TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
   var clockTimer = 0;
+  var verifiedAccess = null;
 
   function show(id) {
     ["gateHuman", "gateTerms", "gateAccount", "gateCode", "gateWallet", "desk"].forEach(function (name) {
@@ -196,7 +197,52 @@
   }
 
   function authBase() {
-    return String(cfg.AUTH_URL || "").replace(/\/$/, "");
+    var base = String(cfg.AUTH_URL || "").replace(/\/$/, "");
+    return /^https:\/\//i.test(base) ? base : "";
+  }
+
+  function verifySession(token) {
+    var base = authBase();
+    if (!base || !token) return Promise.reject(new Error("auth session unavailable"));
+    return fetch(base + "/auth/access", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
+        authorization: "Bearer " + token
+      }
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (body) {
+        var expires = Number(body.expires);
+        if (!response.ok || body.ok !== true || !Number.isFinite(expires) || expires <= Date.now()) {
+          var error = new Error("auth session rejected");
+          error.unauthorized = response.status === 401 || (Number.isFinite(expires) && expires <= Date.now());
+          throw error;
+        }
+        return body;
+      });
+    });
+  }
+
+  function clearAuthState() {
+    verifiedAccess = null;
+    sessionStorage.removeItem("valhalla-auth-token");
+    sessionStorage.removeItem("valhalla-auth");
+    sessionStorage.removeItem("valhalla-code-ok");
+    sessionStorage.removeItem("valhalla-wallet-ok");
+    sessionStorage.removeItem("valhalla-proof");
+    localStorage.removeItem(SESSION_KEY);
+  }
+
+  function showSignIn() {
+    if (fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS)) {
+      show("gateAccount");
+      mountAccount();
+    } else {
+      show("gateHuman");
+      mountTurnstile();
+    }
   }
 
   function alwaysAsk() {
@@ -255,15 +301,22 @@
       plan: prior.plan || "free"
     };
     writeAccount(account);
-    sessionStorage.setItem("valhalla-auth", "1");
     sessionStorage.removeItem("valhalla-pending-email");
-    saveRemember(account, account.method);
-    if (body.session) sessionStorage.setItem("valhalla-auth-token", body.session);
     if (body.needCode) {
-      sessionStorage.removeItem("valhalla-code-ok");
+      clearAuthState();
       showCode(body.hint || account.hint, "wallet", body.pending);
-    } else {
+      return;
+    }
+    if (typeof body.session !== "string" || !body.session) {
+      fail(document.getElementById("accountNote"), "V-AUTH", "provider returned no session", function () { location.reload(); });
+      return;
+    }
+    verifySession(body.session).then(function (access) {
+      verifiedAccess = access;
+      sessionStorage.setItem("valhalla-auth-token", body.session);
+      sessionStorage.setItem("valhalla-auth", "1");
       sessionStorage.setItem("valhalla-code-ok", "1");
+      saveRemember(account, account.method);
       saveSession(accountSession(account));
       if (body.redirect === "/admin/master-control/") {
         sessionStorage.removeItem("valhalla-entry-desk");
@@ -280,7 +333,16 @@
         return;
       }
       openDesk();
-    }
+    }).catch(function (error) {
+      if (error && error.unauthorized) {
+        clearAuthState();
+        showSignIn();
+        return;
+      }
+      fail(document.getElementById("accountNote"), "V-AUTH",
+        "server session verification " + String(error && error.message || error),
+        function () { acceptAccount(body); });
+    });
   }
 
   function verifyGoogle(credential, note) {
@@ -704,26 +766,17 @@
 
   function openDesk() {
     var session = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
-    if (!session) {
+    if (!session || (session.kind !== "paper" && !verifiedAccess)) {
+      if (!verifiedAccess && (!session || session.kind !== "paper")) {
+        showSignIn();
+        return;
+      }
       var account = readAccount();
-      var verified = account && account.hint &&
-        sessionStorage.getItem("valhalla-auth") === "1" &&
-        sessionStorage.getItem("valhalla-code-ok") === "1";
-      if (verified) {
+      if (verifiedAccess) {
         session = accountSession(account);
         saveSession(session);
-      } else {
-        var pendingCode = sessionStorage.getItem("valhalla-pending");
-        if (pendingCode && sessionStorage.getItem("valhalla-code-ok") !== "1") {
-          show("gateCode");
-        } else if (fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS)) {
-          show("gateAccount");
-          mountAccount();
-        } else {
-          show("gateHuman");
-          mountTurnstile();
-        }
-        return;
+      } else if (session && session.kind === "paper") {
+        session = { kind: "paper" };
       }
     }
     if ((session.kind === "google" || session.kind === "account") && sessionStorage.getItem("valhalla-entry-desk") === "1") {
@@ -814,6 +867,13 @@
   window.addEventListener("valhalla-signed", function (event) {
     var packed = event.detail || {};
     if (!packed.pubkey) return;
+    if (!verifiedAccess) {
+      var signInNote = document.getElementById("walletNote");
+      if (signInNote) signInNote.textContent = "Wallet signatures do not authenticate an account. Sign in with Google or email first.";
+      show("gateAccount");
+      mountAccount();
+      return;
+    }
     var expected = window.__valhallaExpected || "";
     var note = document.getElementById("walletNote");
     if (expected && packed.pubkey !== expected) {
@@ -858,23 +918,42 @@
   }
 
   function initialize() {
-    var human = fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS);
-    var account = readAccount();
-    var signed = sessionStorage.getItem("valhalla-wallet-ok") === "1";
-    var authed = sessionStorage.getItem("valhalla-auth") === "1" && sessionStorage.getItem("valhalla-code-ok") === "1";
-    if (human && account && account.hint && authed) {
-      var savedSession = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
-      if (!signed || !savedSession || savedSession.kind !== "wallet") saveSession(accountSession(account));
+    var token = sessionStorage.getItem("valhalla-auth-token") || "";
+    if (token) {
+      verifySession(token).then(function (access) {
+        verifiedAccess = access;
+        sessionStorage.setItem("valhalla-auth", "1");
+        sessionStorage.setItem("valhalla-code-ok", "1");
+        var account = readAccount() || {};
+        var savedSession = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
+        if (!savedSession || (savedSession.kind !== "paper" && savedSession.kind !== "wallet")) {
+          saveSession(accountSession(account));
+        }
+        openDesk();
+      }).catch(function (error) {
+        if (error && error.unauthorized) {
+          clearAuthState();
+          showSignIn();
+          return;
+        }
+        fail(document.getElementById("accountNote"), "V-AUTH",
+          "server session verification " + String(error && error.message || error),
+          initialize);
+      });
+      return;
+    }
+    var saved = fresh(localStorage.getItem(SESSION_KEY), 12 * 60 * 60 * 1000);
+    if (saved && saved.kind === "paper") {
       openDesk();
-    } else if (human && sessionStorage.getItem("valhalla-pending") && sessionStorage.getItem("valhalla-code-ok") !== "1") {
+      return;
+    }
+    clearAuthState();
+    var human = fresh(sessionStorage.getItem(HUMAN_KEY), HUMAN_MS);
+    if (human && sessionStorage.getItem("valhalla-pending")) {
       show("gateCode");
       mountAccount();
-    } else if (human) {
-      show("gateAccount");
-      mountAccount();
     } else {
-      show("gateHuman");
-      mountTurnstile();
+      showSignIn();
     }
   }
 

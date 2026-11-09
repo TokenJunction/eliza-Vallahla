@@ -84,6 +84,15 @@ class SiteTests(unittest.TestCase):
             self.assertFalse((OUT / name).exists())
         self.assertIn('"/media/hero.mp4"', (OUT / "home-motion.js").read_text())
 
+    def test_brain_api_is_documentation_not_an_unverified_endpoint(self):
+        page = (OUT / "api/index.html").read_text()
+        config = (OUT / "site-config.js").read_text()
+        connect = (OUT / "connect/connect-page.js").read_text()
+        self.assertIn("does not ship or configure a Brain API", page)
+        self.assertNotIn("YOUR-WORKER.workers.dev", page)
+        self.assertIn('BRAIN_URL: ""', config)
+        self.assertIn("No wallet session can be accepted here.", connect)
+
     def test_build_rejects_missing_entry_points_and_assets(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
