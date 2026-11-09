@@ -186,3 +186,28 @@ Secret scan: No secrets detected in the scanned files.
 - The earlier `develop` deployment run `42606443037` failed with exit code 2 because the Google Drive response was not gzip (`gzip: stdin: not in gzip format`). That obsolete input path is removed from this PR’s release workflow; local release fixtures pass. This does not imply a deployment passed.
 - **Blocked/not run live:** Google sign-in, email delivery, Turnstile verification, auth Worker `/auth/access`/logout, real CORS/cookie behavior, chat provider, external status/agent/brain APIs, DNS/domain/Vercel/Pages configuration, production release-marker equality, and any ValOS chain/address verification. The local browser environment could not resolve the relevant external hosts; no live credentials or provider-side changes were available.
 - **Not run:** a formal WCAG/axe audit, dedicated JS lint tool, production load/stress test, live provider test, or production deployment. The only stress checks were bounded local fixtures listed above. No production traffic was generated.
+
+## ValOS page follow-up
+
+The ValOS page and onboarding follow-up were implemented in commit `e8127da902188524898fbd9e7a4d050e7d2b667e`. `/valos/` is part of the `website/` allowlisted build; the existing homepage, `/app/`, `/os/`, and desktop assets remain in the build. The six sections each link back to `/valos/`. Public token identity fields and X profile begin unset, the profile remains hidden until exact owner confirmation, and purchase UI is disabled in markup with no script path to enable it. The onboarding package documents verified scope, unsupported services, secret-name references, release/rollback prerequisites, a support placeholder, and risks. The calendar contains stable, undated VTODOs linking to PR #54 and `/valos/`; its `DTSTAMP` is metadata, not a scheduled milestone.
+
+Validation on the implementation commit, with exit code `0` unless noted:
+
+| Command | Result |
+|---|---|
+| `python3 website/scripts/build-site.py` | **PASS** — reproducible static build completed. |
+| `node --test website/scripts/*.test.cjs` | **PASS** — 29 tests, 29 passed, 0 failed, including token defaults, section links, disabled purchase, X profile gating, accessibility/responsive structure, and calendar invariants. |
+| `node website/scripts/test-wallet.cjs` | **PASS** — wallet adapter regression checks passed. |
+| `python3 website/scripts/test-site.py` | **PASS** — 5 tests; `/`, `/app/`, `/os/`, `/valos/`, onboarding, assets, redirect, ICS and Chromium checks passed. |
+| `python3 -m unittest discover -s tests -p 'test_*.py' -v` | **PASS** — 15 release, deployment, and marker tests. |
+| `python3 scripts/test_release_artifact.py` | **PASS** — 18 safe archive/release fixture tests. |
+| `python3 scripts/test_release_browser.py` | **PASS** — 1 local Chromium smoke test using synthetic release assets. |
+| `node --check website/site-config.js && node --check website/valos/valos.js && node --check website/scripts/valos.test.cjs && python3 -m py_compile website/scripts/build-site.py website/scripts/test-site.py && bash -n deploy-valhalla.sh` | **PASS** — JavaScript, Python, and shell syntax checks. |
+| Parse `vercel.json` and the touched workflow YAML with Python | **PASS** — JSON/YAML parse successfully. |
+| `git diff --check` and secret scan of changed files | **PASS** — no whitespace errors or secrets detected. |
+
+No dedicated JS/CSS/HTML lint command is configured in this checkout; a formal accessibility audit was not run. Chromium checks use local fixtures only. These results do not verify external services, production routes, or live hosting.
+
+GitHub Actions runs `42654189273` (`site-node22.yml`) and `42654189615` (`test-valhalla-deployment.yml`) on implementation commit `e8127da902188524898fbd9e7a4d050e7d2b667e` are `action_required`, each with zero jobs and no failed-job logs. Approval is required before GitHub Actions can validate this revision. No actual CI pass is claimed here.
+
+Remaining owner/external prerequisites: confirm the exact X profile before setting its public URL; approve real calendar dates, times, and target calendar before creating Google Calendar events; supply the canonical chain and token mint/contract or explicitly confirm undeployed status; coordinate the single Pages publisher and Vercel/domain owners; and verify external auth/chat/status services in approved staging. The X account password is never requested, no automatic posting/calendar sync exists, and no purchase, trading, transaction, deployment, DNS change, hosting-setting change, or spend occurred. Token status remains **NO-GO / BLOCKED** pending identity evidence and separate approvals.
