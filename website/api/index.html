@@ -6,29 +6,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Valhalla Brain API</title>
-<meta name="description" content="Read-only Valhalla signal scores. Informational only. Not financial advice.">
+<meta name="description" content="Valhalla Brain API availability and request information.">
 <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
 <main class="wrap" style="padding:32px 0 64px">
   <p class="kicker">API</p>
   <h1>Valhalla Brain API</h1>
-  <p>Read-only signal scores from public data. Valhalla does not trade and does not send funds. Scores are informational. They are not financial advice and they do not promise profit.</p>
+  <p>This route is static documentation only. This repository does not ship or configure a Brain API, issue API keys, or provide verified signal scores.</p>
   <article class="card">
-    <h2>Quickstart</h2>
-    <pre>curl -s https://YOUR-WORKER.workers.dev/v1/health
-curl -s -H "Authorization: Bearer $VALHALLA_BRAIN_KEY" \
-  https://YOUR-WORKER.workers.dev/v1/score/So11111111111111111111111111111111111111112</pre>
-    <p>The TypeScript client is <code>@valhalla/brain-sdk</code>. Plans: free is 100 calls a day, then dev and pro. Keys are stored as SHA-256 hashes. Helius and Birdeye keys stay in the worker secrets.</p>
+    <h2>Availability</h2>
+    <p>A Brain provider, routes, authentication contract, and deployment credentials must be reviewed and configured separately before API use. Do not send API keys or wallet secrets to an unverified endpoint.</p>
   </article>
   <article class="card">
-    <h2>Request an API key</h2>
+    <h2>Request information</h2>
     <form id="key-form">
       <label>Email <input id="email" type="email" required autocomplete="email"></label>
       <label>How you will use it <textarea id="use" required rows="4"></textarea></label>
-      <button class="btn" type="submit">Request API key</button>
+      <button class="btn" type="submit">Contact support</button>
     </form>
-    <p id="key-note">The request opens an email to hello@valhalla-app.xyz. It does not create a key by itself.</p>
+    <p id="key-note">This opens an email. It does not create an API key or enable a service.</p>
   </article>
   <p><a href="../">Back to Valhalla</a></p>
 </main>
@@ -38,10 +35,9 @@ document.getElementById("key-form").addEventListener("submit", function (event) 
   var email = document.getElementById("email").value;
   var use = document.getElementById("use").value;
   var body = "Email: " + email + "\nUse: " + use + "\n";
-  window.location.href = "mailto:hello@valhalla-app.xyz?subject=" + encodeURIComponent("Valhalla Brain API key") + "&body=" + encodeURIComponent(body);
+  window.location.href = "mailto:hello@valhalla-app.xyz?subject=" + encodeURIComponent("Valhalla Brain API information") + "&body=" + encodeURIComponent(body);
 });
 </script>
-
 <script src="/site-config.js"></script>
 <script src="/nacl.min.js"></script>
 <script src="/connect-core.js"></script>

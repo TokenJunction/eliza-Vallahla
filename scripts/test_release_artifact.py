@@ -247,6 +247,7 @@ class FixtureTest(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, "scripts/release_artifact.py", "--manifest", str(self.manifest),
              "--output", str(self.output), "--url", "https://invalid.invalid/",
+             "--expected-sha256", digest(b"unreviewed"),
              "--sha", SHA, "--request-id", REQUEST_ID],
             capture_output=True, text=True, timeout=5,
         )

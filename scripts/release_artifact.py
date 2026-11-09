@@ -20,10 +20,6 @@ import zipfile
 from pathlib import Path
 
 
-DRIVE_ID = "1_rFRoaRKhbqHB0CXOVygtYUtfVYH18jO"
-DEFAULT_URL = f"https://drive.google.com/uc?export=download&id={DRIVE_ID}"
-# This production value is unverified; it is not a substitute for review.
-DEFAULT_SHA256 = "63b9b02d491efd4f10ee195ba2452e8ad3eeaf242006bb859f8d96ee2c257a05"
 MAX_DOWNLOAD = 128 * 1024 * 1024
 MAX_ARCHIVE = 512 * 1024 * 1024
 MAX_FILE = 64 * 1024 * 1024
@@ -369,8 +365,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, help="explicitly reviewed JSON manifest")
     parser.add_argument("--output", required=True, help="new output directory (must not exist)")
-    parser.add_argument("--url", default=DEFAULT_URL, help="HTTPS archive URL")
-    parser.add_argument("--expected-sha256", default=DEFAULT_SHA256)
+    parser.add_argument("--url", required=True, help="explicit HTTPS archive URL")
+    parser.add_argument("--expected-sha256", required=True, help="independently reviewed archive SHA-256")
     parser.add_argument("--sha", required=True, help="exact source commit SHA")
     parser.add_argument("--request-id", required=True, help="deployment request ID")
     args = parser.parse_args()

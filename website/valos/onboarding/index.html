@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#121a27">
+  <meta name="description" content="ValOS project onboarding: current verified capabilities, configuration boundaries, release gates, and risks.">
+  <link rel="canonical" href="https://valhalla-app.xyz/valos/onboarding/">
+  <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="stylesheet" href="/valos/valos.css">
+  <title>ValOS onboarding package · ValhallaOS</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="/valos/">VALOS · PROJECT ONBOARDING</a>
+    <nav aria-label="Main navigation"><a href="/valos/">Token status</a><a href="/os/">Explore OS</a><a href="/">Home</a></nav>
+  </header>
+  <main id="main">
+    <section class="hero" aria-labelledby="page-title">
+      <p class="eyebrow">REUSABLE INTRODUCTION · NO TOKEN OFFER</p>
+      <h1 id="page-title">ValOS onboarding package</h1>
+      <p>This package describes the project and its current boundaries. ValOS token identity is planned and unverified. It is not a purchase invitation, investment offer, or promise of utility.</p>
+      <p><a class="button primary" href="/valos/">Return to ValOS status</a></p>
+    </section>
+    <div class="sections">
+      <section aria-labelledby="quick-title">
+        <h2 id="quick-title">Quick start</h2>
+        <ol>
+          <li>Visit the <a href="/os/">public ValhallaOS desk</a> without signing in to inspect its paper-first interface.</li>
+          <li>Connect a wallet only if you choose; the inspected public desk can display its public address, but connection does not load balances or positions.</li>
+          <li>Use paper simulation only. It accepts assumed inputs and does not request a signature or execute an order.</li>
+          <li>Read the <a href="/whitepaper/">product and safety paper</a> and <a href="/disclosure/">risk disclosure</a> before evaluating the project.</li>
+        </ol>
+      </section>
+      <section aria-labelledby="capabilities-title">
+        <h2 id="capabilities-title">Code-verified capabilities</h2>
+        <ul>
+          <li>Static public routes include <code>/</code>, <code>/app/</code>, <code>/os/</code>, and <code>/valos/</code>.</li>
+          <li>The public OS includes a wallet-address display and local paper-trade journal.</li>
+          <li>Current public flags leave live trading, rewards payouts, and hive features disabled.</li>
+          <li>Browser auth checks the configured server session; a local-storage flag does not authorize an account.</li>
+        </ul>
+        <p>These are repository observations, not proof of production hosting or external service availability.</p>
+      </section>
+      <section aria-labelledby="unsupported-title">
+        <h2 id="unsupported-title">Unavailable or unsupported</h2>
+        <ul>
+          <li>No ValOS contract or mint, network, tokenomics, market, price, or purchase link is verified.</li>
+          <li>No ValOS buying, payment, swap, live-trading, or payout controls are available.</li>
+          <li>Brain and SIWS are not enabled as verified backend services. External auth, chat, and status service uptime has not been live-verified.</li>
+          <li>No investment return, token safety, audit, listing, launch date, or legal approval is represented.</li>
+        </ul>
+      </section>
+      <section aria-labelledby="config-title">
+        <h2 id="config-title">Configuration and secret names</h2>
+        <p>Public token metadata lives in <code>website/site-config.js</code> under <code>VALHALLA_SITE.VALOS</code>. The network, mint/contract address, explorer, purchase URL, and X profile begin empty; status is <code>planned-unverified</code>; purchase approval and X profile owner-confirmation are false.</p>
+        <p>Do not put private keys, provider credentials, mail keys, or database secrets in browser configuration. The existing external Worker secret-name reference is <code>docs/worker-secret-names.example</code>; it lists names only. This website defines no ValOS-token server secret.</p>
+        <p>The configured X profile is shown only when the owner sets the exact URL and explicitly confirms it. Ask the owner to supply/confirm the URL; do not infer it from a ticker, branch, or prior profile. Share links open a user-controlled X compose screen; the page never requests an X password or posts automatically.</p>
+      </section>
+      <section aria-labelledby="release-title">
+        <h2 id="release-title">Deployment and rollback</h2>
+        <p>This page ships through the repository website build from <code>website/</code> to <code>site-build/</code>. The separate Pages publisher and external host settings must be coordinated first. Do not set the Pages readiness gate or dispatch production until an authorized owner approves the release.</p>
+        <p>For an approved staging release, record the source SHA and release marker, verify exactly one correlated workflow and compare the marker. Roll back with the selected publisher to the last reviewed SHA and verify its marker; do not use DNS changes as a shortcut. See the <a href="https://github.com/TokenJunction/eliza-valhalla/blob/develop/docs/architecture-spec.md">architecture and launch prerequisites</a>.</p>
+      </section>
+      <section aria-labelledby="support-title">
+        <h2 id="support-title">Support and risk disclosure</h2>
+        <p>Support contact: <strong>[owner to confirm and publish a monitored channel]</strong>. Do not send passwords, seed phrases, private keys, payment details, or sensitive account information to a placeholder or unverified contact.</p>
+        <p>Digital assets are volatile and may become worthless or illiquid. Contract, issuer, custody, wallet, phishing, regulatory, tax, and operational risks may apply. No safety, profit, or return is guaranteed. Nothing here is financial, investment, or legal advice.</p>
+      </section>
+    </div>
+  </main>
+  <footer>
+    <p>Token status: planned · unverified. No purchase path is enabled.</p>
+    <nav aria-label="Footer"><a href="/valos/">ValOS</a><a href="/os/">ValhallaOS</a><a href="https://github.com/TokenJunction/eliza-valhalla/pull/54">PR #54</a></nav>
+  </footer>
+</body>
+</html>

@@ -8,7 +8,7 @@ out = root / "site-build"
 directories = (
     "admin api app assets chrome connect contact cookies dashboard demo disclosure "
     "extension faq health kernel media os pay preview privacy shop status terms tools "
-    "updates whitepaper"
+    "updates valos whitepaper"
 ).split()
 files = (
     "404.html ads.txt app-ads.txt changelog.json connect-core.js consent.js "
@@ -30,6 +30,9 @@ for name in directories:
 for name in files:
     shutil.copy2(source / name, out / name)
 
+calendar = out / "valos/milestones.ics"
+calendar.write_bytes(calendar.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+
 # Match the upstream Pages build: do not cover the sign-in page with the preview iframe.
 errors = out / "errors.js"
 text = errors.read_text()
@@ -43,7 +46,8 @@ if "root.ValhallaErrors = " not in text:
     raise RuntimeError("Missing error handler")
 errors.write_text(text)
 
-for name in ("index.html", "app/index.html", "app/gate.js", "assets/mark.svg",
+for name in ("index.html", "app/index.html", "app/gate.js", "valos/index.html",
+             "valos/onboarding/index.html", "valos/milestones.ics", "assets/mark.svg",
              "assets/mech.jpg", "assets/poster.jpg", "media/hero.mp4",
              "connect-core.js", "site-wallet.js", "desk.js", "desk.css"):
     if not (out / name).is_file() or not (out / name).stat().st_size:

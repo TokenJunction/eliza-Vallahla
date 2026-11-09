@@ -5,12 +5,16 @@ on:
     paths:
       - 'website/**'
       - 'vercel.json'
+      - 'scripts/write_valhalla_release.py'
+      - 'tests/test_valhalla_site_release.py'
       - '.github/workflows/site-node22.yml'
   pull_request:
     branches: [develop]
     paths:
       - 'website/**'
       - 'vercel.json'
+      - 'scripts/write_valhalla_release.py'
+      - 'tests/test_valhalla_site_release.py'
       - '.github/workflows/site-node22.yml'
   workflow_dispatch:
 permissions:
@@ -40,10 +44,12 @@ jobs:
         run: python3 website/scripts/build-site.py
       - name: Verify static routes and assets
         run: python3 website/scripts/test-site.py
+      - name: Verify release marker generation
+        run: python3 tests/test_valhalla_site_release.py
       - name: Verify wallet boundaries
         run: node website/scripts/test-wallet.cjs
-      - name: Verify gate, OS, and all seven desk tests
-        run: node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs website/scripts/desk.test.cjs
+      - name: Verify gate, OS, desk, wallet handoff, and settings tests
+        run: node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs website/scripts/desk.test.cjs website/scripts/connect-page.test.cjs website/scripts/settings.test.cjs website/scripts/valos.test.cjs
       - name: Upload verified static build
         uses: actions/upload-artifact@v4
         with:

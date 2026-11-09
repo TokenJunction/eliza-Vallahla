@@ -41,22 +41,35 @@ jobs:
           RUN_SHA: ${{ github.sha }}
           REQUEST_ID: ${{ inputs.request_id }}
           DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          PAGES_PUBLISHER_READY: ${{ vars.VALHALLA_PAGES_PUBLISHER_READY }}
         run: |
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ && "$SOURCE_SHA" == "$RUN_SHA" ]] || { echo "Source SHA does not match workflow checkout" >&2; exit 1; }
           [[ "$REQUEST_ID" =~ ^[A-Za-z0-9_-]{1,128}$ ]] || { echo "Invalid request ID" >&2; exit 1; }
           [[ "$DEPLOY_ENVIRONMENT" == github-pages ]] || { echo "Unapproved deployment environment" >&2; exit 1; }
-      - name: Download, validate and assemble reviewed release
+          [[ "$PAGES_PUBLISHER_READY" == true ]] || { echo "Pages publishing is blocked until all publishers are coordinated; set VALHALLA_PAGES_PUBLISHER_READY only after review" >&2; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build and verify repository website
+        run: |
+          python3 website/scripts/build-site.py
+          python3 website/scripts/test-site.py
+          python3 tests/test_valhalla_site_release.py
+          node website/scripts/test-wallet.cjs
+          node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs website/scripts/desk.test.cjs website/scripts/connect-page.test.cjs website/scripts/settings.test.cjs website/scripts/valos.test.cjs
+      - name: Add source-correlated release marker
         env:
           SOURCE_SHA: ${{ inputs.sha }}
           REQUEST_ID: ${{ inputs.request_id }}
         run: |
-          python3 scripts/release_artifact.py \
-            --manifest .github/valhalla-reviewed-manifest.json \
-            --output "$RUNNER_TEMP/valhalla-public" \
-            --sha "$SOURCE_SHA" --request-id "$REQUEST_ID"
+          python3 scripts/write_valhalla_release.py \
+            --directory site-build --sha "$SOURCE_SHA" --request-id "$REQUEST_ID"
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: ${{ runner.temp }}/valhalla-public
+          path: site-build/
 
   deploy:
     needs: build

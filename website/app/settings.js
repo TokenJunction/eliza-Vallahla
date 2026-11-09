@@ -63,6 +63,47 @@
     localStorage.removeItem("valhalla-watch");
     location.href = "/app/";
   });
+  document.getElementById("signOut").addEventListener("click", function () {
+    var token = sessionStorage.getItem("valhalla-auth-token") || "";
+    var base = String((window.VALHALLA_SITE || {}).AUTH_URL || "").replace(/\/$/, "");
+    var note = document.getElementById("signOutNote");
+    function finish() {
+      localStorage.removeItem(SESSION);
+      localStorage.removeItem("valhalla-watch");
+      ["valhalla-auth-token", "valhalla-auth", "valhalla-code-ok",
+        "valhalla-wallet-ok", "valhalla-proof"].forEach(function (key) {
+        sessionStorage.removeItem(key);
+      });
+      location.href = "/app/";
+    }
+    if (!token) {
+      finish();
+      return;
+    }
+    if (base.indexOf("https://") !== 0) {
+      if (note) note.textContent = "Sign-out service is unavailable. You are still signed in.";
+      return;
+    }
+    fetch(base + "/auth/logout", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
+        authorization: "Bearer " + token,
+        "content-type": "application/json"
+      },
+      body: "{}"
+    }).then(function (response) {
+      if (response.ok || response.status === 401) {
+        finish();
+        return;
+      }
+      if (note) note.textContent = "The sign-out service could not revoke this session. You are still signed in.";
+    }).catch(function () {
+      if (note) note.textContent = "The sign-out service could not be reached. You are still signed in.";
+    });
+  });
   document.getElementById("saveKeys").addEventListener("click", function () {
     var rpc = document.getElementById("keyRpc").value.trim();
     if (rpc && rpc.indexOf("https://") !== 0) rpc = "";

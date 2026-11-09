@@ -18,7 +18,7 @@ window.VALHALLA_SITE = {
   LEMONSQUEEZY_LIFETIME_URL: "",
   CHROME_WEB_STORE_URL: "",
   OFFER_CLICK_URL: "",
-  BRAIN_URL: "https://valhalla-brain-api.valhalla-app.workers.dev",
+  BRAIN_URL: "",
   handle: "@ValhallaOS",
   xUrl: "https://x.com/intent/user?user_id=2092719999886475265",
   dmUrl: "https://x.com/messages/compose?recipient_id=2092719999886475265",
@@ -42,7 +42,20 @@ window.VALHALLA_SITE = {
   COINBASE_COMMERCE_URL: "",
   NOWPAYMENTS_URL: "",
   LIVE_TRADING: false,
-  /* Public chat uses the deployed Cloudflare Workers AI service. Brain integration is separate. */
+  /* Public chat uses the configured service; no Brain or SIWS backend is enabled here. */
   CHAT_URL: "https://valhalla-chat.valhalla-app.workers.dev",
   TICKER_URL: ""
+};
+
+window.VALHALLA_SITE.VALOS = {
+  STATUS: "planned-unverified",
+  NETWORK: "",
+  MINT_ADDRESS: "",
+  EXPLORER_URL: "",
+  PURCHASE_URL: "",
+  PURCHASE_APPROVED: false,
+  X_PROFILE_URL: "",
+  X_PROFILE_OWNER_CONFIRMED: false,
+  X_HANDLE: "",
+  X_SHARE_TEXT: "ValhallaOS capabilities are separate from any token. ValOS token identity, network, and utility are not verified. No purchase is available."
 };
