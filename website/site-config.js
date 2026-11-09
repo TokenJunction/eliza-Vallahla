@@ -46,3 +46,16 @@ window.VALHALLA_SITE = {
   CHAT_URL: "https://valhalla-chat.valhalla-app.workers.dev",
   TICKER_URL: ""
 };
+
+window.VALHALLA_SITE.VALOS = {
+  STATUS: "planned-unverified",
+  NETWORK: "",
+  MINT_ADDRESS: "",
+  EXPLORER_URL: "",
+  PURCHASE_URL: "",
+  PURCHASE_APPROVED: false,
+  X_PROFILE_URL: "",
+  X_PROFILE_OWNER_CONFIRMED: false,
+  X_HANDLE: "",
+  X_SHARE_TEXT: "ValhallaOS capabilities are separate from any token. ValOS token identity, network, and utility are not verified. No purchase is available."
+};

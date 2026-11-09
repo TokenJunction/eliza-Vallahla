@@ -49,7 +49,7 @@ jobs:
       - name: Verify wallet boundaries
         run: node website/scripts/test-wallet.cjs
       - name: Verify gate, OS, desk, wallet handoff, and settings tests
-        run: node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs website/scripts/desk.test.cjs website/scripts/connect-page.test.cjs website/scripts/settings.test.cjs
+        run: node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs website/scripts/desk.test.cjs website/scripts/connect-page.test.cjs website/scripts/settings.test.cjs website/scripts/valos.test.cjs
       - name: Upload verified static build
         uses: actions/upload-artifact@v4
         with:

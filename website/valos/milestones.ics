@@ -1,0 +1,62 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//TokenJunction//ValOS Milestone Template//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:ValOS unscheduled milestone tasks
+BEGIN:VTODO
+UID:valos-identity@valhalla-app.xyz
+DTSTAMP:20261109T161455Z
+SUMMARY:Provide ValOS identity or confirm undeployed
+DESCRIPTION:No date set. Provide canonical identity.\nPR #54:
+ https://github.com/TokenJunction/eliza-valhalla/pull/54\nValOS page:
+ https://valhalla-app.xyz/valos/
+URL:https://github.com/TokenJunction/eliza-valhalla/pull/54
+STATUS:NEEDS-ACTION
+CATEGORIES:VALOS,MILESTONE
+END:VTODO
+BEGIN:VTODO
+UID:valos-owner-purpose-review@valhalla-app.xyz
+DTSTAMP:20261109T161455Z
+SUMMARY:Review proposed purpose and disclosures
+DESCRIPTION:No date set. Review proposed wording and disclosures.\nPR #54:
+ https://github.com/TokenJunction/eliza-valhalla/pull/54\nValOS page:
+ https://valhalla-app.xyz/valos/
+URL:https://github.com/TokenJunction/eliza-valhalla/pull/54
+STATUS:NEEDS-ACTION
+CATEGORIES:VALOS,MILESTONE
+END:VTODO
+BEGIN:VTODO
+UID:valos-confirm-x-profile@valhalla-app.xyz
+DTSTAMP:20261109T161455Z
+SUMMARY:Confirm exact official X profile
+DESCRIPTION:No date set. Confirm the exact X profile.\nPR #54:
+ https://github.com/TokenJunction/eliza-valhalla/pull/54\nValOS page:
+ https://valhalla-app.xyz/valos/
+URL:https://github.com/TokenJunction/eliza-valhalla/pull/54
+STATUS:NEEDS-ACTION
+CATEGORIES:VALOS,MILESTONE
+END:VTODO
+BEGIN:VTODO
+UID:valos-readonly-testnet-validation@valhalla-app.xyz
+DTSTAMP:20261109T161455Z
+SUMMARY:Perform read-only testnet identity checks
+DESCRIPTION:No date. Read-only validation; do not transact.\nPR #54:
+ https://github.com/TokenJunction/eliza-valhalla/pull/54\nValOS page:
+ https://valhalla-app.xyz/valos/
+URL:https://github.com/TokenJunction/eliza-valhalla/pull/54
+STATUS:NEEDS-ACTION
+CATEGORIES:VALOS,MILESTONE
+END:VTODO
+BEGIN:VTODO
+UID:valos-release-and-rollback-review@valhalla-app.xyz
+DTSTAMP:20261109T161455Z
+SUMMARY:Approve release gates and rollback plan
+DESCRIPTION:No date set. Review publisher and rollback plan.\nPR #54:
+ https://github.com/TokenJunction/eliza-valhalla/pull/54\nValOS page:
+ https://valhalla-app.xyz/valos/
+URL:https://github.com/TokenJunction/eliza-valhalla/pull/54
+STATUS:NEEDS-ACTION
+CATEGORIES:VALOS,MILESTONE
+END:VTODO
+END:VCALENDAR
