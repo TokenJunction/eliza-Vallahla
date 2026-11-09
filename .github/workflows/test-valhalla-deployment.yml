@@ -7,6 +7,8 @@ on:
       - 'scripts/*valhalla*.py'
       - 'scripts/*release_artifact.py'
       - 'scripts/test_release_browser.py'
+      - 'scripts/write_valhalla_release.py'
+      - 'tests/test_valhalla_site_release.py'
       - 'tests/*valhalla*'
       - 'tests/deploy_valhalla_mock/**'
   push:
@@ -17,6 +19,8 @@ on:
       - 'scripts/*valhalla*.py'
       - 'scripts/*release_artifact.py'
       - 'scripts/test_release_browser.py'
+      - 'scripts/write_valhalla_release.py'
+      - 'tests/test_valhalla_site_release.py'
       - 'tests/*valhalla*'
       - 'tests/deploy_valhalla_mock/**'
   workflow_dispatch:
@@ -39,5 +43,6 @@ jobs:
         run: |
           python3 scripts/test_release_artifact.py
           python3 scripts/test_release_browser.py
+          python3 tests/test_valhalla_site_release.py
           python3 tests/test_deploy_valhalla.py
           python3 tests/test_valhalla_marker.py
