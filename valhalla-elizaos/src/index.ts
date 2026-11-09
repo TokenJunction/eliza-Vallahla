@@ -2,6 +2,7 @@ import { logger, type IAgentRuntime, type Project, type ProjectAgent } from '@el
 import { character, gorgoCharacter, cerberusCharacter } from './character.ts';
 import { cerberusPlugin } from './cerberus.ts';
 import { valhallaStatusPlugin } from './plugin.ts';
+import { ProjectStarterTestSuite } from './__tests__/e2e/project-starter.e2e.ts';
 
 const initializeAgent = (name: string) => async (runtime: IAgentRuntime) => {
   logger.info({ agent: name, agentId: runtime.agentId }, 'Valhalla read-only agent initialized');
@@ -11,6 +12,7 @@ const zeusAgent: ProjectAgent = {
   character,
   init: initializeAgent(character.name),
   plugins: [valhallaStatusPlugin],
+  tests: [ProjectStarterTestSuite],
 };
 
 const gorgoAgent: ProjectAgent = {

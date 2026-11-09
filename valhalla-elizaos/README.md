@@ -71,7 +71,14 @@ src/
 
 - `elizaos test` - Run all tests (component + e2e)
 - `elizaos test component` - Run only component tests
-- `elizaos test e2e` - Run only E2E tests
+- `elizaos test --type e2e` - Run only E2E tests
+
+### Cypress tests
+
+- `bun run test:install` validates the declared and resolvable Cypress test packages; it does not install or modify dependencies.
+- `bun run cypress:component` runs the React/Vite component tests.
+- `bun run cypress:e2e` runs browser tests against the configured base URL (`http://localhost:3000` by default) and requires the app to be running there.
+- `bash scripts/test-all.sh` starts the app, waits for its health endpoint, and then runs Cypress E2E tests.
 
 ### Writing Tests
 
