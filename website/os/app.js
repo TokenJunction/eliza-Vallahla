@@ -97,7 +97,7 @@
   function closeWindow(node) {
     node.hidden = true;
     node.dataset.minimized = 'false';
-    node.classList.remove('is-max');
+    if (node.classList) node.classList.remove('is-max');
     updateTaskbar();
     showFront();
     announce(node.querySelector('.title-bar h2').textContent + ' closed.');
@@ -106,7 +106,7 @@
   function minimizeWindow(node) {
     node.hidden = true;
     node.dataset.minimized = 'true';
-    node.classList.remove('is-max');
+    if (node.classList) node.classList.remove('is-max');
     updateTaskbar();
     showFront();
     announce(node.querySelector('.title-bar h2').textContent + ' minimized.');
@@ -152,7 +152,7 @@
   function startDrag(event) {
     var handle = event.target.closest('[data-drag-handle]');
     var node = handle && handle.closest('[data-window]');
-    if (!handle || !node || node.classList.contains('is-max') || event.target.closest('button') || event.button !== 0) return;
+    if (!handle || !node || (node.classList && node.classList.contains('is-max')) || event.target.closest('button') || event.button !== 0) return;
     event.preventDefault();
     focusWindow(node);
     var startX = event.clientX;
@@ -194,7 +194,7 @@
       var node = action.closest('[data-window]');
       if (action.dataset.action === 'close') closeWindow(node);
       if (action.dataset.action === 'minimize') minimizeWindow(node);
-      if (action.dataset.action === 'maximize') node.classList.toggle('is-max');
+      if (action.dataset.action === 'maximize' && node.classList) node.classList.toggle('is-max');
       return;
     }
     if (event.target.closest('[data-refresh]')) checkHealth();
