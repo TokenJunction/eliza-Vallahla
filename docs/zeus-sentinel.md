@@ -4,7 +4,7 @@ Zeus runs every 3 hours on a GitHub-hosted runner. It checks the public site, as
 
 This costs nothing. It uses GitHub Actions and, when `OPENROUTER_API_KEY` is present, the existing `:free` models.
 
-Issues are disabled on this repository. Zeus does not open or pin an issue. The human-readable report is the job summary. The rollback clock is a commit-free file, `.zeus-state/state.json`, restored from the Actions cache and, when the cache misses, from the newest `zeus-sentinel-state` artifact. The same file is saved again before a promote. The GitHub token used here cannot update repository variables, so `ZEUS_LAST_ROLLBACK_AT` is not written.
+Issues are disabled on this repository. Zeus does not open or pin an issue. The human-readable report is the job summary. The rollback clock is a commit-free file, `.zeus-state/state.json`, stored only in this workflow's Actions cache. A new run uses a fresh cache key, and `restore-keys` brings back the newest `zeus-state-` entry. The exact key never matches, so the restored file, not `cache-hit`, is what counts. Zeus does not read or write repository artifacts: another workflow can upload the same artifact name, and the artifact list is not ordered by time. The GitHub token used here cannot update repository variables, so `ZEUS_LAST_ROLLBACK_AT` is not written.
 
 ## What it must never do
 
@@ -32,6 +32,6 @@ A rollback is not a new deploy. It promotes `ZEUS_LAST_VERIFIED_DEPLOYMENT` for 
 | `OPENROUTER_API_KEY` | secret, optional |
 | `VERCEL_TOKEN` | secret, optional, project-scoped, current ops token expires December 10, 2026 |
 | `ZEUS_LAST_VERIFIED_DEPLOYMENT` | repository variable, optional |
-| `GITHUB_TOKEN` | provided by Actions, used for pull request comments, the cache, and artifacts |
+| `GITHUB_TOKEN` | provided by Actions, used for pull request comments and the cache |
 
 No key belongs in this file or in the browser.

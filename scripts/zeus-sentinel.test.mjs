@@ -193,7 +193,8 @@ test('the workflow and the doc refuse merge, main, and a new deploy', () => {
   assert.match(workflow, /pull-requests:\s*write/);
   assert.match(workflow, /actions:\s*write/);
   assert.match(workflow, /actions\/cache\/restore/);
-  assert.match(workflow, /upload-artifact/);
+  assert.match(workflow, /state\.json/);
+  assert.doesNotMatch(workflow, /upload-artifact|actions\/artifacts|cache-hit/);
   assert.doesNotMatch(workflow, /issues:\s*write/);
   assert.doesNotMatch(workflow, /push:\s*\n\s*branches:\s*\[main\]|git push|vercel deploy/i);
   assert.match(doc, /never merge/i);
