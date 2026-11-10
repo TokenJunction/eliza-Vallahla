@@ -267,6 +267,21 @@ test('a failed invoice does not reopen a canceled subscription', async () => {
   });
   assert.equal(missed.status, 502);
   assert.equal(wrote, false);
+  const open = JSON.stringify({
+    type: 'invoice.payment_failed',
+    data: { object: { id: 'in_3', customer: 'cus_1', parent: { subscription_details: { subscription: 'sub_new', metadata: { user_id: '44444444-4444-4444-4444-444444444444' } } } } }
+  });
+  const unfinished = await handleWebhook({
+    method: 'POST',
+    headers: { 'stripe-signature': sign(open, secret) },
+    body: open
+  }, { STRIPE_WEBHOOK_SECRET: secret, SUPABASE_SERVICE_ROLE_KEY: 'service-role', STRIPE_SECRET_KEY: 'sk_test_only' }, async (url) => {
+    if (String(url).includes('/subscriptions/')) return { ok: true, status: 200, json: async () => ({ id: 'sub_new', status: 'incomplete', metadata: { user_id: '44444444-4444-4444-4444-444444444444' } }) };
+    wrote = true;
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  assert.equal(unfinished.status, 200);
+  assert.equal(wrote, false);
 });
 
 test('the desk explains the one dollar hold', () => {

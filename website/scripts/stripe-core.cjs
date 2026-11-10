@@ -209,7 +209,7 @@ async function handleWebhook(req, env, fetchImpl) {
     }
     if (failed) {
       if (!readSubscription) return { status: 502, body: { error: 'The subscription was not read.' } };
-      if (subStatus === 'canceled' || subStatus === 'incomplete_expired') return { status: 200, body: { received: true } };
+      if (subStatus === 'canceled' || subStatus === 'incomplete' || subStatus === 'incomplete_expired') return { status: 200, body: { received: true } };
     }
     if (!userId) return { status: 200, body: { received: true } };
     const saved = await writeEntitlement(env, {
