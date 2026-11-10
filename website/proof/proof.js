@@ -18,7 +18,7 @@
       more.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
   }
-  fetch('/api/proof', { cache: 'no-store' }).then(function (response) {
+  fetch('/api/proof').then(function (response) {
     if (!response.ok) throw new Error('unavailable');
     return response.json();
   }).then(function (body) {

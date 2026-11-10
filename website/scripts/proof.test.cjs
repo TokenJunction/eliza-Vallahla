@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { measureProof, measureTamper } = require('./proof-core.cjs');
+const { measureProof, measureTamper, handleProof, resetProofLimits } = require('./proof-core.cjs');
 
 const root = path.join(__dirname, '../..');
 
@@ -99,4 +99,49 @@ test('the proof page does not load ads', () => {
   assert.doesNotMatch(volos, /paper desk|Public desk/i);
   assert.match(home, /See live proof/);
   assert.match(volos, /See live proof/);
+  const client = fs.readFileSync(path.join(root, 'website/proof/proof.js'), 'utf8');
+  assert.doesNotMatch(client, /cache:\s*'no-store'/);
+});
+
+test('proof reads are limited and a query does not call Helius', async () => {
+  resetProofLimits();
+  let calls = 0;
+  const measure = async () => {
+    calls += 1;
+    return { online: true, label: 'cryptographic proof' };
+  };
+  const denied = await handleProof({ method: 'POST', url: '/api/proof', headers: {} }, {}, null, 1_000, measure);
+  assert.equal(denied.status, 405);
+  const queried = await handleProof({ method: 'GET', url: '/api/proof?bust=1', headers: {} }, {}, null, 1_000, measure);
+  assert.equal(queried.status, 400);
+  assert.equal(calls, 0);
+  const first = handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-vercel-forwarded-for': '203.0.113.4' } }, {}, null, 1_000, measure);
+  const second = handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-vercel-forwarded-for': '203.0.113.5' } }, {}, null, 1_000, measure);
+  const pair = await Promise.all([first, second]);
+  assert.equal(pair[0].status, 200);
+  assert.equal(pair[1].status, 200);
+  assert.equal(calls, 1);
+  const again = await handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-vercel-forwarded-for': '203.0.113.4' } }, {}, null, 1_000 + 60_000, measure);
+  assert.equal(again.status, 200);
+  assert.equal(calls, 1);
+  let limited = null;
+  for (let i = 0; i < 40; i += 1) {
+    limited = await handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-vercel-forwarded-for': '203.0.113.9' } }, {}, null, 5_000, measure);
+  }
+  assert.equal(limited.status, 429);
+  assert.equal(calls, 1);
+});
+
+test('a failed proof read does not retry on the next request', async () => {
+  resetProofLimits();
+  let calls = 0;
+  const measure = async () => {
+    calls += 1;
+    throw new Error('down');
+  };
+  const first = await handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-vercel-forwarded-for': '203.0.113.8' } }, {}, null, 9_000, measure);
+  const second = await handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-vercel-forwarded-for': '203.0.113.8' } }, {}, null, 9_000 + 1_000, measure);
+  assert.equal(first.status, 503);
+  assert.equal(second.status, 503);
+  assert.equal(calls, 1);
 });

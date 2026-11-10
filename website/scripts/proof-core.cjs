@@ -220,10 +220,89 @@ async function measureProof(fetchImpl, env, now, timeoutMs) {
   };
 }
 
+const WINDOW_MS = 60 * 1000;
+const IP_LIMIT = 30;
+const SUCCESS_TTL = 5 * 60 * 1000;
+const FAILURE_TTL = 60 * 1000;
+const hits = new Map();
+let cached = null;
+let inflight = null;
+let blockedUntil = 0;
+
+function resetProofLimits() {
+  hits.clear();
+  cached = null;
+  inflight = null;
+  blockedUntil = 0;
+}
+
+function headerValue(headers, name) {
+  if (!headers) return '';
+  return headers[name] || headers[name.toLowerCase()] || '';
+}
+
+function clientIp(headers) {
+  const trusted = headerValue(headers, 'x-vercel-forwarded-for') || headerValue(headers, 'x-real-ip') || headerValue(headers, 'x-forwarded-for');
+  const first = String(trusted).split(',')[0].trim();
+  return first || 'unknown';
+}
+
+function allowIp(ip, now) {
+  const recent = (hits.get(ip) || []).filter(function (at) { return now - at < WINDOW_MS; });
+  if (recent.length >= IP_LIMIT) {
+    hits.set(ip, recent);
+    return false;
+  }
+  if (!hits.has(ip) && hits.size >= 2000) return false;
+  recent.push(now);
+  hits.set(ip, recent);
+  return true;
+}
+
+async function handleProof(req, env, fetchImpl, now, measure) {
+  if (!req || req.method !== 'GET') {
+    return { status: 405, cache: 'no-store', body: { error: 'Method not allowed.' } };
+  }
+  if (String(req.url || '').indexOf('?') !== -1) {
+    return { status: 400, cache: 'no-store', body: { error: 'This address takes no query.' } };
+  }
+  const stamp = now || Date.now();
+  const ip = clientIp(req.headers);
+  if (!allowIp(ip, stamp)) {
+    return { status: 429, cache: 'no-store', body: { error: 'Too many proof requests.' } };
+  }
+  if (cached && stamp < cached.until) {
+    return { status: 200, cache: 'public, max-age=60, s-maxage=300, stale-while-revalidate=300', body: cached.body };
+  }
+  if (stamp < blockedUntil) {
+    return { status: 503, cache: 'no-store', body: { error: 'Proof not checked.' } };
+  }
+  const run = measure || measureProof;
+  if (!inflight) {
+    inflight = run(fetchImpl, env, new Date(stamp)).then(function (body) {
+      cached = { until: stamp + SUCCESS_TTL, body: body };
+      return body;
+    }).catch(function () {
+      blockedUntil = stamp + FAILURE_TTL;
+      throw new Error('proof');
+    }).finally(function () {
+      inflight = null;
+    });
+  }
+  try {
+    await inflight;
+  } catch (error) {
+    return { status: 503, cache: 'no-store', body: { error: 'Proof not checked.' } };
+  }
+  return { status: 200, cache: 'public, max-age=60, s-maxage=300, stale-while-revalidate=300', body: cached && cached.body };
+}
+
 module.exports = {
   measureProof: measureProof,
   measureTamper: measureTamper,
   measureDelivery: measureDelivery,
   readChain: readChain,
-  scrub: scrub
+  scrub: scrub,
+  handleProof: handleProof,
+  resetProofLimits: resetProofLimits
 };
