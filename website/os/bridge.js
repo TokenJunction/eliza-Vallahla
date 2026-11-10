@@ -22,8 +22,9 @@
     disconnect.hidden = true;
   }
   function showWallet(name, address) {
-    overview.textContent = name + ' connected'; detail.textContent = address;
-    status.textContent = name + ' connected: ' + address; disconnect.hidden = false;
+    var shown = window.ValhallaOverseer ? window.ValhallaOverseer.maskAddress(address) : address;
+    overview.textContent = name + ' connected'; detail.textContent = shown;
+    status.textContent = name + ' connected: ' + shown; disconnect.hidden = false;
   }
   function listen(provider, event, handler) {
     if (typeof provider.on !== 'function') return;
@@ -107,6 +108,45 @@
     var text = input.value.trim();
     if (!text) return;
     if (secretLike(text)) { chatStatus.textContent = 'Do not share a seed phrase or private key. Your message was not sent.'; return; }
+    var overseer = window.ValhallaOverseer;
+    var started = Date.now();
+    function finish(answer, extra) {
+      extra = extra || {};
+      if (!overseer || typeof overseer.review !== 'function') return;
+      var judged = overseer.review({
+        goal: text,
+        answer: answer,
+        evidence: extra.evidence || [],
+        errors: extra.errors || [],
+        latencyMs: Date.now() - started,
+        saidStillWorking: true,
+        claimedLive: Boolean(extra.claimedLive),
+        liveVerified: Boolean(extra.liveVerified),
+        inventedContract: Boolean(extra.inventedContract),
+        unapprovedLiveTrade: Boolean(extra.unapprovedLiveTrade),
+        raw: answer
+      });
+      if (judged && judged.reward === -1 && judged.patch) {
+        chatStatus.textContent = (chatStatus.textContent ? chatStatus.textContent + ' ' : '') + 'Proposed patch, not applied: ' + judged.patch;
+      }
+    }
+    if (overseer && typeof overseer.prepare === 'function') {
+      var local = overseer.prepare(text);
+      if (local && local.handled) {
+        message('OS', local.answer);
+        input.value = '';
+        if (local.open === 'tools') {
+          var startBtn = document.getElementById('start-button');
+          if (startBtn) startBtn.click();
+        } else if (local.open) {
+          var launcher = document.querySelector('.dock [data-open="' + local.open + '"]');
+          if (launcher) launcher.click();
+        }
+        chatStatus.textContent = 'Workstation reply. No transaction was requested.';
+        finish(local.answer, {});
+        return;
+      }
+    }
     var base = String((window.VALHALLA_SITE || {}).CHAT_URL || '').replace(/\/+$/, '');
     if (!base) { chatStatus.textContent = 'Chat service is not configured.'; return; }
     try {
@@ -120,7 +160,7 @@
       var endpoint = base + '/chat';
       var response = await fetch(endpoint, {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: text, history: history, stream: false }), signal: controller.signal
+        body: JSON.stringify({ text: text, history: history, stream: false, rules: overseer && overseer.rulesForModel ? overseer.rulesForModel() : '' }), signal: controller.signal
       });
       var type = response.headers.get('content-type') || '';
       if (!response.ok || type.indexOf('application/json') === -1) {
@@ -140,22 +180,31 @@
         empty.valhallaClosed = true;
         throw empty;
       }
-      message('ASSISTANT', reply);
+      var screened = overseer && overseer.screenReply ? overseer.screenReply(reply) : { ok: true, text: reply };
+      if (!screened.ok) {
+        message('OVERSEER', screened.text);
+        chatStatus.textContent = 'The model reply was not shown. Not financial advice.';
+        finish(screened.text, { inventedContract: screened.inventedContract, claimedLive: screened.claimedLive, evidence: ['screened model reply'] });
+        return;
+      }
+      message('ASSISTANT', screened.text);
       var speechFailed = false;
       if (voiceEnabled) {
         try {
-          window.speechSynthesis.cancel(); window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(reply));
+          window.speechSynthesis.cancel(); window.speechSynthesis.speak(new window.SpeechSynthesisUtterance(screened.text));
         } catch (error) {
           speechFailed = true; voiceEnabled = false; voiceButton.setAttribute('aria-pressed', 'false'); voiceButton.textContent = 'Voice replies off';
           chatStatus.textContent = 'Reply received, but browser speech failed. Try voice again.';
         }
       }
-      history.push({ role: 'user', content: text }, { role: 'assistant', content: reply.slice(0, 500) }); history = history.slice(-8);
+      history.push({ role: 'user', content: text }, { role: 'assistant', content: screened.text.slice(0, 500) }); history = history.slice(-8);
       if (!speechFailed) chatStatus.textContent = 'Reply received from ' + (body.provider || response.headers.get('x-valhalla-provider') || 'the configured service') + '. Not financial advice.';
+      finish(screened.text, { evidence: ['configured chat service'] });
     } catch (error) {
       chatStatus.textContent = error.name === 'AbortError'
         ? 'Chat timed out. No reply was generated.'
         : (error.valhallaClosed ? error.message : 'Chat service did not return a reply. Nothing was generated.');
+      finish(chatStatus.textContent, { evidence: [], errors: ['no reply'] });
     } finally {
       window.clearTimeout(timeout); submitting = false; form.querySelector('button').disabled = false; input.disabled = false; input.focus();
     }
