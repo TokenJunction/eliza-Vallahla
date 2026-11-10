@@ -123,6 +123,20 @@ test('a 429 from the primary free model falls through to gemma', async () => {
   assert.equal(calls.filter(call => call.includes('openrouter')).join(' | '), 'https://openrouter.ai/api/v1/chat/completions ' + DEFAULT_MODEL + ' | https://openrouter.ai/api/v1/chat/completions ' + FALLBACK_MODEL);
 });
 
+test('both free models returning 429 says the model is busy', async () => {
+  resetAiLimits();
+  const result = await handleAi({
+    method: 'POST',
+    headers: { authorization: 'Bearer good' },
+    body: ask('What is the desk?')
+  }, { OPENROUTER_API_KEY: 'server-only-key' }, async (url) => {
+    if (String(url).includes('/auth/v1/user')) return supabase(true);
+    return { ok: false, status: 429, json: async () => ({}) };
+  }, 8_000);
+  assert.equal(result.status, 429);
+  assert.equal(result.body.error, 'The free model is busy. Try again shortly.');
+});
+
 test('a seed-like message is refused before OpenRouter is called', async () => {
   resetAiLimits();
   const calls = [];
@@ -194,6 +208,7 @@ test('the desk says the assistant is not connected until a reply arrives', () =>
   assert.match(client, /Assistant not connected/);
   assert.match(client, /Sign-in required/);
   assert.match(client, /Too many assistant requests/);
+  assert.match(client, /The free model is busy\. Try again shortly\./);
   assert.doesNotMatch(client, /OPENROUTER_API_KEY|openrouter\.ai/);
   assert.match(api, /process\.env/);
   assert.match(core, /env\.OPENROUTER_API_KEY/);
