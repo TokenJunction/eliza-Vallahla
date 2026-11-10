@@ -60,12 +60,11 @@
         if (node.dataset.minimized === 'true') {
           node.hidden = false;
           node.dataset.minimized = 'false';
-        } else if (node.style.zIndex === frontZ) {
-          node.dataset.minimized = 'true';
-          node.hidden = true;
+          updateTaskbar();
+          focusWindow(node);
+          return;
         }
-        updateTaskbar();
-        if (!node.hidden) focusWindow(node);
+        if (node.style.zIndex === frontZ) minimizeWindow(node);
       });
       taskbarApps.appendChild(button);
     });

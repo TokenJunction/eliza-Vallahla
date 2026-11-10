@@ -94,6 +94,15 @@ test('desktop icons open and Escape closes without treating HTML health as live'
   });
   for (const fn of page.events.keydown) fn({ key: 'Escape', target: { tagName: 'TEXTAREA' } });
   assert.equal(page.node('window-status').hidden, false);
+  click(page.node('desktop'), {
+    closest(selector) { return selector === '[data-open]' ? { dataset: { open: 'wallet' } } : null; }
+  });
+  const apps = page.node('taskbar-apps').children;
+  const front = apps.find(function (button) { return button.dataset.task === 'wallet'; });
+  front.handlers.click[0]();
+  assert.equal(page.node('window-wallet').hidden, true);
+  assert.equal(page.node('active-app').textContent, 'status title');
+  assert.equal(page.node('window-status').style.zIndex, '40');
 });
 
 test('health accepts only an explicit service status and fails closed on timeout', async () => {
