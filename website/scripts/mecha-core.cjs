@@ -127,27 +127,34 @@ async function completeFree(env, system, task, fetchImpl) {
 }
 
 async function askBrain(env, system, task, fetchImpl) {
-  const home = String(env && env.VLLM_BASE_URL || '');
-  if (home) {
+  const onVercel = String(env && env.VERCEL || '') === '1';
+  const home = onVercel ? '' : String(env && env.VLLM_BASE_URL || '');
+  const token = String(env && env.VLLM_API_KEY || '');
+  if (home && token) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(function () { controller.abort(); }, 8000) : null;
     try {
       const response = await fetchImpl(home.replace(/\/$/, '') + '/v1/chat/completions', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
         body: JSON.stringify({
           model: 'local',
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: task }
           ]
-        })
+        }),
+        signal: controller && controller.signal
       });
       if (response && response.ok) {
         const body = await response.json();
         const text = body && body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;
-        if (typeof text === 'string' && text.trim()) return { brain: 'vllm', reply: text.trim() };
+        if (typeof text === 'string' && text.trim() && !text.includes(token)) return { brain: 'vllm', reply: text.trim() };
       }
     } catch (error) {
       /* home model offline */
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
   const free = await completeFree(env, system, task, fetchImpl);

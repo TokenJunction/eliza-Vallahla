@@ -58,6 +58,7 @@ test('a customer node refuses Zeus and a busy free model falls through', async (
   });
   assert.equal(refused.status, 400);
   const models = [];
+  const homes = [];
   const answered = await handleMechas({
     method: 'POST',
     headers: { authorization: 'Bearer person' },
@@ -65,7 +66,7 @@ test('a customer node refuses Zeus and a busy free model falls through', async (
   }, { OPENROUTER_API_KEY: 'test-key', VLLM_BASE_URL: 'https://home.example' }, async (url, init) => {
     const target = String(url);
     if (target.includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-1' }) };
-    if (target.includes('home.example')) throw new Error('offline');
+    if (target.includes('home.example')) { homes.push(init && init.headers); throw new Error('offline'); }
     if (target.includes('openrouter.ai')) {
       const body = JSON.parse(init.body);
       models.push(body.model);
@@ -79,4 +80,35 @@ test('a customer node refuses Zeus and a busy free model falls through', async (
   assert.equal(models[0].indexOf('nemotron') !== -1, true);
   assert.equal(models[1].indexOf('gemma') !== -1, true);
   assert.equal(answered.body.executed, false);
+  assert.equal(homes.length, 0);
+});
+
+test('the home model call has a timeout and an auth header, and stays off on Vercel', async () => {
+  resetMechaLimits();
+  let headers = null;
+  let signal = null;
+  const local = await handleMechas({
+    method: 'POST',
+    headers: { authorization: 'Bearer person' },
+    body: JSON.stringify({ task: 'what is the desktop shell' })
+  }, { VLLM_BASE_URL: 'https://home.example', VLLM_API_KEY: 'home-token' }, async (url, init) => {
+    if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-2' }) };
+    headers = init && init.headers;
+    signal = init && init.signal;
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'Local desk.' } }] }) };
+  });
+  assert.equal(local.status, 200);
+  assert.equal(local.body.brain, 'vllm');
+  assert.equal(headers.authorization, 'Bearer home-token');
+  assert.equal(signal instanceof AbortSignal, true);
+  const hosted = await handleMechas({
+    method: 'POST',
+    headers: { authorization: 'Bearer person' },
+    body: JSON.stringify({ task: 'what is the desktop shell' })
+  }, { VERCEL: '1', VLLM_BASE_URL: 'https://home.example', VLLM_API_KEY: 'home-token', OPENROUTER_API_KEY: 'test-key' }, async (url) => {
+    if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-3' }) };
+    if (String(url).includes('home.example')) throw new Error('should not call home');
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'Free desk.' } }] }) };
+  });
+  assert.equal(hosted.body.brain.endsWith(':free'), true);
 });
