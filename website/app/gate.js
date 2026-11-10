@@ -270,11 +270,7 @@
         window.location.assign(body.redirect);
         return;
       }
-      if (sessionStorage.getItem("valhalla-entry-desk") === "1") {
-        sessionStorage.removeItem("valhalla-entry-desk");
-        window.location.assign("/os/");
-        return;
-      }
+      sessionStorage.removeItem("valhalla-entry-desk");
       if (body.redirect === "/dashboard/analytics/") {
         window.location.assign(body.redirect);
         return;
@@ -486,13 +482,6 @@
         }).catch(function (err) {
           fail(note, "V-MAIL", "create code request failed: " + String(err && err.message || err), function () { createForm.requestSubmit(); });
         });
-      });
-    }
-    var paperBtn = document.getElementById("openPaper");
-    if (paperBtn && !paperBtn.dataset.bound) {
-      paperBtn.dataset.bound = "1";
-      paperBtn.addEventListener("click", function () {
-        window.location.assign("/os/");
       });
     }
     var form = document.getElementById("emailForm");
@@ -724,11 +713,7 @@
         return;
       }
     }
-    if ((session.kind === "google" || session.kind === "account") && sessionStorage.getItem("valhalla-entry-desk") === "1") {
-      sessionStorage.removeItem("valhalla-entry-desk");
-      window.location.assign("/os/");
-      return;
-    }
+    sessionStorage.removeItem("valhalla-entry-desk");
     show("desk");
     var banner = document.getElementById("connectBanner");
     if (banner) banner.hidden = Boolean(session && session.pubkey);

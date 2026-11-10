@@ -2,71 +2,27 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 
 const root = path.join(__dirname, '../..');
 const homeSource = fs.readFileSync(path.join(root, 'website/home.js'), 'utf8');
 
-function entrance({ storageError = false } = {}) {
-  const store = {};
-  const validity = [];
-  const input = {
-    value: 'person@example.test',
-    setCustomValidity(message) { validity.push(message); },
-    reportValidity() { this.reported = true; },
-    addEventListener() {}
-  };
-  const form = { handlers: {}, addEventListener(type, fn) { this.handlers[type] = fn; } };
-  const link = { handlers: {}, addEventListener(type, fn) { this.handlers[type] = fn; } };
-  const assigned = [];
-  const sessionStorage = {
-    setItem(key, value) { if (storageError) throw new Error('denied'); store[key] = String(value); },
-    getItem(key) { return store[key] || null; }
-  };
-  vm.runInNewContext(homeSource, {
-    document: {
-      getElementById(id) {
-        if (id === 'home-email') return form;
-        if (id === 'home-email-address') return input;
-        return null;
-      },
-      querySelectorAll() { return [link]; }
-    },
-    window: { location: { assign(url) { assigned.push(url); } } },
-    sessionStorage
-  });
-  return { form, input, link, store, assigned, validity };
-}
-
 test('homepage continue stores the return preference and opens sign-in', () => {
-  const page = entrance();
-  page.form.handlers.submit({ preventDefault() {} });
-  assert.deepEqual(page.assigned, ['/app/']);
-  assert.equal(page.store['valhalla-entry-desk'], '1');
-  assert.equal(page.store['valhalla-entry-email'], 'person@example.test');
-  assert.equal(page.store['valhalla-auth'], undefined);
-  page.link.handlers.click({ preventDefault() {} });
-  assert.deepEqual(page.assigned, ['/app/', '/app/']);
-  assert.equal(page.store['valhalla-auth'], undefined);
+  assert.match(homeSource, /Sign-in is not available yet/);
+  assert.doesNotMatch(homeSource, /\/app\/|valhalla-entry-email|valhalla-auth/);
 });
 
 test('blocked storage does not pretend the entrance completed sign-in', () => {
-  const page = entrance({ storageError: true });
-  page.form.handlers.submit({ preventDefault() {} });
-  assert.deepEqual(page.assigned, []);
-  assert.match(page.validity[0], /sign-in link/i);
-  page.link.handlers.click({ preventDefault() {} });
-  assert.deepEqual(page.assigned, ['/app/']);
+  assert.match(homeSource, /catch\(unavailable\)/);
+  assert.doesNotMatch(homeSource, /sessionStorage/);
 });
 
 test('entrance and volOS copy stay honest', () => {
   const home = fs.readFileSync(path.join(root, 'website/index.html'), 'utf8');
   const volos = fs.readFileSync(path.join(root, 'website/volos/index.html'), 'utf8');
-  assert.match(home, /Continue to sign-in/);
-  assert.match(home, /ValhallaOS Citadel/);
-  assert.match(home, /\/assets\/poster\.jpg/);
-  assert.match(home, /Live trading is off/);
-  assert.doesNotMatch(home, /Trade Solana/);
+  assert.match(home, /Sign-in is not available yet/);
+  assert.match(home, /id="clerk-sign-in"/);
+  assert.match(home, /\/assets\/heaven-poster\.jpg/);
+  assert.doesNotMatch(home, /Trade Solana|Public desk|Preview the public|Continue to sign-in|github\.com/);
   const desk = fs.readFileSync(path.join(root, 'website/os/index.html'), 'utf8');
   for (const text of [home, volos, desk]) {
     assert.doesNotMatch(text, /enterWorkstationSession|keene\.jos|operator-01@|Valhalla2033|pk_test_/);
@@ -74,8 +30,12 @@ test('entrance and volOS copy stay honest', () => {
   assert.match(desk, /data-open="wallet"/);
   assert.match(desk, /LIVE TRADING OFF/);
   assert.match(desk, /disabled/);
-  assert.doesNotMatch(desk, /data-enter-desk/);
-  assert.match(desk, /href="\/app\/"/);
+  assert.match(desk, /id="desktop" hidden/);
+  assert.doesNotMatch(desk, /data-enter-desk|PUBLIC DESK|href="\/os\/"/);
+  assert.match(fs.readFileSync(path.join(root, 'website/os/session.js'), 'utf8'), /location\.replace\('\/'\)/);
+  const css = fs.readFileSync(path.join(root, 'website/home.css'), 'utf8');
+  assert.match(css, /@media \(max-width: 720px\)/);
+  assert.match(css, /@media \(min-width: 1024px\)/);
   const mobile = fs.readFileSync(path.join(root, 'website/os/os.css'), 'utf8').split('@media (max-width: 720px)')[1];
   assert.doesNotMatch(mobile, /top:\s*118px/);
   assert.doesNotMatch(mobile, /z-index:\s*\d+\s*!important/);

@@ -8,13 +8,16 @@
   <title>ValhallaOS · Workstation</title>
   <link rel="stylesheet" href="/os/os.css?v=1.4.2">
   <link rel="stylesheet" href="/desk.css?v=1.4.2">
-  <script src="/home.js" defer></script>
   <script src="/site-config.js?v=1.4.2" defer></script>
+  <script src="/account-level.js" defer></script>
+  <script src="/clerk-gate.js" defer></script>
+  <script src="/os/session.js" defer></script>
   <script src="/os/app.js?v=1.4.2" defer></script>
   <script src="/os/bridge.js?v=1.4.2" defer></script>
   <script src="/desk.js?v=1.4.2" defer></script>
 </head>
 <body>
+  <p id="session-hold" role="status">Sign-in is required.</p>
   <svg class="icon-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
     <symbol id="icon-computer" viewBox="0 0 32 32">
       <path fill="#d4d0c8" stroke="#222" d="M3 4h26v19H3z"/><path fill="#000080" d="M5 6h22v14H5z"/>
@@ -39,31 +42,31 @@
     </symbol>
   </svg>
 
-  <main class="desktop" id="desktop">
+  <main class="desktop" id="desktop" hidden>
     <header class="desktop-heading menu-bar">
       <img src="/assets/mark.svg" alt="" width="28" height="28">
       <div><h1>VALHALLA<span>OS</span></h1>
-      <p>PAPER-FIRST WORKSTATION</p></div>
-      <div class="header-state"><span class="state-dot"></span> PUBLIC DESK <span class="paper-badge">LIVE TRADING OFF</span></div>
-      <a class="classic-button menu-signin" href="/app/">Account</a>
+      <p id="account-level">Account level: FREE. Plans are not configured.</p></div>
+      <div class="header-state"><span class="state-dot"></span> SIGNED IN <span class="paper-badge">LIVE TRADING OFF</span></div>
+      <div id="account-menu"></div>
     </header>
 
     <nav class="desktop-icons dock" aria-label="Desktop applications">
-      <button class="desktop-icon" type="button" data-open="status">
+      <button class="desktop-icon" type="button" data-open="status" data-tool="status">
         <svg aria-hidden="true"><use href="#icon-computer"></use></svg><span>Status</span>
       </button>
-      <a class="desktop-icon" href="#chat-title"><svg aria-hidden="true"><use href="#icon-notepad"></use></svg><span>Assistant</span></a>
-      <button class="desktop-icon" type="button" data-open="wallet">
+      <a class="desktop-icon" href="#chat-title" data-tool="assistant"><svg aria-hidden="true"><use href="#icon-notepad"></use></svg><span>Assistant</span></a>
+      <button class="desktop-icon" type="button" data-open="wallet" data-tool="wallet">
         <svg aria-hidden="true"><use href="#icon-wallet"></use></svg><span>Wallet</span>
       </button>
-      <a class="desktop-icon" href="#cyber-desk-title"><svg aria-hidden="true"><use href="#icon-browser"></use></svg><span>Paper</span></a>
-      <button class="desktop-icon" type="button" data-open="memory">
+      <a class="desktop-icon" href="#cyber-desk-title" data-tool="paper"><svg aria-hidden="true"><use href="#icon-browser"></use></svg><span>Paper</span></a>
+      <button class="desktop-icon" type="button" data-open="memory" data-tool="memory">
         <svg aria-hidden="true"><use href="#icon-notepad"></use></svg><span>Memory</span>
       </button>
-      <button class="desktop-icon" type="button" data-open="browser">
+      <button class="desktop-icon" type="button" data-open="browser" data-tool="web">
         <svg aria-hidden="true"><use href="#icon-browser"></use></svg><span>Web</span>
       </button>
-      <button class="desktop-icon" type="button" data-open="swarm">
+      <button class="desktop-icon" type="button" data-open="swarm" data-tool="monitor">
         <svg aria-hidden="true"><use href="#icon-network"></use></svg><span>Monitor</span>
       </button>
       <button class="desktop-icon" type="button" disabled title="Live trading is off. No swap is available."><span>Swap</span></button>
