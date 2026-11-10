@@ -24,7 +24,7 @@
   }).then(function (body) {
     var delivery = body.delivery || {};
     var tamper = body.tamper || {};
-    text('proof-status', body.online ? 'Measured just now.' : 'One or more pages did not answer.');
+    text('proof-status', body.online ? 'Checked. The time is below.' : 'One or more pages did not answer.');
     text('proof-online', body.online ? 'Online' : 'Not fully online');
     text('proof-speed', body.online ? body.speed : '—');
     text('proof-intact', delivery.intact + '/' + delivery.total);

@@ -75,21 +75,40 @@ function checkedAt(now) {
   return stamp.replace('GMT-4', 'ET').replace('GMT-5', 'ET').replace('EDT', 'ET').replace('EST', 'ET');
 }
 
-async function timeOne(target, fetchImpl) {
+function withTimeout(work, ms) {
+  return new Promise(function (resolve, reject) {
+    const timer = setTimeout(function () { reject(new Error('timeout')); }, ms);
+    Promise.resolve().then(work).then(function (value) {
+      clearTimeout(timer);
+      resolve(value);
+    }, function (error) {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
+async function timeOne(target, fetchImpl, timeoutMs) {
   const start = process.hrtime.bigint();
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = controller ? setTimeout(function () { controller.abort(); }, timeoutMs) : null;
   try {
-    const response = await fetchImpl(target.url, { method: 'GET', redirect: 'follow' });
+    const response = await withTimeout(function () {
+      return fetchImpl(target.url, { method: 'GET', redirect: 'follow', signal: controller && controller.signal });
+    }, timeoutMs);
     const ms = Number(process.hrtime.bigint() - start) / 1e6;
     return { name: target.name, status: response && response.status ? response.status : 0, ms: Math.round(ms) };
   } catch (error) {
     const ms = Number(process.hrtime.bigint() - start) / 1e6;
     return { name: target.name, status: 0, ms: Math.round(ms) };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
-async function measureProof(fetchImpl, env, now) {
-  const checks = [];
-  for (let i = 0; i < TARGETS.length; i += 1) checks.push(await timeOne(TARGETS[i], fetchImpl));
+async function measureProof(fetchImpl, env, now, timeoutMs) {
+  const limit = timeoutMs || 4000;
+  const checks = await Promise.all(TARGETS.map(function (target) { return timeOne(target, fetchImpl, limit); }));
   const online = checks.every(function (row) { return row.status >= 200 && row.status < 300; });
   const region = env && typeof env.VERCEL_REGION === 'string' && env.VERCEL_REGION ? env.VERCEL_REGION : null;
   return {

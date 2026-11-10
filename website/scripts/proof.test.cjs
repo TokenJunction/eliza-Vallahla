@@ -38,6 +38,18 @@ test('the proof measurement has the public shape and no secrets', async () => {
   assert.equal(calls.includes('https://valos.live/'), true);
 });
 
+test('a hung check times out and the other results still return', async () => {
+  const body = await measureProof(async (url) => {
+    if (String(url).includes('valos.live')) return new Promise(function () {});
+    return { status: 200 };
+  }, {}, new Date('2026-11-10T17:00:00Z'), 30);
+  assert.equal(body.checks.length, 3);
+  assert.equal(body.checks.find(row => row.name === 'Coin').status, 0);
+  assert.equal(body.checks.find(row => row.name === 'Entrance').status, 200);
+  assert.equal(body.online, false);
+  assert.equal(body.delivery.intact, 50);
+});
+
 test('the proof page does not load ads', () => {
   const page = fs.readFileSync(path.join(root, 'website/proof/index.html'), 'utf8');
   const home = fs.readFileSync(path.join(root, 'website/index.html'), 'utf8');
