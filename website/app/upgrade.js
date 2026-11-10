@@ -42,9 +42,14 @@
     }
     try {
       var file = await fetch("/monetization.json").then(function (res) { return res.json(); });
-      var address = String(file.cryptoReceiveAddress || "");
-      var usdc = String(file.usdcMint || "");
-      var amount = Number(file.priceMonthlyUsd);
+      var signed = window.ValhallaTrust && window.nacl && window.ValhallaTrust.verifyMonetization(window.nacl, file);
+      if (!signed) {
+        note("Crypto checkout is off until the signed config verifies.");
+        return;
+      }
+      var address = String(signed.cryptoReceiveAddress || "");
+      var usdc = String(signed.usdcMint || "");
+      var amount = Number(signed.priceMonthlyUsd);
       if (!address || !Number.isFinite(amount) || amount <= 0) {
         note("Checkout is temporarily unavailable. Please try again shortly. (V-PAY)");
         return;
