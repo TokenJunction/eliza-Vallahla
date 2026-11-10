@@ -12,7 +12,7 @@
   var spotlightList = document.getElementById('spotlight-list');
   var announcement = document.getElementById('desktop-announcement');
   var windows = Array.prototype.slice.call(document.querySelectorAll('[data-window]'));
-  var topZ = 10;
+  var frontZ = '40';
   var healthTimer = 0;
 
   function getWindow(name) {
@@ -29,8 +29,12 @@
   }
 
   function focusWindow(node) {
-    topZ += 1;
-    node.style.zIndex = String(topZ);
+    var open = windows.filter(function (item) { return !item.hidden; });
+    open.sort(function (a, b) { return Number(a.style.zIndex || 0) - Number(b.style.zIndex || 0); });
+    open.forEach(function (item, index) {
+      if (item !== node) item.style.zIndex = String(10 + index);
+    });
+    node.style.zIndex = '40';
     windows.forEach(function (item) {
       var button = taskbarApps.querySelector('[data-task="' + item.dataset.window + '"]');
       if (button) button.setAttribute('aria-pressed', String(item === node && !item.hidden));
@@ -56,7 +60,7 @@
         if (node.dataset.minimized === 'true') {
           node.hidden = false;
           node.dataset.minimized = 'false';
-        } else if (node.style.zIndex === String(topZ)) {
+        } else if (node.style.zIndex === frontZ) {
           node.dataset.minimized = 'true';
           node.hidden = true;
         }
@@ -80,17 +84,31 @@
     if (name === 'status') checkHealth();
   }
 
+  function showFront() {
+    var open = windows.filter(function (item) { return !item.hidden; });
+    if (!open.length) {
+      if (activeApp) activeApp.textContent = 'Desk';
+      return;
+    }
+    open.sort(function (a, b) { return Number(a.style.zIndex || 0) - Number(b.style.zIndex || 0); });
+    focusWindow(open[open.length - 1]);
+  }
+
   function closeWindow(node) {
     node.hidden = true;
     node.dataset.minimized = 'false';
+    node.classList.remove('is-max');
     updateTaskbar();
+    showFront();
     announce(node.querySelector('.title-bar h2').textContent + ' closed.');
   }
 
   function minimizeWindow(node) {
     node.hidden = true;
     node.dataset.minimized = 'true';
+    node.classList.remove('is-max');
     updateTaskbar();
+    showFront();
     announce(node.querySelector('.title-bar h2').textContent + ' minimized.');
   }
 
@@ -134,7 +152,7 @@
   function startDrag(event) {
     var handle = event.target.closest('[data-drag-handle]');
     var node = handle && handle.closest('[data-window]');
-    if (!handle || !node || event.target.closest('button') || event.button !== 0) return;
+    if (!handle || !node || node.classList.contains('is-max') || event.target.closest('button') || event.button !== 0) return;
     event.preventDefault();
     focusWindow(node);
     var startX = event.clientX;
@@ -147,7 +165,7 @@
       var dy = moveEvent.clientY - startY;
       if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
       var x = Math.max(0, Math.min(window.innerWidth - Math.min(120, rect.width), rect.left + dx));
-      var y = Math.max(0, Math.min(window.innerHeight - 60, rect.top + dy));
+      var y = Math.max(52, Math.min(window.innerHeight - 60, rect.top + dy));
       node.style.left = x + 'px';
       node.style.top = y + 'px';
       node.style.right = 'auto';

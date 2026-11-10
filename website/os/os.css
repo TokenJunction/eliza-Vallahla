@@ -559,6 +559,9 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
   border-radius: 50%;
   font-size: 0;
 }
+@media (pointer: coarse) {
+  .window-controls .traffic { width: 44px; height: 44px; min-height: 44px; }
+}
 .traffic.close { background: #c4554a; }
 .traffic.min { background: #d7b06a; }
 .traffic.max { background: #7d9a78; }
@@ -574,6 +577,8 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
   max-height: none;
 }
 .start-menu {
+  position: fixed;
+  z-index: 70;
   top: 48px;
   bottom: auto;
   left: 12px;
