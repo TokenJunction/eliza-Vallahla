@@ -9,5 +9,12 @@
   "redirects": [
     { "source": "/app", "destination": "/", "permanent": false },
     { "source": "/app/", "destination": "/", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/admin", "destination": "/api/admin" },
+    { "source": "/admin/", "destination": "/api/admin" }
+  ],
+  "crons": [
+    { "path": "/api/overseer", "schedule": "15 12 * * *" }
   ]
 }

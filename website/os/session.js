@@ -7,6 +7,22 @@
     window.location.replace('/');
   }
 
+  function offerAdmin(access) {
+    if (!access) return;
+    fetch('/api/admin', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { authorization: 'Bearer ' + access, 'content-type': 'application/json' },
+      body: '{"action":"enter"}'
+    }).then(function (response) {
+      if (!response || !response.ok) return;
+      ['admin-link', 'admin-icon', 'admin-menu', 'overseer-icon', 'overseer-menu'].forEach(function (id) {
+        var node = document.getElementById(id);
+        if (node) node.hidden = false;
+      });
+    }, function () {});
+  }
+
   function show(user, level) {
     document.body.dataset.session = 'in';
     var email = document.getElementById('account-email');
@@ -32,11 +48,17 @@
         return;
       }
       show(user, 'Free');
+      offerAdmin(session.access_token);
       var signOut = document.getElementById('sign-out');
       if (signOut) {
         signOut.hidden = false;
         signOut.addEventListener('click', function () {
-          supabase.auth.signOut().then(function () { leave(); }, leave);
+          fetch('/api/admin', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' },
+            body: '{"action":"leave"}'
+          }).then(function () { return supabase.auth.signOut(); }, function () { return supabase.auth.signOut(); }).then(leave, leave);
         });
       }
       return supabase.from('profiles').select('account_level').eq('id', user.id).maybeSingle().then(function (row) {

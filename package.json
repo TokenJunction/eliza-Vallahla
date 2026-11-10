@@ -2,6 +2,7 @@
   "private": true,
   "dependencies": {
     "@vercel/functions": "^2.2.13",
-    "esbuild": "^0.25.12"
+    "esbuild": "^0.25.12",
+    "terser": "5.51.2"
   }
 }
