@@ -48,6 +48,25 @@ function forbiddenAkershus(release) {
   return '';
 }
 
+function versionParts(version) {
+  if (typeof version !== 'string' || !/^\d+(?:\.\d+){0,3}$/.test(version)) return null;
+  return version.split('.').map(part => Number(part));
+}
+
+function newerVersion(next, current) {
+  const left = versionParts(next);
+  const right = versionParts(current);
+  if (!left || !right) return false;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const a = left[index] || 0;
+    const b = right[index] || 0;
+    if (a > b) return true;
+    if (a < b) return false;
+  }
+  return false;
+}
+
 export function retainKnownGood(entries, now) {
   return (entries || []).filter(entry => now - entry.acceptedAt <= FALLBACK_MS);
 }
@@ -93,14 +112,21 @@ export function acceptRelease(node, release, publicKey, now) {
   if (!ORDINARY.has(release.category) || GATED.has(release.category)) {
     return { applied: false, autoAccept: false, reason: 'gated change needs review', node: current };
   }
+  const previousIssued = Number.isSafeInteger(current.issuedAt) ? current.issuedAt : 0;
+  if (!Number.isSafeInteger(release.issuedAt) || release.issuedAt > now || release.issuedAt <= previousIssued) {
+    return { applied: false, autoAccept: false, reason: 'older or unsigned release time', node: current };
+  }
+  if (!newerVersion(release.version, current.version)) {
+    return { applied: false, autoAccept: false, reason: 'not a newer version', node: current };
+  }
   const knownGood = retainKnownGood([
     ...current.knownGood,
-    { version: release.version, path: release.path, channel: release.channel, acceptedAt: now }
+    { version: release.version, path: release.path, channel: release.channel, issuedAt: release.issuedAt, acceptedAt: now }
   ], now);
   return {
     applied: true,
     autoAccept: true,
     reason: 'ordinary patch accepted',
-    node: { ...current, version: release.version, knownGood }
+    node: { ...current, version: release.version, issuedAt: release.issuedAt, knownGood }
   };
 }

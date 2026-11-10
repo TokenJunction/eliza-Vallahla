@@ -86,13 +86,27 @@ test('ordinary patches auto-accept and gated changes do not', () => {
 
 test('known-good versions stay available for at least 3 hours', () => {
   const now = 10_000_000;
-  const first = acceptRelease(customer(), release({ version: '1.0.1' }), keys.publicKey, now);
-  const second = acceptRelease(first.node, release({ version: '1.0.2' }), keys.publicKey, now + 60 * 60 * 1000);
+  const first = acceptRelease(customer(), release({ version: '1.0.1', issuedAt: 1 }), keys.publicKey, now);
+  const second = acceptRelease(first.node, release({ version: '1.0.2', issuedAt: 2 }), keys.publicKey, now + 60 * 60 * 1000);
   const stillKept = retainKnownGood(second.node.knownGood, now + FALLBACK_MS);
   assert.equal(stillKept.some(entry => entry.version === '1.0.1'), true);
   const expired = retainKnownGood(second.node.knownGood, now + FALLBACK_MS + 1);
   assert.equal(expired.some(entry => entry.version === '1.0.1'), false);
   assert.equal(expired.some(entry => entry.version === '1.0.2'), true);
+});
+
+test('an older signed ordinary patch cannot move the node backward', () => {
+  const now = 50_000;
+  const current = acceptRelease(customer(), release({ version: '1.0.2', issuedAt: 20 }), keys.publicKey, now);
+  assert.equal(current.applied, true);
+  const older = acceptRelease(current.node, release({ version: '1.0.1', issuedAt: 10 }), keys.publicKey, now + 1);
+  assert.equal(older.applied, false);
+  assert.equal(older.node.version, '1.0.2');
+  const sameVersion = acceptRelease(current.node, release({ version: '1.0.2', issuedAt: 30 }), keys.publicKey, now + 2);
+  assert.equal(sameVersion.reason, 'not a newer version');
+  const replayedTime = acceptRelease(current.node, release({ version: '1.0.3', issuedAt: 20 }), keys.publicKey, now + 3);
+  assert.equal(replayedTime.reason, 'older or unsigned release time');
+  assert.equal(replayedTime.node.version, '1.0.2');
 });
 
 test('only a live node on the same channel can be a repair source', () => {
