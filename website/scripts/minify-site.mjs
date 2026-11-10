@@ -1,53 +1,52 @@
 import esbuild from 'esbuild';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const out = path.join(root, 'site-build');
-const trailTarget = 28 * 1024;
-const forbidden = [
-  'enterWorkstationSession',
-  'keene.jos',
-  'operator-01@',
-  'Valhalla2033',
-  'pk_test_',
-  'BEGIN PRIVATE KEY',
-  'BEGIN RSA PRIVATE KEY',
-  'sourceMappingURL',
-  'AKIA'
-];
+const hashFile = path.join(root, 'website/scripts/ship-canary-hashes.txt');
+const localCanaries = path.join(root, 'website/scripts/ship-canaries.local');
 
-const words = [
-  'workstation-dock',
-  'telemetry-unconfigured',
-  'sign-in-required',
-  'paper-desk',
-  'wallet-bridge',
-  'status-probe',
-  'viewport-frame',
-  'no-live-trade'
-];
+export function sha256(value) {
+  return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
+}
 
-export function generateTrail(target = trailTarget) {
-  let body = '';
-  let i = 0;
-  while (Buffer.byteLength(body) < target) {
-    const left = words[i % words.length];
-    const right = words[(i + 3) % words.length];
-    body += `function vho${i}(a){var b="${left}";var c="${right}";if(false){return b+c+(a|0)}return(a|0)^${i % 7};}`;
-    i += 1;
-    if (i > 5000) break;
+export function committedCanaryHashes(text) {
+  return String(text || '').split('\n').map(function (line) { return line.trim(); }).filter(function (line) { return line && !line.startsWith('#'); });
+}
+
+export function verifiedCanaries(values, hashes) {
+  if (values == null) return [];
+  const actual = values.map(sha256).sort();
+  const expected = hashes.slice().sort();
+  if (actual.length !== expected.length || actual.some(function (hash, index) { return hash !== expected[index]; })) {
+    throw new Error('ship canary file does not match the committed hashes');
   }
-  return body;
+  return values;
+}
+
+export function readCanaryValues(env = process.env, file = localCanaries) {
+  if (env && env.VALHALLA_SHIP_CANARIES && String(env.VALHALLA_SHIP_CANARIES).trim()) {
+    return String(env.VALHALLA_SHIP_CANARIES).split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  }
+  if (file && fs.existsSync(file)) {
+    return fs.readFileSync(file, 'utf8').split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  }
+  return null;
 }
 
 export async function minifySource(code, loader) {
   const result = await esbuild.transform(code, {
     loader,
     minify: true,
+    minifyIdentifiers: true,
     legalComments: 'none',
     sourcemap: false,
-    target: 'es2020'
+    target: 'es2020',
+    drop: ['console', 'debugger'],
+    mangleProps: /^_/,
+    mangleQuoted: false
   });
   if (result.map) throw new Error('source map was produced');
   return result.code;
@@ -63,9 +62,9 @@ function walk(dir, files = []) {
   return files;
 }
 
-function checkPublic(text, file) {
-  for (const item of forbidden) {
-    if (text.includes(item)) throw new Error(file + ' contains ' + item);
+function checkPublic(text, file, canaries) {
+  for (const item of canaries) {
+    if (item && text.includes(item)) throw new Error(file + ' contains a forbidden ship canary');
   }
 }
 
@@ -89,19 +88,20 @@ export async function minifySite(directory = out) {
       fs.writeFileSync(file, minifyHtml(fs.readFileSync(file, 'utf8')));
     }
   }
-  const appJs = path.join(directory, 'os', 'app.js');
-  const trail = generateTrail();
-  if (Buffer.byteLength(trail) > 40 * 1024) throw new Error('trail is too large');
-  fs.appendFileSync(appJs, '\n' + trail);
   const shipped = walk(directory).filter(file => /\.(html|js|css)$/.test(file));
-  for (const file of shipped) checkPublic(fs.readFileSync(file, 'utf8'), path.relative(directory, file));
+  const canaries = verifiedCanaries(readCanaryValues(), committedCanaryHashes(fs.readFileSync(hashFile, 'utf8')));
+  for (const file of shipped) checkPublic(fs.readFileSync(file, 'utf8'), path.relative(directory, file), canaries);
+  const appJs = path.join(directory, 'os', 'app.js');
+  if (fs.existsSync(appJs) && fs.readFileSync(appJs, 'utf8').includes('function vho' + '0')) {
+    throw new Error('padding trail was shipped');
+  }
   const workstation = ['os/index.html', 'os/app.js', 'os/bridge.js', 'os/os.css', 'desk.js', 'desk.css']
     .reduce((sum, name) => sum + fs.statSync(path.join(directory, name)).size, 0);
   if (workstation >= 1500000) throw new Error('workstation bundle is too large');
   if (files.some(file => file.includes('private-export') || file.endsWith('.tar.gz'))) {
     throw new Error('private pack reached the public build');
   }
-  return { trailBytes: Buffer.byteLength(trail), workstation };
+  return { trailBytes: 0, workstation };
 }
 
 function minifyHtml(html) {

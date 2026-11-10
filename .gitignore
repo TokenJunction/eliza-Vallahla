@@ -1,4 +1,5 @@
 /site-build/
+website/scripts/ship-canaries.local
 /node_modules/
 /private-export/
 **/__pycache__/
