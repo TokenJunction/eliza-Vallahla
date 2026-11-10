@@ -30,5 +30,7 @@ module.exports = async function handler(req, res) {
   const body = await readBody(req);
   const built = await swap.buildSwap(process.env, fetch, body.quoteResponse, body.userPublicKey);
   if (!built.ok) return send(res, built.status, { error: built.error });
-  return send(res, 200, { swapTransaction: built.swapTransaction, platformFee: built.platformFee });
+  const bind = swap.bindTicket(process.env, session.sessionId, body.userPublicKey, built.swapTransaction);
+  if (!bind) return send(res, 503, { error: 'The Jupiter build could not be bound to this sign-in. Nothing was sent.' });
+  return send(res, 200, { swapTransaction: built.swapTransaction, platformFee: built.platformFee, bind: bind });
 };

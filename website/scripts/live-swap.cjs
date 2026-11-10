@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 'use strict';
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -67,7 +68,7 @@ async function requireSession(env, fetchImpl, token) {
     body: JSON.stringify({ token: token })
   });
   if (!response || !response.ok) return { ok: false, status: 401, error: 'Sign-in required.' };
-  return { ok: true };
+  return { ok: true, sessionId: sessionId };
 }
 
 function resolveMint(value) {
@@ -138,6 +139,69 @@ async function buildSwap(env, fetchImpl, quoteResponse, userPublicKey) {
   return { ok: true, swapTransaction: body.swapTransaction, platformFee: publicStatus(env).platformFee };
 }
 
+function messageBytes(encoded) {
+  let raw;
+  try { raw = Buffer.from(String(encoded || ''), 'base64'); }
+  catch (error) { return null; }
+  if (!raw || raw.length < 66) return null;
+  let length = 0;
+  let size = 0;
+  while (size < 3 && size < raw.length) {
+    const elem = raw[size];
+    length |= (elem & 0x7f) << (size * 7);
+    size += 1;
+    if ((elem & 0x80) === 0) break;
+  }
+  if (length < 1 || length > 8) return null;
+  const start = size + length * 64;
+  if (start >= raw.length) return null;
+  return raw.subarray(start);
+}
+
+function bindPayload(sessionId, userPublicKey, digest, exp) {
+  return [sessionId, userPublicKey, digest, String(exp)].join('|');
+}
+
+function bindTicket(env, sessionId, userPublicKey, unsignedTransaction) {
+  const message = messageBytes(unsignedTransaction);
+  if (!message || !env || !env.CLERK_SECRET_KEY) return null;
+  const exp = Date.now() + 2 * 60 * 1000;
+  const digest = crypto.createHash('sha256').update(message).digest('base64url');
+  const mac = crypto.createHmac('sha256', env.CLERK_SECRET_KEY).update(bindPayload(sessionId, userPublicKey, digest, exp)).digest('base64url');
+  return { exp: exp, mac: mac };
+}
+
+const sendHits = new Map();
+
+function allowSend(sessionId, now) {
+  const recent = (sendHits.get(sessionId) || []).filter(function (at) { return now - at < 60000; });
+  if (recent.length >= 5) {
+    sendHits.set(sessionId, recent);
+    return false;
+  }
+  recent.push(now);
+  sendHits.set(sessionId, recent);
+  if (sendHits.size > 1000) sendHits.clear();
+  return true;
+}
+
+async function sendBound(env, fetchImpl, sessionId, userPublicKey, signedTransaction, ticket, now) {
+  const checkedAt = now || Date.now();
+  if (!allowSend(sessionId, checkedAt)) return { ok: false, status: 429, error: 'Too many send attempts. Nothing was sent.' };
+  if (!ticket || !ticket.mac || !ticket.exp) return { ok: false, status: 400, error: 'This send is not tied to a Jupiter build. Nothing was sent.' };
+  if (Number(ticket.exp) < checkedAt) return { ok: false, status: 400, error: 'The Jupiter build expired. Nothing was sent.' };
+  const message = messageBytes(signedTransaction);
+  if (!message || !env || !env.CLERK_SECRET_KEY) return { ok: false, status: 400, error: 'The signed transaction could not be checked. Nothing was sent.' };
+  const digest = crypto.createHash('sha256').update(message).digest('base64url');
+  const expected = crypto.createHmac('sha256', env.CLERK_SECRET_KEY).update(bindPayload(sessionId, userPublicKey, digest, ticket.exp)).digest('base64url');
+  const left = Buffer.from(expected);
+  const right = Buffer.from(String(ticket.mac));
+  if (left.length !== right.length || !crypto.timingSafeEqual(left, right)) {
+    return { ok: false, status: 403, error: 'The signed transaction does not match the Jupiter build. Nothing was sent.' };
+  }
+  return sendSigned(env, fetchImpl, signedTransaction);
+}
+
 async function sendSigned(env, fetchImpl, signedTransaction) {
   const url = rpcUrl(env);
   if (!url) return { ok: false, status: 503, error: 'RPC not connected. The signed transaction was not sent.' };
@@ -203,6 +267,8 @@ module.exports = {
   requireSession: requireSession,
   quoteSwap: quoteSwap,
   buildSwap: buildSwap,
+  bindTicket: bindTicket,
+  sendBound: sendBound,
   sendSigned: sendSigned,
   transactionStatus: transactionStatus
 };

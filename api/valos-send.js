@@ -28,7 +28,7 @@ module.exports = async function handler(req, res) {
   const session = await swap.requireSession(process.env, fetch, token(req));
   if (!session.ok) return send(res, session.status, { error: session.error });
   const body = await readBody(req);
-  const sent = await swap.sendSigned(process.env, fetch, body.signedTransaction);
+  const sent = await swap.sendBound(process.env, fetch, session.sessionId, body.userPublicKey, body.signedTransaction, body.bind);
   if (!sent.ok) return send(res, sent.status, { error: sent.error });
   return send(res, 200, { signature: sent.signature });
 };

@@ -28,17 +28,8 @@ module.exports = async function handler(req, res) {
   const session = await swap.requireSession(process.env, fetch, token(req));
   if (!session.ok) return send(res, session.status, { error: session.error });
   const body = await readBody(req);
-  if (body.signature && !body.signedTransaction) {
-    const report = await swap.transactionStatus(process.env, fetch, body.signature);
-    if (!report.ok) return send(res, report.status, { error: report.error });
-    return send(res, 200, report);
-  }
-  const sent = await swap.sendSigned(process.env, fetch, body.signedTransaction);
-  if (!sent.ok) return send(res, sent.status, { error: sent.error });
-  const report = await swap.transactionStatus(process.env, fetch, sent.signature);
-  return send(res, 200, {
-    signature: sent.signature,
-    confirmation: report.ok ? report.confirmation : 'not-reported',
-    err: report.ok ? report.err : null
-  });
+  if (body.signedTransaction) return send(res, 400, { error: 'This route only reports a signature. It does not send a transaction.' });
+  const report = await swap.transactionStatus(process.env, fetch, body.signature);
+  if (!report.ok) return send(res, report.status, { error: report.error });
+  return send(res, 200, report);
 };

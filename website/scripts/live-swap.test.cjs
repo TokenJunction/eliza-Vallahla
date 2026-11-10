@@ -84,6 +84,33 @@ test('unsigned build and RPC send fail closed without a connection', async () =>
   assert.equal(invented.reward, -1);
 });
 
+test('send accepts only the signed form of the Jupiter build for that session', async () => {
+  const wallet = '1'.repeat(32);
+  const unsigned = Buffer.concat([Buffer.from([1]), Buffer.alloc(64), Buffer.from('jupiter-message')]).toString('base64');
+  const signed = Buffer.concat([Buffer.from([1]), Buffer.alloc(64, 7), Buffer.from('jupiter-message')]).toString('base64');
+  const other = Buffer.concat([Buffer.from([1]), Buffer.alloc(64, 9), Buffer.from('other-message')]).toString('base64');
+  const boundEnv = { ...env(), HELIUS_API_KEY: 'server-only' };
+  const ticket = swap.bindTicket(boundEnv, 'sess_bind', wallet, unsigned);
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return { ok: true, json: async () => ({ result: 'sig' }) }; };
+  const missing = await swap.sendBound(boundEnv, fetchImpl, 'sess_bind', wallet, signed, null, 1000);
+  assert.equal(missing.status, 400);
+  const mismatch = await swap.sendBound(boundEnv, fetchImpl, 'sess_bind', wallet, other, ticket, 1000);
+  assert.equal(mismatch.status, 403);
+  const sent = await swap.sendBound(boundEnv, fetchImpl, 'sess_bind', wallet, signed, ticket, 1000);
+  assert.equal(sent.signature, 'sig');
+  assert.equal(calls, 1);
+  for (let i = 0; i < 5; i += 1) await swap.sendBound(boundEnv, fetchImpl, 'sess_rate', wallet, signed, ticket, 2000);
+  const limited = await swap.sendBound(boundEnv, fetchImpl, 'sess_rate', wallet, signed, ticket, 2000);
+  assert.equal(limited.status, 429);
+  const tx = fs.readFileSync(path.join(root, 'api/valos-tx.js'), 'utf8');
+  assert.doesNotMatch(tx, /sendSigned|sendBound/);
+});
+
+function env() {
+  return { CLERK_PUBLISHABLE_KEY: 'pk_live_example', CLERK_SECRET_KEY: 'sk_live_example' };
+}
+
 test('public pages do not embed a secret or a live-trading bypass', () => {
   const files = [
     'website/swap/index.html',

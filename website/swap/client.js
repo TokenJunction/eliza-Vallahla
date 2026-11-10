@@ -211,7 +211,7 @@ async function confirmSwap(event) {
   const sent = await fetch('/api/valos-send', {
     method: 'POST',
     headers: await bearer(),
-    body: JSON.stringify({ signedTransaction: raw })
+    body: JSON.stringify({ signedTransaction: raw, userPublicKey: walletAddress, bind: swapBody.bind })
   });
   const sentBody = await sent.json();
   if (!sent.ok) {
