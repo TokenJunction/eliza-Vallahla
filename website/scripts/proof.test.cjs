@@ -140,6 +140,18 @@ test('proof reads are limited and a query does not call Helius', async () => {
   assert.equal(calls, 1);
 });
 
+test('expired proof visitors leave room for a new address', async () => {
+  resetProofLimits();
+  const measure = async () => ({ online: true });
+  for (let i = 0; i < 2000; i += 1) {
+    await handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-real-ip': '198.51.100.' + i } }, {}, null, 1_000, measure);
+  }
+  const blocked = await handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-real-ip': '203.0.113.50' } }, {}, null, 1_000, measure);
+  assert.equal(blocked.status, 429);
+  const fresh = await handleProof({ method: 'GET', url: '/api/proof', headers: { 'x-real-ip': '203.0.113.50' } }, {}, null, 70_000, measure);
+  assert.equal(fresh.status, 200);
+});
+
 test('a failed proof read does not retry on the next request', async () => {
   resetProofLimits();
   let calls = 0;

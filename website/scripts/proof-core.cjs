@@ -263,13 +263,24 @@ function clientIp(headers) {
   return first || 'unknown';
 }
 
+function pruneHits(now) {
+  for (const [ip, times] of hits) {
+    const recent = times.filter(function (at) { return now - at < WINDOW_MS; });
+    if (recent.length) hits.set(ip, recent);
+    else hits.delete(ip);
+  }
+}
+
 function allowIp(ip, now) {
   const recent = (hits.get(ip) || []).filter(function (at) { return now - at < WINDOW_MS; });
   if (recent.length >= IP_LIMIT) {
     hits.set(ip, recent);
     return false;
   }
-  if (!hits.has(ip) && hits.size >= 2000) return false;
+  if (!hits.has(ip) && hits.size >= 2000) {
+    pruneHits(now);
+    if (!hits.has(ip) && hits.size >= 2000) return false;
+  }
   recent.push(now);
   hits.set(ip, recent);
   return true;
