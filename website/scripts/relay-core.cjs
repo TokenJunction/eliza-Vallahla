@@ -130,9 +130,31 @@ async function handleRelay(req, env, fetchImpl) {
   let packet;
   try { packet = JSON.parse(req.body || ''); }
   catch (error) { return { status: 400, body: { error: 'The package was refused.' } }; }
-  const opened = openPackage(packet, { agreePrivate: keys.agreePrivate, signPublics: peerPublics(keys.peers), seen: seen, now: Date.now() });
+  const opened = openPackage(packet, { agreePrivate: keys.agreePrivate, signPublics: peerPublics(keys.peers), now: Date.now() });
   if (!opened.ok) return { status: 400, body: { error: opened.error } };
-  return { status: 200, body: { ok: true, payload: opened.payload } };
+  const claimed = await claimNonce(env, packet.from + ':' + packet.nonce, fetchImpl, Date.now());
+  if (!claimed.configured) return { status: 503, body: { error: 'Relay not configured' } };
+  if (!claimed.ok) return { status: 400, body: { error: 'That package was already seen.' } };
+  return { status: 200, body: { ok: true } };
+}
+
+async function claimNonce(env, id, fetchImpl, now) {
+  const site = publicSupabase();
+  const key = String(env && env.SUPABASE_SERVICE_ROLE_KEY || '');
+  if (!site.url || !key) return { ok: false, configured: false };
+  const headers = { authorization: 'Bearer ' + key, apikey: key, 'content-type': 'application/json' };
+  await fetchImpl(site.url + '/rest/v1/relay_nonces?expires_at=lt.' + encodeURIComponent(new Date(now).toISOString()), {
+    method: 'DELETE',
+    headers: headers
+  });
+  const saved = await fetchImpl(site.url + '/rest/v1/relay_nonces', {
+    method: 'POST',
+    headers: Object.assign({ prefer: 'return=minimal' }, headers),
+    body: JSON.stringify({ id: id, expires_at: new Date(now + MAX_SKEW_MS).toISOString() })
+  });
+  if (saved && (saved.status === 409 || saved.status === 23505)) return { ok: false, configured: true };
+  if (!saved || !saved.ok) return { ok: false, configured: true };
+  return { ok: true, configured: true };
 }
 
 function bearer(headers) {

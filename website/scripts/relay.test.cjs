@@ -92,14 +92,28 @@ test('the relay accepts one sealed package and refuses the replay', async () => 
   });
   const env = {
     RELAY_AGREE_PRIVATE: recipient.privateKey.export({ type: 'pkcs8', format: 'pem' }),
-    RELAY_PEERS: JSON.stringify({ 'node-a': { sign: sender.publicKey.export({ type: 'spki', format: 'pem' }) } })
+    RELAY_PEERS: JSON.stringify({ 'node-a': { sign: sender.publicKey.export({ type: 'spki', format: 'pem' }) } }),
+    SUPABASE_SERVICE_ROLE_KEY: 'service-role-test'
   };
   const request = { method: 'POST', headers: {}, body: JSON.stringify(packet) };
-  const first = await handleRelay(request, env, async () => { throw new Error('no'); });
+  const stored = new Set();
+  async function store(url, init) {
+    const target = String(url);
+    if (!target.includes('relay_nonces')) throw new Error('no');
+    if (init && init.method === 'DELETE') return { ok: true, status: 200, json: async () => ({}) };
+    const row = JSON.parse(init.body);
+    if (stored.has(row.id)) return { ok: false, status: 409, json: async () => ({}) };
+    stored.add(row.id);
+    return { ok: true, status: 201, json: async () => ({}) };
+  }
+  const first = await handleRelay(request, env, store);
   assert.equal(first.status, 200);
-  assert.equal(first.body.payload.n, 2);
-  const replay = await handleRelay(request, env, async () => { throw new Error('no'); });
+  assert.equal(first.body.ok, true);
+  assert.equal(first.body.payload, undefined);
+  assert.equal(JSON.stringify(first.body).includes('desk'), false);
+  const replay = await handleRelay(request, env, store);
   assert.equal(replay.status, 400);
+  assert.equal(replay.body.payload, undefined);
 });
 
 test('the relay endpoint rejects a package signed by the wrong key', async () => {
@@ -116,7 +130,7 @@ test('the relay endpoint rejects a package signed by the wrong key', async () =>
     RELAY_AGREE_PRIVATE: recipient.privateKey.export({ type: 'pkcs8', format: 'pem' }),
     RELAY_PEERS: JSON.stringify({ 'node-a': { sign: sender.publicKey.export({ type: 'spki', format: 'pem' }) } })
   };
-  const result = await handleRelay({ method: 'POST', headers: {}, body: JSON.stringify(packet) }, env, async () => { throw new Error('no'); });
+  const result = await handleRelay({ method: 'POST', headers: {}, body: JSON.stringify(packet) }, Object.assign({ SUPABASE_SERVICE_ROLE_KEY: 'service-role-test' }, env), async () => { throw new Error('no'); });
   assert.equal(result.status, 400);
   assert.equal(result.body.error, 'The package was refused.');
 });
