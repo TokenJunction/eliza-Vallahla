@@ -434,8 +434,15 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
   .placeholder-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 14px 14px; padding: 0; list-style: none; }
   .placeholder-row li { min-height: 44px; display: flex; align-items: center; padding: 8px 10px; border: 1px dashed #6f5630; color: #d9d0c2; }
   .dock .desktop-icon { text-decoration: none; }
-  .menu-bar { z-index: 30; }
-  .dock { z-index: 20; }
-  .window, .browser-window { position: fixed; top: 118px !important; left: 8px !important; width: calc(100vw - 16px) !important; max-height: calc(100dvh - 180px); }
-  .window-body { max-height: calc(100dvh - 175px); }
+  .menu-bar, .dock { z-index: 1; }
+  .taskbar { z-index: 60; }
+  .window, .browser-window {
+    position: fixed;
+    top: 8px !important;
+    left: 8px !important;
+    width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 76px);
+    z-index: 50 !important;
+  }
+  .window-body { max-height: calc(100dvh - 130px); }
 }
