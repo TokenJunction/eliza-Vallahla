@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { handleAi, resetAiLimits, DEFAULT_MODEL, FALLBACK_MODEL, MAX_TOKENS } = require('./ai-core.cjs');
 
 const root = path.join(__dirname, '../..');
@@ -98,6 +99,68 @@ test('a free-model failure falls back to the other free model and hides the key'
   assert.equal(result.body.reply.includes('server-only-key'), false);
   const models = calls.filter(call => call.url.includes('openrouter')).map(call => JSON.parse(call.init.body).model);
   assert.deepEqual(models, [DEFAULT_MODEL, FALLBACK_MODEL]);
+});
+
+test('a seed-like message is refused before OpenRouter is called', async () => {
+  resetAiLimits();
+  const calls = [];
+  const phrase = 'one two three four five six seven eight nine ten eleven twelve';
+  const secret = await handleAi({
+    method: 'POST',
+    headers: { authorization: 'Bearer good' },
+    body: ask(phrase)
+  }, { OPENROUTER_API_KEY: 'server-only-key' }, async (url) => {
+    calls.push(String(url));
+    if (String(url).includes('/auth/v1/user')) return supabase(true);
+    return { ok: true, json: async () => ({}) };
+  }, 6_000);
+  assert.equal(secret.status, 400);
+  assert.match(secret.body.error, /seed phrase or private key/);
+  assert.equal(calls.some(url => url.includes('openrouter')), false);
+});
+
+test('an empty ask keeps the last reply and a second ask waits', async () => {
+  const source = fs.readFileSync(path.join(root, 'website/os/ai.js'), 'utf8');
+  const nodes = {};
+  function node(id) {
+    return nodes[id] ||= { id: id, value: '', textContent: '', disabled: false, handlers: {}, addEventListener(type, fn) { (this.handlers[type] ||= []).push(fn); }, querySelector() { return nodes['ai-button']; } };
+  }
+  node('ai-form');
+  node('ai-status');
+  node('ai-input');
+  node('ai-state');
+  nodes['ai-reply'] = { textContent: 'kept' };
+  nodes['ai-button'] = { disabled: false };
+  const calls = [];
+  let release;
+  const pending = new Promise(function (resolve) { release = resolve; });
+  vm.runInNewContext(source, {
+    document: { body: { dataset: { session: 'in' } }, getElementById(id) { return nodes[id]; } },
+    window: { ValhallaSupabase: { client: async () => ({ auth: { getSession: async () => ({ data: { session: { access_token: 'token' } } }) } }) } },
+    fetch: async () => {
+      calls.push('fetch');
+      await pending;
+      return { status: 200, ok: true, json: async () => ({ reply: 'answer' }) };
+    },
+    JSON: JSON
+  });
+  const submit = nodes['ai-form'].handlers.submit[0];
+  nodes['ai-input'].value = '   ';
+  await submit({ preventDefault() {} });
+  assert.equal(nodes['ai-reply'].textContent, 'kept');
+  assert.equal(calls.length, 0);
+  nodes['ai-input'].value = 'What is the desk?';
+  const first = submit({ preventDefault() {} });
+  const second = submit({ preventDefault() {} });
+  await new Promise(function (resolve) { setImmediate(resolve); });
+  assert.equal(calls.length, 1);
+  assert.equal(nodes['ai-button'].disabled, true);
+  release();
+  await first;
+  await second;
+  assert.equal(calls.length, 1);
+  assert.equal(nodes['ai-reply'].textContent, 'answer');
+  assert.equal(nodes['ai-button'].disabled, false);
 });
 
 test('the desk says the assistant is not connected until a reply arrives', () => {

@@ -43,6 +43,12 @@ function allowedModel(id) {
   return typeof id === 'string' && id.endsWith(':free') && ALLOWED.has(id);
 }
 
+function secretLike(text) {
+  const words = String(text || '').trim().toLowerCase().split(/\s+/);
+  const phrase = words.length >= 12 && words.length <= 24 && words.every(function (word) { return /^[a-z]+$/.test(word); });
+  return phrase || /[1-9A-HJ-NP-Za-km-z]{64,}/.test(String(text || ''));
+}
+
 async function verifyUser(token, fetchImpl) {
   const site = publicSupabase();
   if (!site.url || !site.key || !token) return null;
@@ -67,6 +73,9 @@ function messageFrom(raw) {
   const message = payload.message.trim();
   if (message.length > MAX_INPUT) {
     return { error: { status: 400, body: { error: 'Message is too long.' } } };
+  }
+  if (secretLike(message)) {
+    return { error: { status: 400, body: { error: 'Do not share a seed phrase or private key.' } } };
   }
   if (payload.model != null && !allowedModel(payload.model)) {
     return { error: { status: 400, body: { error: 'Model not allowed.' } } };
