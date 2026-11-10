@@ -72,11 +72,15 @@
     try { already = sessionStorage.getItem('valhalla-patch-reload') === '1'; } catch (error) { already = false; }
     var decision = decidePatch(docVersion, versionFrom(fetchedHtml), already);
     row('version', decision.action === 'stay', decision.reason);
+    if (decision.action === 'stay') {
+      try { sessionStorage.removeItem('valhalla-patch-reload'); } catch (error) { /* stay anyway */ }
+      if (window.history && window.location.search) window.history.replaceState({}, '', window.location.pathname);
+    }
     if (decision.action === 'reload') {
       try { sessionStorage.setItem('valhalla-patch-reload', '1'); } catch (error) { /* still reload */ }
       if (result) result.textContent = decision.reason;
       if (overlay) overlay.dataset.state = 'reload';
-      window.location.replace(window.location.pathname);
+      window.location.replace(window.location.pathname + '?reload=' + encodeURIComponent(versionFrom(fetchedHtml) || '1'));
       return { ok: false, reloading: true, decision: decision };
     }
     if (decision.action === 'fail') failed.push(decision.reason);
@@ -128,7 +132,10 @@
     var options = { missingAsset: params.get('pretest') === 'missing', patchProbe: params.get('patchcheck') === '1' };
     run(options);
     var retry = document.getElementById('pretest-retry');
-    if (retry) retry.addEventListener('click', function () { run(options); });
+    if (retry) retry.addEventListener('click', function () {
+      try { sessionStorage.removeItem('valhalla-patch-reload'); } catch (error) { /* retry still runs */ }
+      run(options);
+    });
   }
 
   root.ValhallaPretest = { decidePatch: decidePatch, versionFrom: versionFrom, run: run };

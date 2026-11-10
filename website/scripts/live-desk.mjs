@@ -169,7 +169,7 @@ try {
     state: document.getElementById('os-pretest')?.dataset.state || '',
     result: document.getElementById('pretest-result')?.textContent || ''
   })`);
-  check('patch reload', patched.reloaded === '1' && !patched.href.includes('patchcheck') && patched.state === 'passed', JSON.stringify(patched));
+  check('patch reload', !patched.href.includes('patchcheck') && patched.state === 'passed' && /No newer patch/.test(patched.result), JSON.stringify(patched));
   await desk.send('Page.bringToFront');
 
   const tools = ['status', 'wallet', 'memory', 'browser', 'swarm', 'volos', 'installer', 'settings'];

@@ -63,6 +63,15 @@ test('background windows sleep and a hidden tab freezes polling', async () => {
   assert.equal(element('window-status').dataset.idle, 'sleeping');
   assert.equal(element('window-memory').dataset.idle, 'active');
   assert.equal(desktop.dataset.polling, 'off');
+  const memory = element('window-memory');
+  const close = { dataset: { action: 'close' }, closest(selector) {
+    if (selector === '[data-action]') return close;
+    if (selector === '[data-window]') return memory;
+    return null;
+  } };
+  for (const fn of desktop.handlers.click) fn({ target: close, button: 0, preventDefault() {} });
+  assert.equal(memory.hidden, true);
+  assert.equal(element('window-status').dataset.idle, 'active');
   hidden = true;
   for (const fn of events.visibilitychange) fn();
   assert.equal(document.documentElement.dataset.doze, 'yes');
@@ -72,5 +81,41 @@ test('background windows sleep and a hidden tab freezes polling', async () => {
   hidden = false;
   for (const fn of events.visibilitychange) fn();
   assert.equal(document.documentElement.dataset.doze, 'no');
-  assert.equal(element('window-memory').dataset.idle, 'active');
+  assert.equal(element('window-memory').dataset.idle, 'sleeping');
+  assert.equal(element('window-status').dataset.idle, 'active');
+});
+
+test('a srcdoc preview comes back when its window wakes', () => {
+  const frame = { src: '', srcdoc: '<p>kept</p>', dataset: {}, setAttribute(name, value) { this[name] = value; }, getAttribute(name) { return this[name] || ''; } };
+  const view = {
+    hidden: false, dataset: { window: 'installer' }, style: {}, textContent: '',
+    querySelector(selector) { return selector === 'iframe' ? frame : (selector === '.title-bar h2' ? { textContent: 'Installer' } : null); },
+    addEventListener() {}, setAttribute() {}, replaceChildren() {}, appendChild() {}, focus() {}
+  };
+  const document = {
+    getElementById(id) {
+      if (id === 'window-installer') return view;
+      if (id === 'desktop') return { dataset: {}, addEventListener() {} };
+      if (id === 'taskbar-apps') return { replaceChildren() {}, appendChild() {}, querySelector() { return null; } };
+      if (id === 'start-menu') return { hidden: true, contains() { return false; } };
+      if (id === 'start-button') return { setAttribute() {}, contains() { return false; }, addEventListener() {} };
+      if (id === 'browser-page') return { addEventListener() {} };
+      return { textContent: '', dataset: {}, addEventListener() {}, hidden: true, style: {} };
+    },
+    documentElement: { dataset: {} },
+    createElement() { return { textContent: '', dataset: {}, setAttribute() {}, addEventListener() {} }; },
+    querySelector() { return { style: {} }; },
+    querySelectorAll(selector) { return selector === '[data-window]' ? [view] : []; },
+    addEventListener() {},
+    hidden: false
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../os/app.js'), 'utf8'), {
+    document,
+    window: { setTimeout() { return 1; }, clearTimeout() {}, setInterval() { return 1; }, clearInterval() {}, addEventListener() {}, innerWidth: 800, innerHeight: 600, location: { search: '' } },
+    Date, AbortController, URLSearchParams,
+    fetch: async () => ({ ok: false, headers: { get: () => '' }, text: async () => '' })
+  });
+  assert.equal(frame.dataset.resumeDoc, '<p>kept</p>');
+  assert.equal(frame.srcdoc, '<p>kept</p>');
+  assert.equal(view.dataset.idle, 'active');
 });

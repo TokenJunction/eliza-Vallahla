@@ -216,6 +216,16 @@
   root.ValhallaInstaller = { installPack: installPack, installBytes: installBytes, installUrl: installUrl };
 
   function bind() {
+    var saved = [];
+    try { saved = JSON.parse(localStorage.getItem('valhalla-apps-v1') || '[]'); } catch (error) { saved = []; }
+    if (!Array.isArray(saved)) saved = [];
+    render(saved);
+    var preview = saved.filter(function (app) { return app && app.html; }).pop();
+    var frame = document.getElementById('install-preview');
+    if (frame && preview) {
+      frame.hidden = false;
+      frame.srcdoc = preview.html;
+    }
     var file = document.getElementById('install-file');
     if (file) file.addEventListener('change', function () {
       var chosen = file.files && file.files[0];

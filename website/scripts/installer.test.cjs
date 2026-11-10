@@ -79,3 +79,26 @@ test('pretest patch decision reloads once and then fails closed', () => {
   assert.equal(pretest.decidePatch('1.4.2', '1.4.3', true).action, 'fail');
   assert.match(pretest.decidePatch('1.4.2', '1.4.3', true).reason, /did not replace/);
 });
+
+test('a saved app is shown again when the installer loads', () => {
+  const items = [];
+  const frame = { hidden: true, srcdoc: '' };
+  const document = {
+    getElementById(id) {
+      if (id === 'install-list') return { replaceChildren() { items.length = 0; }, appendChild(child) { items.push(child); } };
+      if (id === 'install-preview') return frame;
+      if (id === 'install-file') return { addEventListener() {} };
+      return null;
+    },
+    createElement() { return { textContent: '' }; },
+    querySelectorAll() { return []; }
+  };
+  const store = { getItem() { return JSON.stringify([{ name: 'Hello ValOS', version: '0.1.0', entry: 'index.html', html: '<p>kept</p>', bunOnly: false }]); } };
+  const context = { window: {}, document, localStorage: store, TextDecoder, Blob, Response };
+  context.window.window = context.window;
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'website/os/installer.js'), 'utf8'), context);
+  assert.equal(items.length, 1);
+  assert.match(items[0].textContent, /Hello ValOS/);
+  assert.equal(frame.hidden, false);
+  assert.equal(frame.srcdoc, '<p>kept</p>');
+});

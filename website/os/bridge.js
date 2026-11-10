@@ -173,26 +173,31 @@
     } catch (error) { chatStatus.textContent = 'Chat service URL is invalid. Contact support.'; return; }
     submitting = true; form.querySelector('button').disabled = true; input.disabled = true;
     message('YOU', text); input.value = ''; chatStatus.textContent = 'Waiting for the configured chat service…';
-    var controller = new AbortController();
-    var timeout = window.setTimeout(function () { controller.abort(); }, 25000);
+    var endpoint = base + '/chat';
+    var payload = JSON.stringify({ text: text, history: history, stream: false, rules: overseer && overseer.rulesForModel ? overseer.rulesForModel() : '' });
     try {
-      var endpoint = base + '/chat';
-      var payload = JSON.stringify({ text: text, history: history, stream: false, rules: overseer && overseer.rulesForModel ? overseer.rulesForModel() : '' });
-      var response = null;
-      var attemptError = null;
-      for (var attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          var candidate = await fetch(endpoint, {
-            method: 'POST', headers: { 'content-type': 'application/json' },
-            body: payload, signal: controller.signal
-          });
-          var attemptType = candidate.headers.get('content-type') || '';
-          if (candidate.ok && attemptType.indexOf('application/json') !== -1) { response = candidate; break; }
-        } catch (error) {
-          attemptError = error;
-          if (error.name === 'AbortError') break;
+    var response = null;
+    var attemptError = null;
+    for (var attempt = 0; attempt < 2; attempt += 1) {
+      var attemptControl = new AbortController();
+      var attemptTimer = window.setTimeout(function () { attemptControl.abort(); }, 12000);
+      try {
+        var candidate = await fetch(endpoint, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: payload, signal: attemptControl.signal
+        });
+        var attemptType = candidate.headers.get('content-type') || '';
+        if (candidate.ok && attemptType.indexOf('application/json') !== -1) {
+          response = candidate;
+          window.clearTimeout(attemptTimer);
+          break;
         }
+      } catch (error) {
+        attemptError = error;
+      } finally {
+        window.clearTimeout(attemptTimer);
       }
+    }
       if (!response) {
         var closed = attemptError && attemptError.name === 'AbortError'
           ? attemptError
@@ -240,7 +245,7 @@
         : (error.valhallaClosed ? error.message : 'Chat service did not return a reply. Nothing was generated.');
       finish(chatStatus.textContent, { evidence: ['chat service did not return JSON'], errors: ['no reply'] });
     } finally {
-      window.clearTimeout(timeout); submitting = false; form.querySelector('button').disabled = false; input.disabled = false; input.focus();
+      submitting = false; form.querySelector('button').disabled = false; input.disabled = false; input.focus();
     }
   });
   if (typeof window.setInterval === 'function') {

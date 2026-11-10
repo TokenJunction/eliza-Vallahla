@@ -74,8 +74,8 @@
         if (doc) frame.dataset.resumeDoc = doc;
         if (current && current !== 'about:blank' && frame.setAttribute) frame.setAttribute('src', 'about:blank');
         if (doc) frame.srcdoc = '';
-      } else if (frame.dataset.resume && frame.setAttribute) {
-        frame.setAttribute('src', frame.dataset.resume);
+      } else {
+        if (frame.dataset.resume && frame.setAttribute) frame.setAttribute('src', frame.dataset.resume);
         if (frame.dataset.resumeDoc) frame.srcdoc = frame.dataset.resumeDoc;
       }
     }
@@ -127,15 +127,9 @@
       button.textContent = title;
       button.setAttribute('aria-pressed', 'false');
       button.addEventListener('click', function () {
-        if (node.dataset.minimized === 'true') {
-          node.hidden = false;
-          node.dataset.minimized = 'false';
-        } else if (node.style.zIndex === String(topZ)) {
-          node.dataset.minimized = 'true';
-          node.hidden = true;
-        }
-        updateTaskbar();
-        if (!node.hidden) focusWindow(node);
+        if (node.hidden || node.dataset.minimized === 'true') openWindow(node.dataset.window);
+        else if (node.style.zIndex === String(topZ)) minimizeWindow(node);
+        else focusWindow(node);
       });
       taskbarApps.appendChild(button);
     });
@@ -160,6 +154,7 @@
     setIdle(node, true);
     updateTaskbar();
     announce(node.querySelector('.title-bar h2').textContent + ' closed.');
+    refillWarm();
   }
 
   function minimizeWindow(node) {
@@ -169,6 +164,16 @@
     setIdle(node, true);
     updateTaskbar();
     announce(node.querySelector('.title-bar h2').textContent + ' minimized.');
+    refillWarm();
+  }
+
+  function refillWarm() {
+    if (document.hidden) return;
+    var open = windows.filter(function (node) { return !node.hidden; }).sort(function (a, b) {
+      return Number(a.style.zIndex || 0) - Number(b.style.zIndex || 0);
+    });
+    warm = open.slice(-WARM_CAP);
+    if (warm.length) scheduleWarm(warm[warm.length - 1]);
   }
 
   function setHealth(text, state) {
