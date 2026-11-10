@@ -84,7 +84,21 @@
       body: '{"action":"ping"}'
     });
     var box = document.getElementById('owner-actions');
-    if (box && response.ok) box.hidden = false;
+    var alerts = document.getElementById('push-toggle');
+    if (!response.ok) return;
+    if (box) box.hidden = false;
+    if (alerts) {
+      alerts.hidden = false;
+      await syncAlerts();
+    }
+  }
+
+  async function syncAlerts() {
+    var toggle = document.getElementById('push-toggle');
+    if (!toggle || !navigator.serviceWorker) return;
+    var registration = await navigator.serviceWorker.ready;
+    var current = await registration.pushManager.getSubscription();
+    toggle.textContent = current ? 'Turn off alerts' : 'Turn on alerts';
   }
 
   async function owner(action) {
@@ -124,11 +138,15 @@
     var registration = await navigator.serviceWorker.ready;
     var current = await registration.pushManager.getSubscription();
     if (current) {
-      await fetch('/api/push', {
+      var removed = await fetch('/api/push', {
         method: 'POST',
         headers: { authorization: 'Bearer ' + access, 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'unsubscribe', subscription: current.toJSON() })
       });
+      if (!removed.ok) {
+        toggle.textContent = 'Alerts were not turned off.';
+        return;
+      }
       await current.unsubscribe();
       toggle.textContent = 'Turn on alerts';
       return;
@@ -137,11 +155,16 @@
       userVisibleOnly: true,
       applicationServerKey: keyBytes(keys.publicKey)
     });
-    await fetch('/api/push', {
+    var saved = await fetch('/api/push', {
       method: 'POST',
       headers: { authorization: 'Bearer ' + access, 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'subscribe', subscription: subscription.toJSON() })
     });
+    if (!saved.ok) {
+      await subscription.unsubscribe();
+      toggle.textContent = 'Alerts were not saved.';
+      return;
+    }
     toggle.textContent = 'Turn off alerts';
   });
 

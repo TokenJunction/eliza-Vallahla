@@ -46,6 +46,7 @@ async function handlePush(req, env, fetchImpl, webPush) {
   if (!token) return { status: 401, body: { error: 'Sign-in required.' } };
   const user = await verifyUser(token, fetchImpl);
   if (!user) return { status: 401, body: { error: 'Sign-in required.' } };
+  if (allowlist(env).indexOf(user.id) === -1) return { status: 404, body: { error: 'Not found.' } };
   const store = service(env);
   const keys = vapid(env);
   if (!store || !keys) return { status: 503, body: { error: 'Push not configured' } };
@@ -82,8 +83,9 @@ async function handlePush(req, env, fetchImpl, webPush) {
 async function notifyUsers(env, fetchImpl, message, webPush) {
   const keys = vapid(env);
   const store = service(env);
-  if (!keys || !store) return { sent: 0, configured: false };
-  const list = await fetchImpl(store.url + '/rest/v1/push_subscriptions?select=endpoint,p256dh,auth', {
+  const ids = allowlist(env);
+  if (!keys || !store || !ids.length) return { sent: 0, configured: false };
+  const list = await fetchImpl(store.url + '/rest/v1/push_subscriptions?select=endpoint,p256dh,auth&user_id=in.(' + ids.map(encodeURIComponent).join(',') + ')', {
     headers: { authorization: 'Bearer ' + store.key, apikey: store.key, accept: 'application/json' }
   });
   const rows = list && list.ok ? await list.json() : [];

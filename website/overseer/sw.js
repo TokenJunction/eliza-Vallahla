@@ -23,8 +23,10 @@ self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.indexOf('/overseer/') !== 0 && url.pathname !== '/visual.css' && url.pathname !== '/supabase.js' && url.pathname !== '/site-config.js') return;
   event.respondWith(fetch(event.request).then(function (response) {
-    const copy = response.clone();
-    caches.open('overseer-shell').then(function (cache) { cache.put(event.request, copy); });
+    if (response && response.ok) {
+      const copy = response.clone();
+      caches.open('overseer-shell').then(function (cache) { cache.put(event.request, copy); });
+    }
     return response;
   }).catch(function () {
     return caches.match(event.request).then(function (cached) {

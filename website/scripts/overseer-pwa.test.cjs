@@ -21,6 +21,7 @@ test('the overseer manifest and service worker are a standalone app', () => {
   assert.match(worker, /addEventListener\('fetch'/);
   assert.match(worker, /addEventListener\('push'/);
   assert.match(worker, /offline\.html/);
+  assert.match(worker, /response\.ok/);
   const script = fs.readFileSync(path.join(root, 'website/overseer/overseer.js'), 'utf8');
   assert.match(page, /Continue with Google/);
   assert.match(script, /signInWithOAuth\(\{ provider: 'google'/);
@@ -47,7 +48,8 @@ test('push subscribe and unsubscribe stay behind sign-in', async () => {
     VAPID_PUBLIC_KEY: 'pub',
     VAPID_PRIVATE_KEY: 'priv-secret',
     VAPID_SUBJECT: 'mailto:ops@example.com',
-    SUPABASE_SERVICE_ROLE_KEY: 'service'
+    SUPABASE_SERVICE_ROLE_KEY: 'service',
+    ADMIN_USER_IDS: 'user-1'
   }, async (url, init) => {
     calls.push({ url: String(url), method: init && init.method, body: init && init.body });
     if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-1' }) };
@@ -64,13 +66,29 @@ test('push subscribe and unsubscribe stay behind sign-in', async () => {
     VAPID_PUBLIC_KEY: 'pub',
     VAPID_PRIVATE_KEY: 'priv-secret',
     VAPID_SUBJECT: 'mailto:ops@example.com',
-    SUPABASE_SERVICE_ROLE_KEY: 'service'
+    SUPABASE_SERVICE_ROLE_KEY: 'service',
+    ADMIN_USER_IDS: 'user-1'
   }, async (url, init) => {
     if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-1' }) };
     assert.equal(init.method, 'DELETE');
     return { ok: true, json: async () => ({}) };
   });
   assert.equal(removed.status, 200);
+  const stranger = await handlePush({
+    method: 'POST',
+    headers: { authorization: 'Bearer person' },
+    body: JSON.stringify({ action: 'subscribe', subscription: { endpoint: 'https://push.example/2', keys: { p256dh: 'p', auth: 'a' } } })
+  }, {
+    VAPID_PUBLIC_KEY: 'pub',
+    VAPID_PRIVATE_KEY: 'priv-secret',
+    VAPID_SUBJECT: 'mailto:ops@example.com',
+    SUPABASE_SERVICE_ROLE_KEY: 'service',
+    ADMIN_USER_IDS: 'owner-1'
+  }, async (url) => {
+    if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-1' }) };
+    throw new Error('stored');
+  });
+  assert.equal(stranger.status, 404);
 });
 
 test('the callback hook rejects a bad signature and the owner gate hides actions', async () => {
