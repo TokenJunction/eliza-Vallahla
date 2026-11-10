@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 test('production transform keeps desk hooks, drops console, and ships no padding trail', async () => {
-  const { minifySource, verifiedCanaries, sha256 } = await import('./minify-site.mjs');
+  const { minifySource, sha256, scanShipped, loadCanaryHashes } = await import('./minify-site.mjs');
   const source = fs.readFileSync(path.join(__dirname, '../os/app.js'), 'utf8');
   const minified = await minifySource(source, 'js');
   assert.match(minified, /getElementById\("desktop"\)|getElementById\('desktop'\)/);
@@ -16,11 +16,25 @@ test('production transform keeps desk hooks, drops console, and ships no padding
   assert.doesNotMatch(dropped, /debugger/);
   assert.doesNotMatch(dropped, /_hidden/);
   assert.match(dropped, /open/);
+  const committed = loadCanaryHashes(path.join(__dirname, 'ship-canary-hashes.json'));
+  assert.ok(committed.size > 0);
   const sample = 'canary-sample';
-  assert.throws(() => verifiedCanaries([sample], [sha256('other')]), /committed hashes/);
-  assert.deepEqual(verifiedCanaries([sample], [sha256(sample)]), [sample]);
+  const hashes = new Set([sha256(sample)]);
+  assert.equal(scanShipped('safe page', hashes), '');
+  assert.equal(scanShipped('token ' + sample + ' end', hashes), 'hash');
+  assert.equal(scanShipped('pk_test_example', hashes), 'pattern');
   const core = fs.readFileSync(path.join(__dirname, 'minify-site.mjs'), 'utf8');
   assert.doesNotMatch(core, /generateTrail/);
-  assert.match(core, /ship-canary-hashes\.txt/);
-  assert.doesNotMatch(core, /contains a forbidden ship canary' \+/);
+  assert.match(core, /ship-canary-hashes\.json/);
+  assert.doesNotMatch(core, /VALHALLA_SHIP_CANARIES/);
+});
+
+test('a missing hash file fails the build', async () => {
+  const { minifySite } = await import('./minify-site.mjs');
+  const dir = fs.mkdtempSync(path.join(__dirname, 'canary-missing-'));
+  fs.writeFileSync(path.join(dir, 'page.js'), 'var ok = 1;\n');
+  await assert.rejects(() => minifySite(dir, path.join(dir, 'missing.json')), /ship canary hash file is missing/);
+  fs.writeFileSync(path.join(dir, 'empty.json'), '{"hashes":[]}\n');
+  await assert.rejects(() => minifySite(dir, path.join(dir, 'empty.json')), /ship canary hash file is empty/);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -5,35 +5,49 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const out = path.join(root, 'site-build');
-const hashFile = path.join(root, 'website/scripts/ship-canary-hashes.txt');
-const localCanaries = path.join(root, 'website/scripts/ship-canaries.local');
+const hashFile = path.join(root, 'website/scripts/ship-canary-hashes.json');
+const PLAIN_PATTERNS = [
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
+  /AKIA/,
+  /pk_test_/,
+  /sk_live/,
+  /sb_secret_/,
+  /sourceMappingURL/
+];
 
 export function sha256(value) {
   return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
 }
 
-export function committedCanaryHashes(text) {
-  return String(text || '').split('\n').map(function (line) { return line.trim(); }).filter(function (line) { return line && !line.startsWith('#'); });
+export function loadCanaryHashes(file) {
+  if (!file || !fs.existsSync(file)) throw new Error('ship canary hash file is missing');
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    throw new Error('ship canary hash file is invalid');
+  }
+  const hashes = Array.isArray(parsed) ? parsed : parsed && parsed.hashes;
+  if (!Array.isArray(hashes) || hashes.length === 0) throw new Error('ship canary hash file is empty');
+  const clean = hashes.map(function (hash) { return String(hash).trim().toLowerCase(); }).filter(Boolean);
+  if (!clean.length || clean.some(function (hash) { return !/^[0-9a-f]{64}$/.test(hash); })) {
+    throw new Error('ship canary hash file is invalid');
+  }
+  return new Set(clean);
 }
 
-export function verifiedCanaries(values, hashes) {
-  if (values == null) return [];
-  const actual = values.map(sha256).sort();
-  const expected = hashes.slice().sort();
-  if (actual.length !== expected.length || actual.some(function (hash, index) { return hash !== expected[index]; })) {
-    throw new Error('ship canary file does not match the committed hashes');
-  }
-  return values;
+export function candidateTokens(text) {
+  return String(text || '').match(/[A-Za-z0-9@][A-Za-z0-9@._+-]{2,}/g) || [];
 }
 
-export function readCanaryValues(env = process.env, file = localCanaries) {
-  if (env && env.VALHALLA_SHIP_CANARIES && String(env.VALHALLA_SHIP_CANARIES).trim()) {
-    return String(env.VALHALLA_SHIP_CANARIES).split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+export function scanShipped(text, hashes) {
+  for (const pattern of PLAIN_PATTERNS) {
+    if (pattern.test(text)) return 'pattern';
   }
-  if (file && fs.existsSync(file)) {
-    return fs.readFileSync(file, 'utf8').split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  for (const token of candidateTokens(text)) {
+    if (hashes.has(sha256(token))) return 'hash';
   }
-  return null;
+  return '';
 }
 
 export async function minifySource(code, loader) {
@@ -62,13 +76,8 @@ function walk(dir, files = []) {
   return files;
 }
 
-function checkPublic(text, file, canaries) {
-  for (const item of canaries) {
-    if (item && text.includes(item)) throw new Error(file + ' contains a forbidden ship canary');
-  }
-}
-
-export async function minifySite(directory = out) {
+export async function minifySite(directory = out, hashesPath = hashFile) {
+  const hashes = loadCanaryHashes(hashesPath);
   if (!fs.existsSync(directory)) throw new Error('missing build directory');
   const files = walk(directory);
   for (const file of files) {
@@ -89,8 +98,9 @@ export async function minifySite(directory = out) {
     }
   }
   const shipped = walk(directory).filter(file => /\.(html|js|css)$/.test(file));
-  const canaries = verifiedCanaries(readCanaryValues(), committedCanaryHashes(fs.readFileSync(hashFile, 'utf8')));
-  for (const file of shipped) checkPublic(fs.readFileSync(file, 'utf8'), path.relative(directory, file), canaries);
+  for (const file of shipped) {
+    if (scanShipped(fs.readFileSync(file, 'utf8'), hashes)) throw new Error(path.relative(directory, file) + ' contains a forbidden ship canary');
+  }
   const appJs = path.join(directory, 'os', 'app.js');
   if (fs.existsSync(appJs) && fs.readFileSync(appJs, 'utf8').includes('function vho' + '0')) {
     throw new Error('padding trail was shipped');
