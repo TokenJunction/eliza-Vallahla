@@ -137,6 +137,17 @@ test('checkout returns to the calling site and skips a second subscription', asy
   });
   assert.equal(again.status, 409);
   assert.equal(sessionBody, '');
+  const due = await handleCheckout({
+    method: 'POST',
+    headers: { authorization: 'Bearer good' }
+  }, { STRIPE_SECRET_KEY: 'sk_test_only' }, async (url) => {
+    if (String(url).includes('/auth/v1/user')) return user(true);
+    if (String(url).includes('/entitlements')) return { ok: true, status: 200, json: async () => [{ plan: 'pro', status: 'past_due', stripe_customer_id: 'cus_9' }] };
+    sessionBody = 'started';
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  assert.equal(due.status, 409);
+  assert.equal(sessionBody, '');
   const fresh = await handleCheckout({
     method: 'POST',
     headers: { authorization: 'Bearer good', origin: 'https://preview.vercel.app' }
@@ -203,6 +214,27 @@ test('subscription updates keep the user id', async () => {
   assert.equal(saved.plan, 'free');
   assert.equal(saved.status, 'canceled');
   assert.equal(saved.stripe_subscription_id, 'sub_1');
+});
+
+test('a failed invoice uses the subscription parent', async () => {
+  const secret = 'whsec_test';
+  const payload = JSON.stringify({
+    type: 'invoice.payment_failed',
+    data: { object: { id: 'in_1', customer: 'cus_1', parent: { subscription_details: { subscription: 'sub_9', metadata: { user_id: '22222222-2222-2222-2222-222222222222' } } } } }
+  });
+  let saved = null;
+  const result = await handleWebhook({
+    method: 'POST',
+    headers: { 'stripe-signature': sign(payload, secret) },
+    body: payload
+  }, { STRIPE_WEBHOOK_SECRET: secret, SUPABASE_SERVICE_ROLE_KEY: 'service-role', STRIPE_SECRET_KEY: 'sk_test_only' }, async (url, init) => {
+    if (String(url).includes('/entitlements')) saved = JSON.parse(init.body);
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  assert.equal(result.status, 200);
+  assert.equal(saved.status, 'past_due');
+  assert.equal(saved.id, '22222222-2222-2222-2222-222222222222');
+  assert.equal(saved.stripe_subscription_id, 'sub_9');
 });
 
 test('the desk explains the one dollar hold', () => {

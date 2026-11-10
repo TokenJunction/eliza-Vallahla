@@ -29,8 +29,15 @@
       });
       var rows = response.ok ? await response.json() : [];
       var row = Array.isArray(rows) ? rows[0] : null;
-      var pro = row && row.plan === 'pro' && (row.status === 'active' || row.status === 'trialing');
+      button.hidden = false;
+      var pro = row && row.plan === 'pro' && (row.status === 'active' || row.status === 'trialing' || row.status === 'past_due');
       if (level && pro) level.textContent = 'Pro';
+      if (row && row.status === 'past_due') {
+        panel.hidden = false;
+        button.hidden = true;
+        if (status) status.textContent = 'A payment is past due. A second subscription is not started.';
+        return;
+      }
       panel.hidden = !!pro;
     } catch (error) {
       panel.hidden = !(level && level.textContent === 'Free');

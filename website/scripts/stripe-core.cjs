@@ -73,7 +73,7 @@ async function handleCheckout(req, env, fetchImpl) {
   const secret = String(env && env.STRIPE_SECRET_KEY || '');
   if (!secret || !testKey(secret)) return { status: 503, body: { error: 'Checkout not configured' } };
   const current = await loadEntitlement(user, token, fetchImpl);
-  if (current && current.plan === 'pro' && (current.status === 'active' || current.status === 'trialing')) {
+  if (current && current.plan === 'pro' && (current.status === 'active' || current.status === 'trialing' || current.status === 'past_due')) {
     return { status: 409, body: { error: 'Pro is already on.' } };
   }
   const prices = await stripeRequest(secret, 'GET', 'prices?lookup_keys[]=' + encodeURIComponent(LOOKUP_KEY) + '&active=true&limit=1', null, fetchImpl);
@@ -194,9 +194,11 @@ async function handleWebhook(req, env, fetchImpl) {
     const ended = event.type === 'customer.subscription.deleted';
     const failed = event.type === 'invoice.payment_failed';
     const isSub = event.type.indexOf('customer.subscription.') === 0;
-    let userId = object.metadata && object.metadata.user_id || object.client_reference_id;
-    if (!userId && object.subscription && stripeKey) {
-      const subscription = await stripeRequest(stripeKey, 'GET', 'subscriptions/' + encodeURIComponent(object.subscription), null, fetchImpl);
+    const parent = object.parent && object.parent.subscription_details;
+    let userId = object.metadata && object.metadata.user_id || object.client_reference_id || (parent && parent.metadata && parent.metadata.user_id);
+    const subId = object.subscription || (parent && parent.subscription) || '';
+    if (!userId && subId && stripeKey) {
+      const subscription = await stripeRequest(stripeKey, 'GET', 'subscriptions/' + encodeURIComponent(subId), null, fetchImpl);
       userId = subscription.ok && subscription.body && subscription.body.metadata && subscription.body.metadata.user_id;
     }
     if (!userId) return { status: 200, body: { received: true } };
@@ -205,7 +207,7 @@ async function handleWebhook(req, env, fetchImpl) {
       plan: ended ? 'free' : 'pro',
       status: ended ? 'canceled' : (failed ? 'past_due' : (object.status || 'active')),
       stripe_customer_id: object.customer || null,
-      stripe_subscription_id: isSub ? object.id : (object.subscription || null)
+      stripe_subscription_id: isSub ? object.id : (subId || null)
     }, fetchImpl);
     if (!saved) return { status: 502, body: { error: 'Entitlement was not saved.' } };
     return { status: 200, body: { received: true } };
