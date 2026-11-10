@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090a0c">
+  <meta name="description" content="Live proof that ValhallaOS is online and that signed packages arrive intact.">
+  <title>Live proof · ValhallaOS</title>
+  <link rel="stylesheet" href="/visual.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    .wrap { width: min(640px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 64px; }
+    a { color: var(--gold); }
+    h1 { margin: 0 0 8px; font-size: var(--title); font-weight: 650; }
+    .lead, p { margin: 0; line-height: 1.5; }
+    .lead { color: var(--muted); font-size: var(--small); }
+    dl { margin: 24px 0 0; }
+    .row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); }
+    dt { color: var(--muted); font-size: var(--small); }
+    dd { margin: 0; text-align: right; }
+    .compare { margin-top: 24px; color: var(--muted); font-size: var(--small); }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 24px; }
+    .trial { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 10px; background: var(--gold); color: var(--gold-ink); font-weight: 650; text-decoration: none; }
+    button { min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--muted); font: inherit; text-decoration: underline; cursor: pointer; }
+    #proof-numbers { margin-top: 8px; color: var(--muted); font-size: 13px; }
+    #proof-numbers[hidden] { display: none; }
+    #proof-numbers li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Live proof</h1>
+    <p class="lead" id="proof-status">Checking now.</p>
+    <dl>
+      <div class="row"><dt>Status</dt><dd id="proof-online">—</dd></div>
+      <div class="row"><dt>Response speed</dt><dd id="proof-speed">—</dd></div>
+      <div class="row"><dt>Delivered intact</dt><dd id="proof-intact">—</dd></div>
+      <div class="row"><dt>Tampered package caught</dt><dd id="proof-tamper">—</dd></div>
+      <div class="row"><dt>Last checked</dt><dd id="proof-time">—</dd></div>
+    </dl>
+    <p class="compare">AI models are great at writing instructions, not at carrying data. In our Nov 10 test, AI-relayed data arrived 0% intact and took about 100 s, while signed packages arrived 100% intact in about 1 ms.</p>
+    <div class="actions">
+      <a class="trial" href="https://valhalla-app.xyz/">Try Pro free for 7 days</a>
+      <button type="button" id="proof-more" aria-expanded="false">Show the numbers</button>
+    </div>
+    <ul id="proof-numbers" hidden></ul>
+  </main>
+  <script src="/proof/proof.js" defer></script>
+</body>
+</html>
