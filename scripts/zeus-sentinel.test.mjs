@@ -5,6 +5,7 @@ import {
   scanSecrets,
   reviewFile,
   reviewComment,
+  ownReviewComment,
   lastRollbackAt,
   rollbackDecision,
   freeModelsFrom,
@@ -38,6 +39,11 @@ test('a diff review flags real secrets, DNS records, addresses, and sign code', 
   assert.ok(publicHit.some(function (flag) { return flag.reason === 'server key referenced in a public file'; }));
   const htmlHit = reviewFile({ filename: 'website/index.html', patch: '+hf_examplekey\n' });
   assert.ok(htmlHit.some(function (flag) { return flag.reason === 'server key referenced in a public file'; }));
+  assert.equal(ownReviewComment([
+    { id: 1, body: 'Zeus pre-review: PASS', user: { login: 'someone' } },
+    { id: 2, body: 'Zeus pre-review: FLAG', user: { login: 'github-actions[bot]' } }
+  ], 'github-actions[bot]').id, 2);
+  assert.equal(ownReviewComment([{ id: 1, body: 'Zeus pre-review: PASS', user: { login: 'someone' } }], 'github-actions[bot]'), null);
   assert.match(reviewComment([]), /^Zeus pre-review: PASS/);
   assert.match(reviewComment([{ path: 'a.js', reason: '3DES' }]), /^Zeus pre-review: FLAG/);
 });

@@ -70,6 +70,16 @@ export function reviewVerdict(flags) {
   return flags.length ? 'FLAG' : 'PASS';
 }
 
+export function ownReviewComment(comments, login) {
+  if (!Array.isArray(comments) || !login) return null;
+  let match = null;
+  comments.forEach(function (comment) {
+    const author = comment && comment.user && comment.user.login;
+    if (author === login && String(comment.body || '').startsWith(REVIEW_HEAD)) match = comment;
+  });
+  return match;
+}
+
 export function reviewComment(flags) {
   const verdict = reviewVerdict(flags);
   if (!flags.length) return REVIEW_HEAD + ' PASS\n\nNo secret pattern, 3DES, DNS record, wallet address, or swap, sign, or execute code in the diff.';
@@ -346,13 +356,16 @@ async function defaultReview(env, fetchImpl) {
     });
     const body = reviewComment(found);
     const comments = await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + pull.number + '/comments?per_page=100');
-    const existing = Array.isArray(comments.body) ? comments.body.find(function (comment) { return String(comment.body || '').startsWith(REVIEW_HEAD); }) : null;
+    const existing = ownReviewComment(comments.body, env.ZEUS_COMMENT_LOGIN || 'github-actions[bot]');
+    let updated = false;
     if (existing) {
-      await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/comments/' + existing.id, {
+      const patched = await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/comments/' + existing.id, {
         method: 'PATCH',
         body: JSON.stringify({ body: body })
       });
-    } else {
+      updated = patched.ok;
+    }
+    if (!updated) {
       await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + pull.number + '/comments', {
         method: 'POST',
         body: JSON.stringify({ body: body })

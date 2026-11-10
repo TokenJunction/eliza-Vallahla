@@ -4,7 +4,7 @@ Zeus runs every 3 hours on a GitHub-hosted runner. It checks the public site, as
 
 This costs nothing. It uses GitHub Actions and, when `OPENROUTER_API_KEY` is present, the existing `:free` models.
 
-Issues are disabled on this repository. Zeus does not open or pin an issue. The human-readable report is the job summary. The rollback clock is a commit-free file, `.zeus-state/state.json`, stored only in this workflow's Actions cache. A new run uses a fresh cache key, and `restore-keys` brings back the newest `zeus-state-` entry. The exact key never matches, so the restored file, not `cache-hit`, is what counts. Zeus does not read or write repository artifacts: another workflow can upload the same artifact name, and the artifact list is not ordered by time. The GitHub token used here cannot update repository variables, so `ZEUS_LAST_ROLLBACK_AT` is not written.
+Issues are disabled on this repository. Zeus does not open or pin an issue. The human-readable report is the job summary. The rollback clock is a commit-free file, `.zeus-state/state.json`, stored only in this workflow's Actions cache. A new run uses a fresh cache key, and `restore-keys` brings back the newest `zeus-state-` entry. The exact key never matches, so the restored file, not `cache-hit`, is what counts. Zeus does not read or write repository artifacts: another workflow can upload the same artifact name, and the artifact list is not ordered by time. The GitHub token used here cannot update repository variables, so `ZEUS_LAST_ROLLBACK_AT` is not written. A pull-request comment is updated only when its author is `github-actions[bot]`. Anyone else's comment with the same heading is ignored, and a failed update is followed by a new comment.
 
 ## What it must never do
 
