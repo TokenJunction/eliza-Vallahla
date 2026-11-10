@@ -9,5 +9,8 @@
   "redirects": [
     { "source": "/app", "destination": "/", "permanent": false },
     { "source": "/app/", "destination": "/", "permanent": false }
+  ],
+  "crons": [
+    { "path": "/api/snapshot", "schedule": "20 4 * * *" }
   ]
 }

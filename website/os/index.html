@@ -12,6 +12,7 @@
   <script src="/site-config.js?v=1.4.2" defer></script>
   <script src="/supabase.js" defer></script>
   <script src="/os/session.js" defer></script>
+  <script src="/os/restore.js" defer></script>
   <script src="/os/feed.js" defer></script>
   <script src="/os/ai.js" defer></script>
   <script src="/os/app.js?v=1.4.2" defer></script>
@@ -70,6 +71,9 @@
       </button>
       <button class="desktop-icon" type="button" data-open="swarm">
         <svg aria-hidden="true"><use href="#icon-network"></use></svg><span>Monitor</span>
+      </button>
+      <button class="desktop-icon" id="restore-icon" type="button" data-open="restore" hidden>
+        <svg aria-hidden="true"><use href="#icon-notepad"></use></svg><span>Restore</span>
       </button>
       <button class="desktop-icon" type="button" disabled title="Live trading is off. No swap is available."><span>Swap</span></button>
     </nav>
@@ -286,6 +290,22 @@
       </div>
     </section>
 
+    <section class="window" id="window-restore" data-window="restore" aria-labelledby="title-restore" hidden
+      style="left:clamp(180px, 30vw, 380px);top:110px;width:min(420px, calc(100vw - 32px));">
+      <header class="title-bar" data-drag-handle>
+        <h2 id="title-restore">Admin board</h2>
+        <div class="window-controls">
+          <button type="button" data-action="minimize" aria-label="Minimize Admin board">_</button>
+          <button type="button" data-action="close" aria-label="Close Admin board">×</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <p>Restore the latest encrypted overseer snapshot. The key stays on the server.</p>
+        <button id="backup-restore" type="button">Restore</button>
+        <p id="restore-status" role="status"></p>
+      </div>
+    </section>
+
     <div class="start-menu" id="start-menu" hidden>
       <strong>ValhallaOS</strong>
       <button type="button" data-open="status">System Status</button>
@@ -293,6 +313,7 @@
       <button type="button" data-open="memory">Memory Inspector</button>
       <button type="button" data-open="browser">Web Shell</button>
       <button type="button" data-open="wallet">Wallet Bridge</button>
+      <button type="button" id="restore-menu" data-open="restore" hidden>Restore</button>
       <hr>
       <p>Administrative controls require a verified server session and are not available here.</p>
     </div>
