@@ -1,5 +1,6 @@
 {
   "framework": null,
+  "installCommand": "npm ci",
   "buildCommand": "bash website/scripts/vercel-build.sh",
   "outputDirectory": "site-build",
   "proxy": {
