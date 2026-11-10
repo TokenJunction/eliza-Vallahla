@@ -77,7 +77,7 @@ class SiteTests(unittest.TestCase):
         self.assertIn({"source": "/app", "destination": "/", "permanent": False}, config["redirects"])
         self.assertIn({"source": "/app/", "destination": "/", "permanent": False}, config["redirects"])
         self.assertNotIn("proxy", config)
-        self.assertIn({"source": "/", "has": [{"type": "host", "value": "valos.live"}], "destination": "/volos/index.html"}, config["rewrites"]["beforeFiles"])
+        self.assertIn({"source": "/", "has": [{"type": "host", "value": "valos.live"}], "destination": "/volos/index.html"}, config["rewrites"])
         self.assertTrue(any(row.get("key") == "Cache-Control" and "max-age=2592000" in row.get("value", "") for group in config["headers"] for row in group["headers"]))
         command = config["buildCommand"]
         self.assertLessEqual(len(command), 256)
@@ -101,8 +101,9 @@ class SiteTests(unittest.TestCase):
             found = script.find(step)
             self.assertGreater(found, position, step)
             position = found
-        self.assertFalse(any(item.get("destination") == "/volos/index.html" and "has" not in item for item in config.get("rewrites", {}).get("beforeFiles", [])))
-        with self.get("/") as response:
+        self.assertFalse(any(item.get("destination") == "/volos/index.html" and "has" not in item for item in config.get("rewrites", [])))
+        self.assertFalse((OUT / "index.html").exists())
+        with self.get("/home/") as response:
             home = response.read().decode()
         self.assertIn("Continue with Google", home)
         self.assertIn("Email me a sign-in link", home)
