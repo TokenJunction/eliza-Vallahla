@@ -16,8 +16,9 @@ A rollback is not a new deploy. It promotes `ZEUS_LAST_VERIFIED_DEPLOYMENT` for 
 ## Checks
 
 - `https://valhalla-app.xyz/`, `https://www.valhalla-app.xyz/`, `https://valhalla-app.xyz/os/`, and `https://valos.live/` must return 200.
-- `https://valhalla-app.xyz/api/ai` and `https://valhalla-app.xyz/api/feed` must return 401 while signed out. A 5xx is a failure.
-- Each failure is retried twice, 30 seconds apart.
+- `https://valhalla-app.xyz/api/ai` is healthy on 401 or 405. The current route answers GET with 405 before sign-in, and 401 is still accepted. `https://valhalla-app.xyz/api/feed` must return 401 while signed out. A 5xx is a failure. Any other status is a failure.
+- Each request aborts after 20 seconds. Each failure is retried twice, 30 seconds apart.
+- A promote that does not return success does not start the 6-hour cooldown. The first successful promote writes `rollback-at:` even when the status issue did not exist yet.
 - The job exits non-zero only when the site is still down after healing, so GitHub can mail the failure.
 
 ## Names it reads

@@ -12,7 +12,7 @@ export const CHECKS = [
   { id: 'www.valhalla-app.xyz', url: 'https://www.valhalla-app.xyz/', accept: [200] },
   { id: 'os', url: 'https://valhalla-app.xyz/os/', accept: [200] },
   { id: 'valos.live', url: 'https://valos.live/', accept: [200] },
-  { id: 'api/ai', url: 'https://valhalla-app.xyz/api/ai', accept: [401] },
+  { id: 'api/ai', url: 'https://valhalla-app.xyz/api/ai', accept: [401, 405] },
   { id: 'api/feed', url: 'https://valhalla-app.xyz/api/feed', accept: [401] }
 ];
 
@@ -76,8 +76,9 @@ export function reviewComment(flags) {
 }
 
 export function lastRollbackAt(comments) {
+  if (!Array.isArray(comments)) return null;
   let latest = null;
-  (comments || []).forEach(function (comment) {
+  comments.forEach(function (comment) {
     const match = String(comment && comment.body || '').match(/rollback-at:\s*([0-9T:Z.+-]+)/);
     if (!match) return;
     const at = Date.parse(match[1]);
@@ -120,17 +121,22 @@ export function formatEt(now) {
 export async function checkUrl(check, deps) {
   const attempts = deps.attempts || 3;
   const gapMs = deps.gapMs == null ? 30_000 : deps.gapMs;
+  const timeoutMs = deps.timeoutMs == null ? 20_000 : deps.timeoutMs;
   let last = { id: check.id, url: check.url, ok: false, status: 0, ms: null, attempts: 0 };
   for (let n = 1; n <= attempts; n += 1) {
     if (n > 1) await deps.sleep(gapMs);
     const start = Date.now();
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = controller ? setTimeout(function () { controller.abort(); }, timeoutMs) : null;
     try {
-      const response = await deps.fetchImpl(check.url, { method: 'GET' });
-      const status = response && response.status ? response.status : 0;
-      last = { id: check.id, url: check.url, ok: check.accept.includes(status), status: status, ms: Date.now() - start, attempts: n };
+      const response = await deps.fetchImpl(check.url, { method: 'GET', signal: controller ? controller.signal : undefined });
+      const status = response && typeof response.status === 'number' ? response.status : 0;
+      last = { id: check.id, url: check.url, ok: status < 500 && check.accept.includes(status), status: status, ms: Date.now() - start, attempts: n };
       if (last.ok) return last;
     } catch (error) {
       last = { id: check.id, url: check.url, ok: false, status: 0, ms: Date.now() - start, attempts: n, error: error.message };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
   return last;
@@ -195,8 +201,9 @@ export async function run(env, deps) {
   const sleep = deps.sleep || function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); };
   const now = deps.now || Date.now();
   const gapMs = deps.gapMs == null ? 30_000 : deps.gapMs;
+  const timeoutMs = deps.timeoutMs == null ? 20_000 : deps.timeoutMs;
   const checks = [];
-  for (const check of CHECKS) checks.push(await checkUrl(check, { fetchImpl: fetchImpl, sleep: sleep, gapMs: gapMs }));
+  for (const check of CHECKS) checks.push(await checkUrl(check, { fetchImpl: fetchImpl, sleep: sleep, gapMs: gapMs, timeoutMs: timeoutMs }));
   let siteDown = checks.some(function (check) { return !check.ok; });
   let rollback = 'not needed';
   let already = false;
@@ -216,12 +223,16 @@ export async function run(env, deps) {
         method: 'POST',
         headers: { authorization: 'Bearer ' + env.VERCEL_TOKEN }
       });
-      already = true;
-      rollback = 'promoted ' + decision.deploymentId + ' status ' + (promoted && promoted.status);
-      await deps.recordRollback(new Date(now).toISOString());
-      checks.length = 0;
-      for (const check of CHECKS) checks.push(await checkUrl(check, { fetchImpl: fetchImpl, sleep: sleep, gapMs: gapMs }));
-      siteDown = checks.some(function (check) { return !check.ok; });
+      if (!promoted || !promoted.ok) {
+        rollback = 'promote failed status ' + (promoted && promoted.status);
+      } else {
+        already = true;
+        rollback = 'promoted ' + decision.deploymentId + ' status ' + promoted.status;
+        await deps.recordRollback(new Date(now).toISOString());
+        checks.length = 0;
+        for (const check of CHECKS) checks.push(await checkUrl(check, { fetchImpl: fetchImpl, sleep: sleep, gapMs: gapMs, timeoutMs: timeoutMs }));
+        siteDown = checks.some(function (check) { return !check.ok; });
+      }
     } else {
       rollback = decision.reason;
     }
@@ -240,19 +251,30 @@ async function defaultReadHistory(env, fetchImpl) {
   const issue = listed.body.find(function (item) { return item && item.title === STATUS_TITLE && !item.pull_request; });
   if (!issue) return { known: true, at: null, issue: null };
   const comments = await githubJson(fetchImpl, env.GITHUB_TOKEN, issue.comments_url);
-  return { known: comments.ok, at: lastRollbackAt(comments.body), issue: issue };
+  if (!comments.ok || !Array.isArray(comments.body)) return { known: false, at: null, issue: issue };
+  return { known: true, at: lastRollbackAt(comments.body), issue: issue };
 }
 
-async function defaultRecordRollback(env, fetchImpl, issue, stamp) {
-  if (!env.GITHUB_TOKEN || !issue) return;
-  await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + issue.number + '/comments', {
+export async function recordRollback(env, fetchImpl, issue, stamp) {
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return issue || null;
+  let current = issue;
+  if (!current) {
+    const created = await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues', {
+      method: 'POST',
+      body: JSON.stringify({ title: STATUS_TITLE, body: 'rollback-at: ' + stamp })
+    });
+    if (!created.ok || !created.body || !created.body.number) return null;
+    current = created.body;
+  }
+  await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + current.number + '/comments', {
     method: 'POST',
     body: JSON.stringify({ body: 'rollback-at: ' + stamp })
   });
-  await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + issue.number + '/labels', {
+  await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + current.number + '/labels', {
     method: 'POST',
     body: JSON.stringify({ labels: ['zeus-rollback'] })
   });
+  return current;
 }
 
 async function defaultPublish(env, fetchImpl, issue, report) {
@@ -326,14 +348,17 @@ async function defaultReview(env, fetchImpl) {
 async function main() {
   const env = process.env;
   const history = await defaultReadHistory(env, fetch);
+  const state = { issue: history.issue || null };
   const result = await run(env, {
     fetchImpl: fetch,
     now: Date.now(),
     readRollbackHistory: async function () { return history; },
-    recordRollback: function (stamp) { return defaultRecordRollback(env, fetch, history.issue, stamp); },
+    recordRollback: async function (stamp) {
+      state.issue = await recordRollback(env, fetch, state.issue, stamp);
+    },
     publishReport: function (report) {
       process.stdout.write(report + '\n');
-      return defaultPublish(env, fetch, history.issue, report);
+      return defaultPublish(env, fetch, state.issue, report);
     },
     probeModels: function () { return defaultProbe(env, fetch); },
     reviewPulls: function () { return defaultReview(env, fetch); }
