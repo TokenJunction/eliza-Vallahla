@@ -16,15 +16,23 @@
     return 'https://valhalla-app.xyz/os/';
   }
 
-  function client() {
+  var shared = null;
+
+  function client(loader) {
+    if (shared) return shared;
     var settings = config();
     if (!settings) return Promise.reject(new Error('Sign-in is not configured yet.'));
-    return import(SDK).then(function (mod) {
+    var load = typeof loader === 'function' ? loader : function () { return import(SDK); };
+    shared = load().then(function (mod) {
       if (!mod || typeof mod.createClient !== 'function') throw new Error('Sign-in is not configured yet.');
       return mod.createClient(settings.url, settings.key, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' }
       });
+    }).catch(function (error) {
+      shared = null;
+      return Promise.reject(error);
     });
+    return shared;
   }
 
   function providerMessage(error) {

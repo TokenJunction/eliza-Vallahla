@@ -32,6 +32,28 @@ test('Google and magic link report a disabled provider instead of failing quietl
   assert.equal(context.ValhallaSupabase.levelLabel(''), 'Free');
   assert.equal(context.ValhallaSupabase.levelLabel('pro'), 'Pro');
   assert.doesNotMatch(supabase, /user_metadata/);
+  context.VALHALLA_SITE = {
+    SUPABASE_URL: 'https://girltjnrrwlyeufrcors.supabase.co',
+    SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_example'
+  };
+  let creates = 0;
+  const loader = function () {
+    return Promise.resolve({
+      createClient: function () {
+        creates += 1;
+        return { id: creates };
+      }
+    });
+  };
+  return Promise.all([
+    context.ValhallaSupabase.client(loader),
+    context.ValhallaSupabase.client(loader)
+  ]).then(function (clients) {
+    assert.equal(clients[0], clients[1]);
+    assert.equal(creates, 1);
+    assert.match(read('website/home.js'), /getSession/);
+    assert.match(read('website/home.js'), /location\.replace\('\/os\/'\)/);
+  });
 });
 
 test('the public site has no repository link or paper desk entry', () => {
