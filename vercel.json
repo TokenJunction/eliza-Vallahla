@@ -9,5 +9,8 @@
   "redirects": [
     { "source": "/app", "destination": "/", "permanent": false },
     { "source": "/app/", "destination": "/", "permanent": false }
+  ],
+  "crons": [
+    { "path": "/api/overseer-cron", "schedule": "25 4 * * *" }
   ]
 }
