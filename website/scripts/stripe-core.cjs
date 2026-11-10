@@ -198,15 +198,18 @@ async function handleWebhook(req, env, fetchImpl) {
     let userId = object.metadata && object.metadata.user_id || object.client_reference_id || (parent && parent.metadata && parent.metadata.user_id);
     const subId = object.subscription || (parent && parent.subscription) || '';
     let subStatus = '';
+    let readSubscription = false;
     if (subId && stripeKey) {
       const subscription = await stripeRequest(stripeKey, 'GET', 'subscriptions/' + encodeURIComponent(subId), null, fetchImpl);
-      if (subscription.ok && subscription.body) {
-        subStatus = subscription.body.status || '';
+      if (subscription.ok && subscription.body && subscription.body.status) {
+        readSubscription = true;
+        subStatus = subscription.body.status;
         if (!userId && subscription.body.metadata) userId = subscription.body.metadata.user_id;
       }
     }
-    if (failed && subStatus !== 'past_due' && subStatus !== 'unpaid' && subStatus !== 'active' && subStatus !== 'trialing') {
-      return { status: 200, body: { received: true } };
+    if (failed) {
+      if (!readSubscription) return { status: 502, body: { error: 'The subscription was not read.' } };
+      if (subStatus === 'canceled' || subStatus === 'incomplete_expired') return { status: 200, body: { received: true } };
     }
     if (!userId) return { status: 200, body: { received: true } };
     const saved = await writeEntitlement(env, {

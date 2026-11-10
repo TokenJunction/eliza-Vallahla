@@ -256,6 +256,17 @@ test('a failed invoice does not reopen a canceled subscription', async () => {
   });
   assert.equal(result.status, 200);
   assert.equal(wrote, false);
+  const missed = await handleWebhook({
+    method: 'POST',
+    headers: { 'stripe-signature': sign(payload, secret) },
+    body: payload
+  }, { STRIPE_WEBHOOK_SECRET: secret, SUPABASE_SERVICE_ROLE_KEY: 'service-role', STRIPE_SECRET_KEY: 'sk_test_only' }, async (url) => {
+    if (String(url).includes('/subscriptions/')) return { ok: false, status: 500, json: async () => ({}) };
+    wrote = true;
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  assert.equal(missed.status, 502);
+  assert.equal(wrote, false);
 });
 
 test('the desk explains the one dollar hold', () => {
