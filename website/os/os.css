@@ -399,9 +399,12 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
 .taskbar-clock { border: 1px solid #423623; color: #d3c7b5; }
 .desktop-heading { pointer-events: auto; }
 .menu-signin { margin-left: 8px; }
-.market-panel, .telemetry-panel, .cyber-desk { grid-column: 1 / -1; }
-.market-panel > p, .telemetry-panel > p { margin: 16px; color: var(--muted, #b7b0a4); font-size: 13px; line-height: 1.5; }
-.empty-state { margin-bottom: 0; color: var(--ink, #f4efe6); font-size: 15px; }
+.feed-panel, .market-panel, .telemetry-panel, .cyber-desk { grid-column: 1 / -1; }
+.market-panel > p, .telemetry-panel > p, #feed-status { margin: 16px; color: var(--muted, #b7b0a4); font-size: 13px; line-height: 1.5; }
+#feed-status { color: var(--ink, #f4efe6); font-size: 15px; }
+#feed-list { margin: 0 16px 16px; padding: 0; list-style: none; }
+#feed-list:empty { display: none; }
+#feed-list li { margin: 6px 0; overflow-wrap: anywhere; color: var(--muted, #b7b0a4); font-size: 13px; }
 .placeholder-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 14px 14px; padding: 0; list-style: none; }
 .placeholder-row li { min-height: 44px; display: flex; align-items: center; padding: 8px 10px; border: 1px dashed #6f5630; color: #d9d0c2; }
 .dock a.desktop-icon { text-decoration: none; }
