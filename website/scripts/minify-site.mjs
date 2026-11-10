@@ -1,6 +1,7 @@
 import esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
+import { minify as terserMinify } from 'terser';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const out = path.join(root, 'site-build');
@@ -50,7 +51,17 @@ export async function minifySource(code, loader) {
     target: 'es2020'
   });
   if (result.map) throw new Error('source map was produced');
-  return result.code;
+  if (loader !== 'js') return result.code;
+  const packed = await terserMinify(result.code, {
+    compress: true,
+    mangle: true,
+    sourceMap: false,
+    format: { comments: false }
+  });
+  if (!packed || !packed.code) throw new Error('terser produced no code');
+  if (packed.map) throw new Error('source map was produced');
+  if (packed.code.includes('sourceMappingURL')) throw new Error('source map comment was produced');
+  return packed.code;
 }
 
 function walk(dir, files = []) {

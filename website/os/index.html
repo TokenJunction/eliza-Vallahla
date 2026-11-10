@@ -12,6 +12,7 @@
   <script src="/site-config.js?v=1.4.2" defer></script>
   <script src="/supabase.js" defer></script>
   <script src="/os/session.js" defer></script>
+  <script src="/os/connections.js" defer></script>
   <script src="/os/feed.js" defer></script>
   <script src="/os/ai.js" defer></script>
   <script src="/os/app.js?v=1.4.2" defer></script>
@@ -75,6 +76,40 @@
     </nav>
 
     <div class="workspace">
+      <section class="workspace-panel connections-panel" id="connections-panel" hidden>
+        <div class="panel-heading"><h2 id="connections-title">API Connections</h2><span>YOUR KEYS</span></div>
+        <form id="connections-form">
+          <label>Service
+            <select id="connections-service">
+              <option value="openai">OpenAI</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="helius">Helius</option>
+              <option value="stripe">Stripe</option>
+              <option value="custom">Custom REST</option>
+            </select>
+          </label>
+          <label id="connections-base-label" hidden>Base URL
+            <input id="connections-base" type="url" inputmode="url" placeholder="https://api.example.com" autocomplete="off">
+          </label>
+          <label>Key
+            <input id="connections-key" type="password" autocomplete="off">
+          </label>
+          <button id="connections-test" type="button">Test</button>
+          <button type="submit">Save</button>
+        </form>
+        <p id="connections-status" role="status"></p>
+        <ul id="connections-list"></ul>
+        <fieldset>
+          <legend>Packs</legend>
+          <label><input id="pack-paper" type="checkbox" checked> Trading desk paper-only</label>
+          <label><input id="pack-assistant" type="checkbox"> AI assistant</label>
+          <label><input id="pack-status" type="checkbox"> Status board</label>
+        </fieldset>
+        <p>Paper-only does not turn trading on.</p>
+        <button id="connections-mint" type="button">Create ValOS API key</button>
+        <p id="connections-once" hidden></p>
+        <pre id="connections-curl" hidden></pre>
+      </section>
       <section class="workspace-panel feed-panel" aria-labelledby="feed-title">
         <div class="panel-heading"><h2 id="feed-title">Live feed</h2><span id="feed-state">NOT CONNECTED</span></div>
         <p id="feed-status" role="status">Feed not connected</p>
