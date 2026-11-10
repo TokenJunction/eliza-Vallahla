@@ -16827,6 +16827,8 @@ Message: ${transactionMessage}.
   var form = document.getElementById("swap-form");
   var config = { clerk: "missing", liveTrading: false, platformFee: "none", rpc: "not-connected" };
   var clerkClient = null;
+  var clerkReady = false;
+  var clerkScript = null;
   var signedIn = false;
   var sessionToken = "";
   var walletAddress = "";
@@ -16865,9 +16867,20 @@ Message: ${transactionMessage}.
     paint();
   }
   async function bearer() {
-    if (clerkClient && clerkClient.session && typeof clerkClient.session.getToken === "function") {
-      sessionToken = await clerkClient.session.getToken() || "";
-      signedIn = Boolean(sessionToken);
+    try {
+      if (clerkClient && clerkClient.session && typeof clerkClient.session.getToken === "function") {
+        sessionToken = await clerkClient.session.getToken() || "";
+        signedIn = Boolean(sessionToken);
+      }
+    } catch (error) {
+      const authError = new Error("Sign-in could not be refreshed. Nothing was sent.");
+      authError.valhallaAuth = true;
+      throw authError;
+    }
+    if (!sessionToken) {
+      const authError = new Error("Sign-in required. Nothing was sent.");
+      authError.valhallaAuth = true;
+      throw authError;
     }
     return { "content-type": "application/json", authorization: "Bearer " + sessionToken };
   }
@@ -16885,26 +16898,40 @@ Message: ${transactionMessage}.
   }
   async function startClerk() {
     if (config.clerk !== "production" || !config.clerkPublishableKey) return;
-    if (!clerkClient) {
-      await new Promise(function(resolve, reject) {
-        const script = document.createElement("script");
-        script.dataset.clerkPublishableKey = config.clerkPublishableKey;
-        script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
-        script.crossOrigin = "anonymous";
-        script.onload = resolve;
-        script.onerror = function() {
-          reject(new Error("Clerk did not load."));
-        };
-        document.head.appendChild(script);
-      });
-      const ClerkClass = window.Clerk;
-      clerkClient = typeof ClerkClass === "function" ? new ClerkClass(config.clerkPublishableKey) : ClerkClass;
-      await clerkClient.load();
-      if (typeof clerkClient.addListener === "function") {
-        clerkClient.addListener(function(emission) {
-          rememberSession(emission && emission.session || clerkClient.session);
-        });
+    if (!clerkReady) {
+      if (!clerkScript) {
+        clerkScript = document.createElement("script");
+        clerkScript.dataset.clerkPublishableKey = config.clerkPublishableKey;
+        clerkScript.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
+        clerkScript.crossOrigin = "anonymous";
+        try {
+          await new Promise(function(resolve, reject) {
+            clerkScript.onload = resolve;
+            clerkScript.onerror = function() {
+              reject(new Error("Clerk did not load."));
+            };
+            document.head.appendChild(clerkScript);
+          });
+        } catch (error) {
+          if (clerkScript.parentNode) clerkScript.parentNode.removeChild(clerkScript);
+          clerkScript = null;
+          throw error;
+        }
       }
+      const ClerkClass = window.Clerk;
+      const client = typeof ClerkClass === "function" ? new ClerkClass(config.clerkPublishableKey) : ClerkClass;
+      try {
+        await client.load();
+        if (typeof client.addListener === "function") {
+          client.addListener(function(emission) {
+            rememberSession(emission && emission.session || client.session);
+          });
+        }
+      } catch (error) {
+        throw new Error("Clerk did not load. Sign in was not started.");
+      }
+      clerkClient = client;
+      clerkReady = true;
     }
     rememberSession(clerkClient.session);
     if (!clerkClient.session && typeof clerkClient.openSignIn === "function") clerkClient.openSignIn();
@@ -17022,13 +17049,13 @@ Message: ${transactionMessage}.
     });
   });
   quoteButton.addEventListener("click", function() {
-    requestQuote().catch(function() {
-      routeLine.textContent = "Jupiter quote is not connected.";
+    requestQuote().catch(function(error) {
+      routeLine.textContent = error && error.valhallaAuth ? error.message : "Jupiter quote is not connected.";
     });
   });
   form.addEventListener("submit", function(event) {
-    confirmSwap(event).catch(function() {
-      document.getElementById("tx-status").textContent = "Swap was not sent.";
+    confirmSwap(event).catch(function(error) {
+      document.getElementById("tx-status").textContent = error && error.valhallaAuth ? error.message : "Swap was not sent.";
     });
   });
   loadConfig().catch(function() {
