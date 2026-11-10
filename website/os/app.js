@@ -64,7 +64,12 @@
           focusWindow(node);
           return;
         }
-        if (node.style.zIndex === frontZ) minimizeWindow(node);
+        if (node.style.zIndex === frontZ) {
+          minimizeWindow(node);
+          return;
+        }
+        updateTaskbar();
+        focusWindow(node);
       });
       taskbarApps.appendChild(button);
     });

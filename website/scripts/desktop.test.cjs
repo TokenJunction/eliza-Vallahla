@@ -98,7 +98,14 @@ test('desktop icons open and Escape closes without treating HTML health as live'
     closest(selector) { return selector === '[data-open]' ? { dataset: { open: 'wallet' } } : null; }
   });
   const apps = page.node('taskbar-apps').children;
-  const front = apps.find(function (button) { return button.dataset.task === 'wallet'; });
+  const back = apps.find(function (button) { return button.dataset.task === 'status'; });
+  back.handlers.click[0]();
+  assert.equal(page.node('window-wallet').hidden, false);
+  assert.equal(page.node('window-status').style.zIndex, '40');
+  assert.equal(page.node('active-app').textContent, 'status title');
+  const raised = page.node('taskbar-apps').children.find(function (button) { return button.dataset.task === 'wallet'; });
+  raised.handlers.click[0]();
+  const front = page.node('taskbar-apps').children.find(function (button) { return button.dataset.task === 'wallet'; });
   front.handlers.click[0]();
   assert.equal(page.node('window-wallet').hidden, true);
   assert.equal(page.node('active-app').textContent, 'status title');
