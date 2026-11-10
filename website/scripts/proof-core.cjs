@@ -133,12 +133,9 @@ function revoked(value) {
 
 function unlockFrom(data) {
   const buf = Buffer.isBuffer(data) ? data : Buffer.from(String(data || ''), 'base64');
-  let found = 0;
-  for (let i = 0; i + 8 <= buf.length; i += 8) {
-    const stamp = Number(buf.readBigInt64LE(i));
-    if (stamp > 1700000000 && stamp < 2000000000 && (!found || stamp < found)) found = stamp;
-  }
-  return found;
+  if (buf.length < 152) return 0;
+  const stamp = Number(buf.readBigInt64LE(144));
+  return stamp > 1700000000 && stamp < 2000000000 ? stamp : 0;
 }
 
 function etStamp(seconds) {
@@ -162,7 +159,7 @@ async function readChain(fetchImpl, key, now) {
   const account = await rpc(key, 'getAccountInfo', [ESCROW, { encoding: 'base64' }], fetchImpl);
   const swaps = await fetchImpl('https://api.helius.xyz/v0/addresses/' + MINT + '/transactions?api-key=' + encodeURIComponent(key) + '&type=SWAP&limit=5');
   const rows = swaps && swaps.ok && typeof swaps.json === 'function' ? await swaps.json() : [];
-  const info = asset && asset.token_info ? asset.token_info : {};
+  const info = asset && asset.token_info;
   const unlock = account && account.value && account.value.data ? unlockFrom(account.value.data[0]) : 0;
   const receipts = (Array.isArray(rows) ? rows : []).slice(0, 5).map(function (tx) {
     const recommendation = tx && tx.recommendationSignature ? last4(tx.recommendationSignature) : '';
@@ -179,7 +176,7 @@ async function readChain(fetchImpl, key, now) {
     zk: false,
     mint: {
       last4: last4(MINT),
-      authoritiesRevoked: revoked(info.mint_authority) && revoked(info.freeze_authority),
+      authoritiesRevoked: info ? revoked(info.mint_authority) && revoked(info.freeze_authority) : null,
       supply: supplyText(info)
     },
     lock: {
@@ -206,7 +203,7 @@ async function measureProof(fetchImpl, env, now, timeoutMs) {
   const when = now || new Date();
   let chain = { configured: false, label: 'cryptographic proof', zk: false };
   if (env && env.HELIUS_API_KEY) {
-    try { chain = await readChain(fetchImpl, env.HELIUS_API_KEY, when); }
+    try { chain = await withTimeout(function () { return readChain(fetchImpl, env.HELIUS_API_KEY, when); }, limit); }
     catch (error) { chain = { configured: true, label: 'cryptographic proof', zk: false, error: 'On-chain proof not checked' }; }
   }
   return {

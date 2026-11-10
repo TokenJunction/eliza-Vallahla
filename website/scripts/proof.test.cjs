@@ -52,7 +52,9 @@ test('a hung check times out and the other results still return', async () => {
 
 test('Helius reports the mint, the lock, and swap receipts without full addresses', async () => {
   const unlock = Buffer.alloc(200);
-  unlock.writeBigInt64LE(BigInt(Math.floor(Date.parse('2027-11-08T15:32:42Z') / 1000)), 144);
+  const cliff = Math.floor(Date.parse('2027-11-08T15:32:42Z') / 1000);
+  unlock.writeBigInt64LE(BigInt(cliff), 144);
+  unlock.writeBigInt64LE(BigInt(cliff - 86400 * 30), 192);
   const signature = 'jFgUp1TvrvAf6BvJxUVQ3PNiuXYDSekedWyLqgGvHnLVUxNjFuYsBjMX3xXWfbmwGbWjVpa2Gg6cDngDVjaBTa1';
   const body = await measureProof(async (url, init) => {
     const target = String(url);
