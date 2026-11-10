@@ -23,7 +23,7 @@ test('volOS root is host-specific and does not replace the Valhalla entrance', (
 test('the entrance stays a static file and only volOS hosts rewrite', () => {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
   assert.equal(config.proxy, undefined);
-  assert.deepEqual(config.rewrites, [
+  assert.deepEqual(config.rewrites.beforeFiles, [
     { source: '/', has: [{ type: 'host', value: 'valos.live' }], destination: '/volos/index.html' },
     { source: '/index.html', has: [{ type: 'host', value: 'valos.live' }], destination: '/volos/index.html' },
     { source: '/', has: [{ type: 'host', value: 'www.valos.live' }], destination: '/volos/index.html' },

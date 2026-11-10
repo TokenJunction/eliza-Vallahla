@@ -6,17 +6,25 @@
     { "source": "/app", "destination": "/", "permanent": false },
     { "source": "/app/", "destination": "/", "permanent": false }
   ],
-  "rewrites": [
-    { "source": "/", "has": [{ "type": "host", "value": "valos.live" }], "destination": "/volos/index.html" },
-    { "source": "/index.html", "has": [{ "type": "host", "value": "valos.live" }], "destination": "/volos/index.html" },
-    { "source": "/", "has": [{ "type": "host", "value": "www.valos.live" }], "destination": "/volos/index.html" },
-    { "source": "/index.html", "has": [{ "type": "host", "value": "www.valos.live" }], "destination": "/volos/index.html" }
-  ],
+  "rewrites": {
+    "beforeFiles": [
+      { "source": "/", "has": [{ "type": "host", "value": "valos.live" }], "destination": "/volos/index.html" },
+      { "source": "/index.html", "has": [{ "type": "host", "value": "valos.live" }], "destination": "/volos/index.html" },
+      { "source": "/", "has": [{ "type": "host", "value": "www.valos.live" }], "destination": "/volos/index.html" },
+      { "source": "/index.html", "has": [{ "type": "host", "value": "www.valos.live" }], "destination": "/volos/index.html" }
+    ]
+  },
   "headers": [
     {
-      "source": "/(.*)\\.(js|css|png|jpg|jpeg|webp|svg|gif|mp4|woff2)",
+      "source": "/(.*)\\.(png|jpg|jpeg|webp|svg|gif|mp4|woff2)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=2592000, stale-while-revalidate=604800" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.(js|css)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]
     }
   ]

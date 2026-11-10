@@ -7,8 +7,7 @@
   <meta name="description" content="Sign in to ValhallaOS. Live trading is off.">
   <link rel="canonical" href="https://valhalla-app.xyz/">
   <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
-  <link rel="preload" as="image" href="/assets/heaven-poster-720.jpg" media="(max-width: 720px)" fetchpriority="high">
-  <link rel="preload" as="image" href="/assets/heaven-poster.jpg" media="(min-width: 721px)" fetchpriority="high">
+  <link rel="preload" as="image" href="/assets/heaven-poster.jpg" fetchpriority="high">
   <title>ValhallaOS</title>
   <style>
 :root{color-scheme:dark;--bg:#090a0c;--surface:#121316;--ink:#f4efe6;--muted:#b7b0a4;--line:rgba(244,239,230,.14);--gold:#d7b06a;--gold-ink:#1c160e;--radius:14px;--font:"Segoe UI",Tahoma,sans-serif;--text:15px;--small:13px;--title:clamp(28px,4vw,36px);--space:16px}
@@ -59,7 +58,7 @@ footer p{max-width:42ch;line-height:1.5}
       <figure class="stage-wrap backdrop" aria-hidden="true">
         <div class="stage">
           <div class="scene" id="hero-scene">
-            <img class="still" src="/assets/heaven-poster.jpg" srcset="/assets/heaven-poster-720.jpg 720w, /assets/heaven-poster.jpg 1280w" sizes="100vw" alt="" width="1280" height="725" decoding="async" fetchpriority="high">
+            <img class="still" src="/assets/heaven-poster.jpg" alt="" width="1280" height="725" decoding="async" fetchpriority="high">
             <video id="hero-video" muted loop playsinline preload="none"></video>
             <p class="motion-slot"><button class="motion-control" id="hero-motion" type="button" aria-pressed="false" aria-label="Play motion" title="Play motion">▶</button></p>
           </div>

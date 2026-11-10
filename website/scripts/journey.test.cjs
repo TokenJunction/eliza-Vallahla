@@ -36,8 +36,8 @@ test('entrance and volOS copy stay honest', () => {
   assert.match(home, /<style>/);
   assert.match(volos, /visual\.css/);
   assert.match(desk, /visual\.css/);
-  assert.match(home, /rel="preload" as="image" href="\/assets\/heaven-poster-720\.jpg"/);
-  assert.match(home, /heaven-poster\.jpg 1280w/);
+  assert.match(home, /rel="preload" as="image" href="\/assets\/heaven-poster\.jpg"/);
+  assert.doesNotMatch(home, /heaven-poster-720/);
   assert.match(home, /defer/);
   assert.match(home, /preload="none"/);
   assert.match(desk, /disabled/);
