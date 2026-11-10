@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090a0c">
+  <title>Overseer · Cached</title>
+  <link rel="stylesheet" href="/visual.css">
+  <style>
+    body { margin: 0; }
+    main { width: min(480px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0; }
+    h1 { margin: 0 0 8px; font-size: var(--title); font-weight: 650; }
+    p { color: var(--muted); line-height: 1.5; }
+    #cached-status { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Cached</h1>
+    <p>This is the last status saved on this device. It is not a live check.</p>
+    <p id="cached-status">No cached status yet.</p>
+  </main>
+  <script>
+    caches.open('overseer-shell').then(function (cache) {
+      return cache.match('/api/overseer-status');
+    }).then(function (response) {
+      if (!response) return null;
+      return response.json();
+    }).then(function (body) {
+      var node = document.getElementById('cached-status');
+      if (node && body && body.label) node.textContent = body.label;
+    }).catch(function () {});
+  </script>
+</body>
+</html>

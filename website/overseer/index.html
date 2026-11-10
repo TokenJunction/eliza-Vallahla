@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090a0c">
+  <meta name="description" content="ValhallaOS Overseer. Sign in with Google. Coin ownership does not sign you in.">
+  <title>ValhallaOS Overseer</title>
+  <link rel="manifest" href="/overseer/manifest.webmanifest">
+  <link rel="icon" href="/overseer/icon-192.png">
+  <link rel="stylesheet" href="/visual.css">
+  <style>
+    body { margin: 0; }
+    main { width: min(480px, calc(100% - 24px)); margin: 0 auto; padding: 20px 0 48px; }
+    h1 { margin: 0; font-size: 28px; font-weight: 650; }
+    h2 { margin: 20px 0 8px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    p, li { line-height: 1.5; }
+    button, a.action { min-height: 44px; margin: 8px 8px 0 0; padding: 0 14px; border: 0; border-radius: 12px; background: var(--gold); color: var(--gold-ink); font: inherit; font-weight: 650; }
+    button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    section { margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    #board[hidden], #gate[hidden], #owner-actions[hidden] { display: none; }
+    textarea, input { width: 100%; min-height: 44px; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); font: inherit; }
+    ul { margin: 8px 0 0; padding-left: 18px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Overseer</h1>
+    <section id="gate">
+      <p id="gate-status">Sign in with Google. Holding the coin does not sign you in.</p>
+      <button id="google-sign-in" type="button">Continue with Google</button>
+    </section>
+    <div id="board" hidden>
+      <button id="install" type="button" hidden>Add to Home screen</button>
+      <button id="push-toggle" class="quiet" type="button" hidden>Turn on alerts</button>
+      <button id="sign-out" class="quiet" type="button">Sign out</button>
+      <section>
+        <h2>Status</h2>
+        <p id="status-board">Not checked.</p>
+      </section>
+      <section>
+        <h2>Approvals</h2>
+        <ul id="approvals"><li>No approvals waiting.</li></ul>
+      </section>
+      <section id="owner-actions" hidden>
+        <h2>Admin board</h2>
+        <button id="ship" type="button">Ship it</button>
+        <button id="undo" class="quiet" type="button">Undo</button>
+        <p id="owner-status"></p>
+      </section>
+      <section>
+        <h2>Cryptographic proof</h2>
+        <p id="proof-panel">Proof not connected. Fees are not loaded.</p>
+      </section>
+    </div>
+  </main>
+  <script src="/site-config.js" defer></script>
+  <script src="/supabase.js" defer></script>
+  <script src="/overseer/overseer.js" defer></script>
+</body>
+</html>
