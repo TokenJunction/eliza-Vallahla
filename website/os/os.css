@@ -442,7 +442,6 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
     left: 8px !important;
     width: calc(100vw - 16px) !important;
     max-height: calc(100dvh - 76px);
-    z-index: 50 !important;
   }
   .window-body { max-height: calc(100dvh - 130px); }
 }

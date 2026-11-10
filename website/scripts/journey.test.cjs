@@ -78,7 +78,7 @@ test('entrance and volOS copy stay honest', () => {
   assert.match(desk, /href="\/app\/"/);
   const mobile = fs.readFileSync(path.join(root, 'website/os/os.css'), 'utf8').split('@media (max-width: 720px)')[1];
   assert.doesNotMatch(mobile, /top:\s*118px/);
-  assert.match(mobile, /z-index:\s*50\s*!important/);
+  assert.doesNotMatch(mobile, /z-index:\s*\d+\s*!important/);
   assert.match(mobile, /\.menu-bar,\s*\.dock\s*\{\s*z-index:\s*1/);
   assert.match(volos, /Not published/);
   assert.match(volos, /can fall to zero/);
