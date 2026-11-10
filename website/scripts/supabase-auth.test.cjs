@@ -53,7 +53,7 @@ test('Google and magic link report a disabled provider instead of failing quietl
     assert.equal(creates, 1);
     assert.match(read('website/home.js'), /getSession/);
     assert.match(read('website/home.js'), /location\.replace\('\/os\/'\)/);
-    assert.match(read('website/home.js'), /pageshow/);
+    assert.match(read('website/home.js'), /event\.persisted/);
     var home = read('website/home.js');
     assert.ok(home.indexOf("form.addEventListener('submit'") < home.indexOf('getSession'));
   });

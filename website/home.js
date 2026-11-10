@@ -62,7 +62,9 @@
     });
   });
 
-  window.addEventListener('pageshow', unlock);
+  window.addEventListener('pageshow', function (event) {
+    if (event && event.persisted) unlock();
+  });
 
   if (!window.ValhallaSupabase.config()) {
     say('Sign-in is not configured yet.');
@@ -75,7 +77,7 @@
     var user = result && result.data && result.data.session && result.data.session.user;
     if (user) window.location.replace('/os/');
   }).catch(function (error) {
+    if (busy) return;
     say(window.ValhallaSupabase.providerMessage(error));
-    unlock();
   });
 })();
