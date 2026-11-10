@@ -44,16 +44,38 @@ test('the Auth0 redirect stays on the public callback URLs and out of localStora
   const options = auth.clientOptions(config, 'https://valhalla-app.xyz/');
   assert.equal(options.domain, 'valhallaos.us.auth0.com');
   assert.equal(options.clientId, CLIENT);
-  assert.equal(options.cacheLocation, 'memory');
-  assert.equal(options.useRefreshTokens, false);
+  assert.equal(options.useRefreshTokens, true);
+  assert.equal(options.useRefreshTokensFallback, false);
+  assert.equal(options.cacheLocation, undefined);
   assert.equal(options.authorizationParams.redirect_uri, 'https://valhalla-app.xyz/');
   assert.equal(auth.clientOptions(config, 'http://127.0.0.1:8765/'), null);
   const source = read('website/auth0-gate.js') + read('website/home.js') + read('website/os/session.js');
-  assert.match(source, /cacheLocation: 'memory'/);
+  assert.match(source, /sessionStorage/);
   assert.match(source, /loginWithRedirect/);
   assert.match(source, /handleRedirectCallback/);
   assert.doesNotMatch(source, /localStorage|client_secret|@clerk/);
   assert.equal(auth.logoutReturnTo, 'https://valhalla-app.xyz/');
+  const saved = [];
+  const store = {
+    length: 0,
+    data: {},
+    setItem(key, value) { this.data[key] = String(value); this.length = Object.keys(this.data).length; },
+    getItem(key) { return Object.prototype.hasOwnProperty.call(this.data, key) ? this.data[key] : null; },
+    removeItem(key) { delete this.data[key]; this.length = Object.keys(this.data).length; },
+    key(index) { return Object.keys(this.data)[index] || null; }
+  };
+  globalThis.auth0 = {
+    createAuth0Client(given) { saved.push(given); return Promise.resolve({ ok: true }); }
+  };
+  return auth.createClient(config, 'https://valhalla-app.xyz/', store).then(function (client) {
+    delete globalThis.auth0;
+    assert.equal(client.ok, true);
+    assert.equal(typeof saved[0].cache.set, 'function');
+    saved[0].cache.set('entry', { access_token: 'tab-only' });
+    assert.equal(saved[0].cache.get('entry').access_token, 'tab-only');
+    assert.equal(store.data['valhalla-auth0.entry'], '{"access_token":"tab-only"}');
+    assert.deepEqual(saved[0].cache.allKeys(), ['entry']);
+  });
 });
 
 test('missing plans stay FREE and named plans are read from Auth0 app metadata', () => {

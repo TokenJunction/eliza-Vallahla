@@ -1,8 +1,8 @@
 (function (root, factory) {
-  var api = factory();
+  var api = factory(root);
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.ValhallaAuth = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
   var DOMAIN = 'valhallaos.us.auth0.com';
   var CALLBACKS = [
     'https://valhalla-app.xyz/',
@@ -34,19 +34,41 @@
     return {
       domain: DOMAIN,
       clientId: String(config.clientId),
-      cacheLocation: 'memory',
-      useRefreshTokens: false,
+      useRefreshTokens: true,
+      useRefreshTokensFallback: false,
       authorizationParams: { redirect_uri: redirect }
     };
   }
 
-  function createClient(config, href) {
+  function tabCache(storage) {
+    var prefix = 'valhalla-auth0.';
+    return {
+      set: function (key, entry) { storage.setItem(prefix + key, JSON.stringify(entry)); },
+      get: function (key) {
+        var raw = storage.getItem(prefix + key);
+        if (!raw) return;
+        try { return JSON.parse(raw); } catch (error) { return; }
+      },
+      remove: function (key) { storage.removeItem(prefix + key); },
+      allKeys: function () {
+        var keys = [];
+        for (var index = 0; index < storage.length; index += 1) {
+          var key = storage.key(index);
+          if (key && key.indexOf(prefix) === 0) keys.push(key.slice(prefix.length));
+        }
+        return keys;
+      }
+    };
+  }
+
+  function createClient(config, href, storage) {
     var options = clientOptions(config, href);
     var sdk = root.auth0;
-    if (!options || !sdk || typeof sdk.createAuth0Client !== 'function') {
+    var store = storage || (typeof sessionStorage !== 'undefined' ? sessionStorage : null);
+    if (!options || !sdk || typeof sdk.createAuth0Client !== 'function' || !store) {
       return Promise.reject(new Error('Sign-in is not available yet.'));
     }
-    return Promise.resolve(sdk.createAuth0Client(options));
+    return Promise.resolve(sdk.createAuth0Client(Object.assign({}, options, { cache: tabCache(store) })));
   }
 
   return {
