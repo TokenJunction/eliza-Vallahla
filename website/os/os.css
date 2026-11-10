@@ -445,3 +445,5 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
   }
   .window-body { max-height: calc(100dvh - 130px); }
 }
+#session-hold { margin: 18vh auto 0; max-width: 28rem; padding: 0 16px; text-align: center; color: #f6f1e8; font-family: "Segoe UI", Tahoma, sans-serif; }
+#account-level { margin: 0; color: #f0e2c4; font-size: 12px; }

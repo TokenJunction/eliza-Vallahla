@@ -120,7 +120,7 @@ test('missing human-check configuration does not advance the gate', () => {
   assert.equal(f.node('humanPlaceholder').handlers.click, undefined);
 });
 
-test('verified entrance sign-in opens the OS desk and does not show the console', async () => {
+test('the old email gate does not open the OS', async () => {
   const f = fixture();
   f.sessionStorage.setItem('valhalla-entry-desk', '1');
   f.ready();
@@ -130,18 +130,16 @@ test('verified entrance sign-in opens the OS desk and does not show the console'
   f.node('emailCodeInput').value = '123456';
   f.node('codeForm').handlers.submit({ preventDefault() {} });
   await flush();
-  assert.deepEqual(f.assigned, ['/os/']);
-  assert.equal(f.node('desk').hidden, true);
+  assert.deepEqual(f.assigned, []);
   assert.equal(f.sessionStorage.getItem('valhalla-entry-desk'), null);
   assert.equal(f.sessionStorage.getItem('valhalla-code-ok'), '1');
 });
 
-test('public paper desk control does not create a session', () => {
+test('there is no public paper desk control', () => {
   const f = fixture();
   f.ready();
-  f.node('openPaper').handlers.click();
-  assert.deepEqual(f.assigned, ['/os/']);
-  assert.equal(f.node('desk').hidden, true);
+  assert.equal(f.node('openPaper').handlers.click, undefined);
+  assert.deepEqual(f.assigned, []);
   assert.equal(f.sessionStorage.getItem('valhalla-auth'), null);
   assert.equal(f.localStorage.getItem('valhalla-session'), null);
 });

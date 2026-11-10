@@ -9,6 +9,9 @@
 <link rel="stylesheet" href="desk.css">
 <link rel="stylesheet" href="leadership.css">
 <link rel="stylesheet" href="access.css">
+<script src="/vendor/auth0-spa-js-2.30.0.js"></script>
+<script src="/auth0-gate.js"></script>
+<script src="/auth-callback.js"></script>
 </head>
 <body data-page="app">
 <div id="mechaBoot" role="status" aria-label="Valhalla is starting">
@@ -31,7 +34,7 @@
     <p class="kicker">HUMAN CHECK</p>
     <p>Confirm you are a person. This does not connect a wallet and it does not ask for a payment.</p>
     <div id="turnstile"></div>
-    <p><a class="btn" href="/os/">Explore the public ValhallaOS desk — no account needed</a></p>
+    <p><a class="btn" href="/">Sign in</a></p>
     <p id="humanNote" class="note"></p>
     <button id="humanPlaceholder" type="button" hidden>Continue</button>
   </div>
@@ -86,8 +89,7 @@
     </form>
     <button id="googleBtn" type="button">Sign in with Google</button>
     <div id="googleSlot"></div>
-    <p><a class="btn" href="/os/">Explore the public ValhallaOS desk</a></p>
-    <button id="openPaper" type="button">Preview the public paper desk</button>
+    <p><a class="btn" href="/">Sign in</a></p>
     <p id="accountNote" class="note" role="status"></p>
     <p class="note">We email a 6-digit code to confirm it is you. To recover access, sign in with the email associated with your account.</p>
   </div>
@@ -131,7 +133,7 @@
     <div class="tape" id="tape">PAPER MODE · no orders are sent from this website</div>
     <div class="chip" id="walletChip"></div>
     <img id="googleAvatar" alt="" width="32" height="32" hidden>
-    <a class="btn" href="/os/" aria-label="Open the ValhallaOS command desk">ValhallaOS desk</a>
+    <a class="btn" href="/">Entrance</a>
     <button id="gear" type="button" aria-label="Settings">
       <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm9 3.5-1.8-.6a7.2 7.2 0 0 0-.5-1.2l1-1.6-1.4-1.4-1.6 1a7.2 7.2 0 0 0-1.2-.5L15 6h-2l-.6 1.8a7.2 7.2 0 0 0-1.2.5l-1.6-1L8.2 8.7l1 1.6a7.2 7.2 0 0 0-.5 1.2L7 12l1.8.6c.1.4.3.8.5 1.2l-1 1.6 1.4 1.4 1.6-1c.4.2.8.4 1.2.5L13 18h2l.6-1.8c.4-.1.8-.3 1.2-.5l1.6 1 1.4-1.4-1-1.6c.2-.4.4-.8.5-1.2L21 12Z"/></svg>
     </button>

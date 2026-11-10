@@ -59,9 +59,23 @@
     });
   }
 
+  var toolForWindow = { status: 'status', wallet: 'wallet', memory: 'memory', browser: 'web', swarm: 'monitor' };
+
+  function mayOpen(name) {
+    var body = document.body;
+    var tool = toolForWindow[name];
+    if (!body || body.dataset.session !== 'in' || !tool || !window.ValhallaAccount) return false;
+    return window.ValhallaAccount.toolAllowed(body.dataset.level || 'FREE', tool);
+  }
+
   function openWindow(name) {
     var node = getWindow(name);
     if (!node) return;
+    if (!mayOpen(name)) {
+      announce('That tool is not included for this account.');
+      setMenu(false);
+      return;
+    }
     node.hidden = false;
     node.dataset.minimized = 'false';
     updateTaskbar();

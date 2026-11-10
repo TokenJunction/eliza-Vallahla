@@ -1,46 +1,49 @@
 (function () {
-  function remember(email) {
-    try {
-      if (email) sessionStorage.setItem('valhalla-entry-email', email);
-      sessionStorage.setItem('valhalla-entry-desk', '1');
-      return true;
-    } catch (error) {
-      return false;
-    }
+  var note = document.getElementById('sign-in-status');
+  var button = document.getElementById('sign-in');
+  if (!note || !button || !window.ValhallaAuth) return;
+
+  function unavailable(message) {
+    note.hidden = false;
+    note.textContent = message || 'Sign-in is not available yet.';
+    button.hidden = true;
   }
 
-  function enter(event, email, requireStorage) {
-    if (event) event.preventDefault();
-    if (!remember(email)) {
-      var input = document.getElementById('home-email-address');
-      if (requireStorage && input) {
-        input.setCustomValidity('Browser storage is unavailable. Use the sign-in link instead.');
-        input.reportValidity();
-        return;
+  fetch('/api/entrance-config', { cache: 'no-store' }).then(function (response) {
+    if (!response || !response.ok) throw new Error('unavailable');
+    return response.json();
+  }).then(function (config) {
+    if (!config || config.auth0 !== 'configured') {
+      unavailable('Sign-in is not available yet.');
+      return;
+    }
+    var redirect = window.ValhallaAuth.redirectUri(window.location.href);
+    if (!redirect) {
+      unavailable('Sign-in cannot return to this address.');
+      return;
+    }
+    return window.ValhallaAuth.createClient(config, window.location.href).then(function (client) {
+      if (window.ValhallaAuth.hasCallback(window.location.search)) {
+        return client.handleRedirectCallback().then(function (result) {
+          var next = result && result.appState && result.appState.returnTo === '/os/' ? '/os/' : '/os/';
+          window.history.replaceState({}, document.title, redirect);
+          window.location.replace(next);
+        });
       }
-    }
-    window.location.assign('/app/');
-  }
-
-  var form = document.getElementById('home-email');
-  if (form) {
-    form.addEventListener('submit', function (event) {
-      var input = document.getElementById('home-email-address');
-      enter(event, input ? input.value.trim() : '', true);
+      return client.isAuthenticated().then(function (ready) {
+        if (ready) {
+          window.location.replace('/os/');
+          return;
+        }
+        note.hidden = true;
+        button.hidden = false;
+        button.addEventListener('click', function () {
+          client.loginWithRedirect({
+            authorizationParams: { redirect_uri: redirect },
+            appState: { returnTo: '/os/' }
+          });
+        });
+      });
     });
-  }
-
-  var typed = document.getElementById('home-email-address');
-  if (typed) {
-    typed.addEventListener('input', function (event) {
-      event.target.setCustomValidity('');
-    });
-  }
-
-  var links = document.querySelectorAll('[data-enter-desk]');
-  Array.prototype.forEach.call(links, function (link) {
-    link.addEventListener('click', function (event) {
-      enter(event, '', false);
-    });
-  });
+  }).catch(function () { unavailable('Sign-in is not available yet.'); });
 })();
