@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { handleFeed, resetFeedLimits, VALOS_MINT } = require('./feed-core.cjs');
 
 const root = path.join(__dirname, '../..');
@@ -89,6 +90,51 @@ test('feed requests are limited per signed-in user', async () => {
     limited = await handleFeed({ method: 'GET', headers: { authorization: 'Bearer good' }, url: '/api/feed' }, env, fetchImpl, 10_000);
   }
   assert.equal(limited.status, 429);
+});
+
+test('a valOS balance shows without a SOL amount and a later wallet reloads the feed', async () => {
+  const feedSource = fs.readFileSync(path.join(root, 'website/os/feed.js'), 'utf8');
+  const bridge = fs.readFileSync(path.join(root, 'website/os/bridge.js'), 'utf8');
+  assert.equal((bridge.match(/notifyWallet\(\);/g) || []).length, 2);
+  const requests = [];
+  const list = {
+    children: [],
+    replaceChildren() { this.children = []; },
+    appendChild(child) { this.children.push(child); return child; }
+  };
+  const nodes = {
+    'feed-status': { textContent: 'Feed not connected' },
+    'feed-state': { textContent: 'NOT CONNECTED' },
+    'feed-list': list
+  };
+  const listeners = {};
+  const document = {
+    body: { dataset: { session: 'in', wallet: '' } },
+    getElementById(id) { return nodes[id]; },
+    createElement() { return { textContent: '' }; }
+  };
+  const window = {
+    ValhallaSupabase: {
+      client: async () => ({ auth: { getSession: async () => ({ data: { session: { access_token: 'token' } } }) } })
+    },
+    addEventListener(type, fn) { (listeners[type] ||= []).push(fn); }
+  };
+  vm.runInNewContext(feedSource, {
+    document: document,
+    window: window,
+    fetch: async (url) => {
+      requests.push(String(url));
+      return { ok: true, json: async () => ({ solPriceUsd: null, valosActivity: [], wallet: { address: WALLET, sol: null, valos: 3.5 } }) };
+    }
+  });
+  await listeners['valhalla-signed-in'][0]();
+  assert.deepEqual(requests, ['/api/feed']);
+  assert.equal(nodes['feed-status'].textContent, 'Live feed');
+  assert.equal(nodes['feed-state'].textContent, 'CONNECTED');
+  assert.deepEqual(list.children.map(item => item.textContent), ['3.5 valOS']);
+  document.body.dataset.wallet = WALLET;
+  await listeners['valhalla-wallet-changed'][0]();
+  assert.equal(requests[1], '/api/feed?wallet=' + encodeURIComponent(WALLET));
 });
 
 test('the desk says the feed is not connected until a response arrives', () => {
