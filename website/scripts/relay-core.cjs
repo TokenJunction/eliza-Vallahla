@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { publicSupabase } = require('./feed-core.cjs');
 
 const MAX_SKEW_MS = 5 * 60 * 1000;
-const seen = new Map();
+const seen = new Set();
 
 function b64(buf) {
   return Buffer.from(buf).toString('base64');
@@ -173,8 +173,9 @@ async function handleSnapshot(req, env, fetchImpl) {
   }
   const doc = publicSnapshot(env, payload.health || 'Overseer not connected');
   const packed = sealSnapshot(doc, key);
-  await storeBackup(env, packed, fetchImpl);
-  return { status: 200, body: { packed: packed, at: doc.at } };
+  const stored = await storeBackup(env, packed, fetchImpl);
+  if (!stored) return { status: 503, body: { error: 'Backup storage not configured', packed: packed, at: doc.at, stored: false } };
+  return { status: 200, body: { packed: packed, at: doc.at, stored: true } };
 }
 
 async function storeBackup(env, packed, fetchImpl) {
