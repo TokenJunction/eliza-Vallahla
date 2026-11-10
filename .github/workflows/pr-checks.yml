@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -34,12 +34,38 @@ jobs:
       - name: Install gitleaks
         run: |
           curl -sSfL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
           tar -xzf gitleaks.tar.gz gitleaks
           install gitleaks /usr/local/bin/gitleaks
-      - name: Fail on a committed secret
+      - name: Fail on a secret in the pull request diff
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.sha }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          gitleaks detect --no-git --source . --config .gitleaks.toml --redact --no-banner --exit-code 1
-          gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1 --log-opts="${BASE_SHA}..${HEAD_SHA}"
+          git fetch --no-tags --depth=1 origin "$BASE"
+          git fetch --no-tags --depth=1 origin "$HEAD"
+          deepened=0
+          while ! git merge-base "$BASE" "$HEAD" >/dev/null 2>&1; do
+            if [ "$deepened" -ge 200 ]; then
+              echo "### Gitleaks" >> "$GITHUB_STEP_SUMMARY"
+              echo "Stopped. The merge base of \`$BASE...$HEAD\` was not in the first 200 commits, and the full history is not fetched." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            git fetch --no-tags --deepen=20 origin "$HEAD"
+            git fetch --no-tags --deepen=20 origin "$BASE"
+            deepened=$((deepened + 20))
+          done
+          set +e
+          gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1 --log-opts="${BASE}...${HEAD}" > /tmp/gitleaks.txt 2>&1
+          code=$?
+          set -e
+          {
+            echo "### Gitleaks"
+            echo
+            echo "Range: \`${BASE}...${HEAD}\`"
+            echo
+            echo '```'
+            cat /tmp/gitleaks.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$code"
