@@ -49,6 +49,9 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
   align-items: flex-start;
   gap: 8px;
 }
+.desktop-icon[hidden], .start-menu button[hidden] { display: none; }
+.window-body .drop { margin: 8px 0; padding: 16px; border: 1px dashed var(--line, rgba(244, 239, 230, .14)); border-radius: var(--radius, 14px); text-align: center; }
+.window-body #publish, .window-body #ship, .window-body #rollback { min-height: 44px; margin: 8px 8px 0 0; }
 .desktop-icon {
   display: flex;
   width: 88px;

@@ -106,5 +106,13 @@
   if (rollback) rollback.addEventListener('click', function () {
     send('/api/push', { action: 'rollback' }).then(function (body) { if (body && body.ok) say('Production was rolled back.'); });
   });
-  load();
+  var host = drop && drop.closest('[data-window]');
+  if (host && host.hidden) {
+    document.addEventListener('click', function (event) {
+      var opener = event.target.closest('[data-open="admin"], [data-open="overseer"]');
+      if (opener) load();
+    });
+  } else {
+    load();
+  }
 })();

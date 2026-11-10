@@ -8,15 +8,18 @@
   }
 
   function offerAdmin(access) {
-    var link = document.getElementById('admin-link');
-    if (!link || !access) return;
+    if (!access) return;
     fetch('/api/admin', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { authorization: 'Bearer ' + access, 'content-type': 'application/json' },
       body: '{"action":"enter"}'
     }).then(function (response) {
-      if (response && response.ok) link.hidden = false;
+      if (!response || !response.ok) return;
+      ['admin-link', 'admin-icon', 'admin-menu', 'overseer-icon', 'overseer-menu'].forEach(function (id) {
+        var node = document.getElementById(id);
+        if (node) node.hidden = false;
+      });
     }, function () {});
   }
 

@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { handleAdmin, handlePush, previousReady, looksSecret } = require('./admin-core.cjs');
 
 const env = {
@@ -17,6 +19,19 @@ function authed(id) {
     return { ok: false, status: 500, json: async () => ({}) };
   };
 }
+
+test('the desk shell opens owner controls as windows', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../os/index.html'), 'utf8');
+  assert.match(html, /data-window="admin"/);
+  assert.match(html, /data-window="overseer"/);
+  assert.match(html, /data-window="proof"/);
+  assert.match(html, /data-window="trial"/);
+  assert.match(html, /id="admin-icon"[^>]*hidden/);
+  assert.match(html, /id="overseer-icon"[^>]*hidden/);
+  assert.match(html, /data-open="proof"/);
+  assert.match(html, /data-open="trial"/);
+  assert.match(html, />Undo</);
+});
 
 test('everyone except the allowlisted owner gets 404', async () => {
   const outsider = await handleAdmin({ method: 'GET', headers: { authorization: 'Bearer person' } }, env, authed('person-2'));
