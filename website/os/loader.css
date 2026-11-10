@@ -1,0 +1,39 @@
+#os-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: #07110e;
+  color: #f4f7f2;
+}
+#os-loader[hidden] { display: none; }
+#os-loader video, #os-loader img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#os-loader p, #os-loader button { position: relative; z-index: 1; }
+#os-loader p {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(7, 17, 14, .72);
+  color: #8ef0c2;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+#os-loader button {
+  margin-top: 72px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #e2b055;
+  color: #1a1408;
+  font: inherit;
+  font-weight: 700;
+}
