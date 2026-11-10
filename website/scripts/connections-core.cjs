@@ -1,14 +1,21 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const dns = require('node:dns').promises;
 const { publicSupabase } = require('./feed-core.cjs');
 
 const SERVICES = {
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
   helius: 'Helius',
-  stripe: 'Stripe',
-  custom: 'Custom REST'
+  stripe: 'Stripe'
+};
+
+const OFFICIAL = {
+  openai: 'https://api.openai.com/v1/models',
+  openrouter: 'https://openrouter.ai/api/v1/models',
+  helius: 'https://mainnet.helius-rpc.com/',
+  stripe: 'https://api.stripe.com/v1/balance'
 };
 
 function bearer(headers) {
@@ -52,10 +59,17 @@ function hashKey(secret) {
 }
 
 function privateHost(host) {
-  const name = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  let name = String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
   if (!name || name === 'localhost' || name.endsWith('.localhost') || name.endsWith('.local') || name.endsWith('.internal')) return true;
-  if (name === '::1' || name === '0:0:0:0:0:0:0:1') return true;
-  if (/^(fc|fd|fe[89ab])/.test(name) && name.includes(':')) return true;
+  if (name === '::1' || name === '0:0:0:0:0:0:0:1' || name === '::') return true;
+  const dotted = name.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) name = dotted[1];
+  const hex = name.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hex) {
+    const value = (parseInt(hex[1], 16) << 16) + parseInt(hex[2], 16);
+    name = [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255].join('.');
+  }
+  if (name.includes(':')) return /^(fc|fd|fe[89ab]|ff|::ffff:)/.test(name) || name === '::1';
   const parts = name.split('.').map(Number);
   if (parts.length !== 4 || parts.some(function (part) { return !Number.isInteger(part) || part < 0 || part > 255; })) return false;
   const a = parts[0];
@@ -68,14 +82,15 @@ function privateHost(host) {
   return false;
 }
 
-function safeBase(url) {
-  let parsed;
-  try { parsed = new URL(String(url || '')); }
-  catch (error) { return ''; }
-  if (parsed.protocol !== 'https:') return '';
-  if (parsed.username || parsed.password) return '';
-  if (privateHost(parsed.hostname)) return '';
-  return parsed.origin;
+async function publicHost(host, lookupImpl) {
+  if (privateHost(host)) return false;
+  const lookup = lookupImpl || dns.lookup;
+  let found;
+  try { found = await lookup(host, { all: true, verbatim: true }); }
+  catch (error) { return false; }
+  const list = Array.isArray(found) ? found : (found ? [found] : []);
+  if (!list.length) return false;
+  return list.every(function (row) { return row && row.address && !privateHost(row.address); });
 }
 
 async function verifyUser(token, fetchImpl) {
@@ -105,31 +120,28 @@ function plainError(status) {
   return 'That service did not accept the key.';
 }
 
-async function ping(service, secret, base, fetchImpl) {
+async function ping(service, secret, fetchImpl, lookupImpl) {
+  const target = OFFICIAL[service];
+  if (!target) return { ok: false, error: 'Choose a listed provider.' };
+  const host = new URL(target).hostname;
+  if (!(await publicHost(host, lookupImpl))) return { ok: false, error: 'That provider address is not available.' };
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = controller ? setTimeout(function () { controller.abort(); }, 4000) : null;
   try {
     let response;
-    if (service === 'openai') {
-      response = await fetchImpl('https://api.openai.com/v1/models', { headers: { authorization: 'Bearer ' + secret }, signal: controller && controller.signal });
-    } else if (service === 'openrouter') {
-      response = await fetchImpl('https://openrouter.ai/api/v1/models', { headers: { authorization: 'Bearer ' + secret }, signal: controller && controller.signal });
-    } else if (service === 'helius') {
-      response = await fetchImpl('https://mainnet.helius-rpc.com/?api-key=' + encodeURIComponent(secret), {
+    if (service === 'helius') {
+      response = await fetchImpl(target + '?api-key=' + encodeURIComponent(secret), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
+        redirect: 'manual',
         signal: controller && controller.signal
       });
-    } else if (service === 'stripe') {
-      response = await fetchImpl('https://api.stripe.com/v1/balance', { headers: { authorization: 'Bearer ' + secret }, signal: controller && controller.signal });
     } else {
-      const origin = safeBase(base);
-      if (!origin) return { ok: false, error: 'Use a public https address.' };
-      response = await fetchImpl(origin + '/', { headers: { authorization: 'Bearer ' + secret }, redirect: 'manual', signal: controller && controller.signal });
+      response = await fetchImpl(target, { headers: { authorization: 'Bearer ' + secret }, redirect: 'manual', signal: controller && controller.signal });
     }
     if (response && (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400))) {
-      return { ok: false, error: 'Use a public https address.' };
+      return { ok: false, error: 'That provider address is not available.' };
     }
     if (!response || !response.ok) return { ok: false, error: plainError(response && response.status) };
     return { ok: true };
@@ -151,7 +163,7 @@ function publicRow(row) {
   };
 }
 
-async function handleConnections(req, env, fetchImpl) {
+async function handleConnections(req, env, fetchImpl, lookupImpl) {
   if (!req || (req.method !== 'GET' && req.method !== 'POST')) return { status: 405, body: { error: 'Method not allowed.' } };
   const token = bearer(req.headers);
   if (token.startsWith('valos_')) {
@@ -199,11 +211,15 @@ async function handleConnections(req, env, fetchImpl) {
   }
 
   if (action === 'test' || action === 'save') {
-    const service = String(payload.service || '');
-    if (!SERVICES[service]) return { status: 400, body: { error: 'Choose a listed service.' } };
+    let service = String(payload.service || '');
     let secret = String(payload.key || '');
-    if (!secret && payload.id) {
+    if (payload.id) {
       if (!key) return { status: 503, body: { error: 'Connections not configured' } };
+      const meta = await fetchImpl(site.url + '/rest/v1/connections?id=eq.' + encodeURIComponent(payload.id) + '&user_id=eq.' + encodeURIComponent(user.id) + '&select=service', rest(site, token));
+      const metaRows = meta && meta.ok ? await meta.json() : [];
+      const stored = Array.isArray(metaRows) ? metaRows[0] : null;
+      if (!stored || !stored.service) return { status: 404, body: { error: 'That connection was not found.' } };
+      service = stored.service;
       const loaded = await fetchImpl(site.url + '/rest/v1/rpc/connection_secret', rest(site, token, '', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -214,11 +230,9 @@ async function handleConnections(req, env, fetchImpl) {
       try { secret = decryptSecret(packed, key); }
       catch (error) { return { status: 400, body: { error: 'That saved key could not be read.' } }; }
     }
-    if (service === 'custom' && !safeBase(payload.baseUrl) && action === 'save') {
-      return { status: 400, body: { error: 'Use a public https address.' } };
-    }
+    if (!OFFICIAL[service]) return { status: 400, body: { error: 'Choose a listed provider.' } };
     if (!secret) return { status: 400, body: { error: 'Paste a key first.' } };
-    const result = await ping(service, secret, payload.baseUrl, fetchImpl);
+    const result = await ping(service, secret, fetchImpl, lookupImpl);
     if (action === 'test') {
       return { status: result.ok ? 200 : 400, body: result.ok ? { ok: true } : { error: result.error } };
     }
@@ -229,7 +243,7 @@ async function handleConnections(req, env, fetchImpl) {
       body: JSON.stringify({
         user_id: user.id,
         service: service,
-        base_url: service === 'custom' ? safeBase(payload.baseUrl) : '',
+        base_url: '',
         last4: last4(secret),
         ciphertext: encryptSecret(secret, key),
         status: result.ok ? 'ok' : 'error'

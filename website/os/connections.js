@@ -10,12 +10,6 @@
   });
 
   var service = document.getElementById('connections-service');
-  var baseLabel = document.getElementById('connections-base-label');
-  if (service && baseLabel) {
-    service.addEventListener('change', function () {
-      baseLabel.hidden = service.value !== 'custom';
-    });
-  }
 
   function say(text) { if (status) status.textContent = text; }
 
@@ -73,8 +67,7 @@
     send('POST', {
       action: 'save',
       service: service && service.value,
-      key: key && key.value,
-      baseUrl: document.getElementById('connections-base') && document.getElementById('connections-base').value
+      key: key && key.value
     }).then(function (body) {
       if (!body) return;
       if (key) key.value = '';
@@ -89,8 +82,7 @@
     send('POST', {
       action: 'test',
       service: service && service.value,
-      key: key && key.value,
-      baseUrl: document.getElementById('connections-base') && document.getElementById('connections-base').value
+      key: key && key.value
     }).then(function (body) { if (body && body.ok) say('Key works.'); });
   });
 

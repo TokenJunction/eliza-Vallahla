@@ -6,7 +6,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.connections (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
-  service text not null check (service in ('openai', 'openrouter', 'helius', 'stripe', 'custom')),
+  service text not null check (service in ('openai', 'openrouter', 'helius', 'stripe')),
   base_url text not null default '',
   last4 text not null default '',
   ciphertext text not null,
@@ -76,7 +76,7 @@ set search_path = public
 as $$
   select k.last4
   from public.valos_api_keys as k
-  where k.key_hash = encode(extensions.digest(raw, 'sha256'), 'hex')
+  where k.key_hash = encode(extensions.digest(convert_to(raw, 'utf8'), 'sha256'), 'hex')
   limit 1;
 $$;
 
