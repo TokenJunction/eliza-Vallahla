@@ -7,8 +7,8 @@ on:
 
 permissions:
   contents: read
-  issues: write
   pull-requests: write
+  actions: write
 
 jobs:
   sentinel:
@@ -19,11 +19,68 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Run the sentinel
+      - name: Restore the rollback clock
+        id: clock
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: .zeus-state
+          key: zeus-state-${{ github.run_id }}
+          restore-keys: |
+            zeus-state-
+      - name: Read a saved clock when the cache has none
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .zeus-state
+          if [ "${{ steps.clock.outcome }}" != "success" ]; then
+            echo "ZEUS_STATE_READ=error" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ "${{ steps.clock.outputs.cache-hit }}" = "true" ]; then
+            echo "ZEUS_STATE_READ=hit" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=zeus-sentinel-state&per_page=5" --jq '[.artifacts[] | select(.expired==false)][0].id')
+          if [ -z "$id" ] || [ "$id" = "null" ]; then
+            echo "ZEUS_STATE_READ=miss" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if ! gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > .zeus-state/state.zip; then
+            echo "ZEUS_STATE_READ=error" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          unzip -o .zeus-state/state.zip -d .zeus-state
+          echo "ZEUS_STATE_READ=artifact" >> "$GITHUB_ENV"
+      - name: Check the site and reserve a rollback
+        id: plan
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           ZEUS_LAST_VERIFIED_DEPLOYMENT: ${{ vars.ZEUS_LAST_VERIFIED_DEPLOYMENT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: node scripts/zeus-sentinel.mjs
+          ZEUS_STATE_PATH: .zeus-state/state.json
+        run: node scripts/zeus-sentinel.mjs plan
+      - name: Save the rollback clock
+        id: save-clock
+        if: steps.plan.outputs.promote == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .zeus-state
+          key: zeus-state-${{ github.run_id }}
+      - name: Promote the verified deployment
+        if: steps.plan.outputs.promote == 'true' && steps.save-clock.outcome == 'success'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ZEUS_LAST_VERIFIED_DEPLOYMENT: ${{ vars.ZEUS_LAST_VERIFIED_DEPLOYMENT }}
+          ZEUS_STATE_PATH: .zeus-state/state.json
+        run: node scripts/zeus-sentinel.mjs promote
+      - name: Keep a copy of the clock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeus-sentinel-state
+          path: .zeus-state/state.json
+          if-no-files-found: ignore
+          retention-days: 30

@@ -1,4 +1,5 @@
 /site-build/
+.zeus-state/
 /node_modules/
 /private-export/
 **/__pycache__/

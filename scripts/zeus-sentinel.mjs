@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -55,8 +56,9 @@ export function reviewFile(file) {
   }
   scanSecrets(text).forEach(function (reason) { flags.push({ path: path, reason: reason }); });
   if (/3des|des-ede3/i.test(text)) flags.push({ path: path, reason: '3DES' });
-  if (/\bDNS\b|A-record|A record/i.test(text)) flags.push({ path: path, reason: 'DNS or A-record' });
-  if (/\bwallet\b|\btrading\b/i.test(text)) flags.push({ path: path, reason: 'wallet or trading change' });
+  if (/A-record|A record|AAAA record|CNAME record|DNS record|"type"\s*:\s*"A"|type:\s*A\b/i.test(text)) flags.push({ path: path, reason: 'DNS record' });
+  if (/\b0x[a-fA-F0-9]{40}\b/.test(text) || /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/.test(text)) flags.push({ path: path, reason: 'wallet address' });
+  if (/signTransaction|signAllTransactions|partialSign|sendTransaction|VersionedTransaction|\bswap\s*\(|executeSwap|executeTrade/.test(text)) flags.push({ path: path, reason: 'swap, sign, or execute code' });
   if (isPublicFile(path)) {
     const serverKey = /OPENROUTER_API_KEY|HF_TOKEN|VERCEL_TOKEN|SUPABASE_SERVICE_ROLE|GPU_NODE_KEY|AI_BYOK_ENC_KEY|process\.env\.[A-Z0-9_]*KEY/;
     if (serverKey.test(text) || scanSecrets(text).length) flags.push({ path: path, reason: 'server key referenced in a public file' });
@@ -70,7 +72,7 @@ export function reviewVerdict(flags) {
 
 export function reviewComment(flags) {
   const verdict = reviewVerdict(flags);
-  if (!flags.length) return REVIEW_HEAD + ' PASS\n\nNo secret pattern, 3DES, DNS, wallet, or trading change in the diff.';
+  if (!flags.length) return REVIEW_HEAD + ' PASS\n\nNo secret pattern, 3DES, DNS record, wallet address, or swap, sign, or execute code in the diff.';
   const lines = flags.map(function (flag) { return '- `' + flag.path + '`: ' + flag.reason; });
   return REVIEW_HEAD + ' FLAG\n\n' + lines.join('\n');
 }
@@ -90,6 +92,7 @@ export function lastRollbackAt(comments) {
 export function rollbackDecision(input) {
   if (!input || !input.siteDown) return { action: 'skip', reason: 'site checks passed' };
   if (input.historyKnown === false) return { action: 'skip', reason: 'rollback history could not be read' };
+  if (input.canWrite === false) return { action: 'skip', reason: 'rollback clock could not be written' };
   if (!input.hasToken) return { action: 'skip', reason: 'VERCEL_TOKEN is not set' };
   if (!input.deploymentId) return { action: 'skip', reason: 'ZEUS_LAST_VERIFIED_DEPLOYMENT is not set' };
   if (input.alreadyRolledBack) return { action: 'skip', reason: 'this run already rolled back once' };
@@ -207,11 +210,13 @@ export async function run(env, deps) {
   let siteDown = checks.some(function (check) { return !check.ok; });
   let rollback = 'not needed';
   let already = false;
+  let reservedId = null;
   if (siteDown) {
-    const history = await deps.readRollbackHistory();
+    const history = await (deps.readState || deps.readRollbackHistory)();
     const decision = rollbackDecision({
       siteDown: true,
       historyKnown: history.known,
+      canWrite: history.canWrite !== false && typeof deps.writeState === 'function',
       hasToken: Boolean(env.VERCEL_TOKEN),
       deploymentId: env.ZEUS_LAST_VERIFIED_DEPLOYMENT || '',
       lastRollbackAt: history.at,
@@ -219,18 +224,18 @@ export async function run(env, deps) {
       now: now
     });
     if (decision.action === 'rollback') {
-      const promoted = await fetchImpl(promoteUrl(decision.deploymentId), {
-        method: 'POST',
-        headers: { authorization: 'Bearer ' + env.VERCEL_TOKEN }
-      });
-      if (!promoted || !promoted.ok) {
-        rollback = 'promote failed status ' + (promoted && promoted.status);
+      const reserved = await deps.writeState(new Date(now).toISOString());
+      if (!reserved) {
+        rollback = 'rollback clock could not be written';
+      } else if (deps.deferPromote) {
+        reservedId = decision.deploymentId;
+        rollback = 'rollback reserved for ' + decision.deploymentId;
       } else {
-        already = true;
-        rollback = 'promoted ' + decision.deploymentId + ' status ' + promoted.status;
-        await deps.recordRollback(new Date(now).toISOString());
+        const applied = await applyPromote(env, deps, decision, history, { fetchImpl: fetchImpl, sleep: sleep, gapMs: gapMs, timeoutMs: timeoutMs });
+        already = applied.ok;
+        rollback = applied.rollback;
         checks.length = 0;
-        for (const check of CHECKS) checks.push(await checkUrl(check, { fetchImpl: fetchImpl, sleep: sleep, gapMs: gapMs, timeoutMs: timeoutMs }));
+        applied.checks.forEach(function (check) { checks.push(check); });
         siteDown = checks.some(function (check) { return !check.ok; });
       }
     } else {
@@ -241,59 +246,72 @@ export async function run(env, deps) {
   const flags = await deps.reviewPulls();
   const report = buildReport({ now: now, checks: checks, models: models, rollback: rollback, flags: flags });
   await deps.publishReport(report);
-  return { exitCode: siteDown ? 1 : 0, report: report, rollback: rollback };
+  return { exitCode: reservedId ? 0 : (siteDown ? 1 : 0), report: report, rollback: rollback, promote: reservedId };
 }
 
-async function defaultReadHistory(env, fetchImpl) {
-  if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return { known: false, at: null };
-  const listed = await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues?state=open&per_page=100');
-  if (!listed.ok || !Array.isArray(listed.body)) return { known: false, at: null };
-  const issue = listed.body.find(function (item) { return item && item.title === STATUS_TITLE && !item.pull_request; });
-  if (!issue) return { known: true, at: null, issue: null };
-  const comments = await githubJson(fetchImpl, env.GITHUB_TOKEN, issue.comments_url);
-  if (!comments.ok || !Array.isArray(comments.body)) return { known: false, at: null, issue: issue };
-  return { known: true, at: lastRollbackAt(comments.body), issue: issue };
+export async function applyPromote(env, deps, decision, history, timing) {
+  const promoted = await timing.fetchImpl(promoteUrl(decision.deploymentId), {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + env.VERCEL_TOKEN }
+  });
+  const status = promoted && typeof promoted.status === 'number' ? promoted.status : 0;
+  const ok = status >= 200 && status < 300;
+  if (!ok) await deps.writeState(history.at == null ? null : new Date(history.at).toISOString());
+  const checks = [];
+  for (const check of CHECKS) checks.push(await checkUrl(check, timing));
+  return {
+    ok: ok,
+    checks: checks,
+    rollback: ok ? 'promoted ' + decision.deploymentId + ' status ' + status : 'promote failed status ' + status
+  };
 }
 
-export async function recordRollback(env, fetchImpl, issue, stamp) {
-  if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return issue || null;
-  let current = issue;
-  if (!current) {
-    const created = await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues', {
-      method: 'POST',
-      body: JSON.stringify({ title: STATUS_TITLE, body: 'rollback-at: ' + stamp })
-    });
-    if (!created.ok || !created.body || !created.body.number) return null;
-    current = created.body;
-  }
-  await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + current.number + '/comments', {
-    method: 'POST',
-    body: JSON.stringify({ body: 'rollback-at: ' + stamp })
-  });
-  await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + current.number + '/labels', {
-    method: 'POST',
-    body: JSON.stringify({ labels: ['zeus-rollback'] })
-  });
-  return current;
+function stateFile() {
+  return process.env.ZEUS_STATE_PATH || '.zeus-state/state.json';
 }
 
-async function defaultPublish(env, fetchImpl, issue, report) {
-  if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return;
-  if (issue) {
-    await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + issue.number, {
-      method: 'PATCH',
-      body: JSON.stringify({ title: STATUS_TITLE, body: report })
-    });
-    await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + issue.number + '/pin', { method: 'PUT' });
-    return;
+function readLocalState() {
+  if (process.env.ZEUS_STATE_READ === 'error') return { known: false, canWrite: false, at: null };
+  try {
+    const parsed = JSON.parse(readFileSync(stateFile(), 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { known: false, canWrite: false, at: null };
+    if (!parsed.lastRollbackAt) return { known: true, canWrite: true, at: null, previous: null, pending: false };
+    const at = Date.parse(parsed.lastRollbackAt);
+    const previous = parsed.previousRollbackAt ? Date.parse(parsed.previousRollbackAt) : null;
+    if (!Number.isFinite(at)) return { known: false, canWrite: false, at: null, previous: null, pending: false };
+    return { known: true, canWrite: true, at: at, previous: Number.isFinite(previous) ? previous : null, pending: Boolean(parsed.pending) };
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return { known: true, canWrite: true, at: null };
+    return { known: false, canWrite: false, at: null };
   }
-  const created = await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues', {
-    method: 'POST',
-    body: JSON.stringify({ title: STATUS_TITLE, body: report })
-  });
-  if (created.ok && created.body && created.body.number) {
-    await githubJson(fetchImpl, env.GITHUB_TOKEN, 'https://api.github.com/repos/' + env.GITHUB_REPOSITORY + '/issues/' + created.body.number + '/pin', { method: 'PUT' });
+}
+
+function writeLocalState(stamp) {
+  try {
+    const file = stateFile();
+    let previous = null;
+    try {
+      const current = JSON.parse(readFileSync(file, 'utf8'));
+      previous = current && current.pending ? (current.previousRollbackAt || null) : (current && current.lastRollbackAt || null);
+    } catch (error) {
+      previous = null;
+    }
+    const pending = Boolean(stamp) && stamp !== previous;
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify({
+      lastRollbackAt: stamp || previous,
+      previousRollbackAt: pending ? previous : null,
+      pending: pending
+    }) + '\n');
+    return true;
+  } catch (error) {
+    return false;
   }
+}
+
+function publishSummary(report) {
+  process.stdout.write(report + '\n');
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report + '\n');
 }
 
 async function defaultProbe(env, fetchImpl) {
@@ -347,22 +365,40 @@ async function defaultReview(env, fetchImpl) {
 
 async function main() {
   const env = process.env;
-  const history = await defaultReadHistory(env, fetch);
-  const state = { issue: history.issue || null };
+  const phase = process.argv[2] || 'run';
+  const timing = { fetchImpl: fetch, sleep: function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }, gapMs: 30_000, timeoutMs: 20_000 };
+  if (phase === 'promote') {
+    const history = readLocalState();
+    if (!history.known) {
+      publishSummary('Rollback skipped. The clock could not be read before promote.');
+      process.exitCode = 1;
+      return;
+    }
+    const applied = await applyPromote(env, { writeState: writeLocalState }, { deploymentId: env.ZEUS_LAST_VERIFIED_DEPLOYMENT }, { at: history.pending ? history.previous : history.at }, timing);
+    const report = buildReport({
+      now: Date.now(),
+      checks: applied.checks,
+      models: [],
+      rollback: applied.rollback,
+      flags: []
+    });
+    publishSummary(report);
+    process.exitCode = applied.checks.some(function (check) { return !check.ok; }) ? 1 : 0;
+    return;
+  }
   const result = await run(env, {
     fetchImpl: fetch,
     now: Date.now(),
-    readRollbackHistory: async function () { return history; },
-    recordRollback: async function (stamp) {
-      state.issue = await recordRollback(env, fetch, state.issue, stamp);
-    },
-    publishReport: function (report) {
-      process.stdout.write(report + '\n');
-      return defaultPublish(env, fetch, state.issue, report);
-    },
+    deferPromote: phase === 'plan',
+    readState: async function () { return readLocalState(); },
+    writeState: async function (stamp) { return writeLocalState(stamp); },
+    publishReport: async function (report) { publishSummary(report); },
     probeModels: function () { return defaultProbe(env, fetch); },
     reviewPulls: function () { return defaultReview(env, fetch); }
   });
+  if (phase === 'plan' && process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, 'promote=' + (result.promote ? 'true' : 'false') + '\n');
+  }
   process.exitCode = result.exitCode;
 }
 

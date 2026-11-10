@@ -10,7 +10,6 @@ import {
   freeModelsFrom,
   checkUrl,
   promoteUrl,
-  recordRollback,
   run,
   CHECKS
 } from './zeus-sentinel.mjs';
@@ -26,12 +25,15 @@ test('the secret scanner flags key material and ignores ordinary prose', () => {
   assert.ok(scanSecrets('Authorization: Bearer abcdefghijklmnop').includes('bearer token'));
 });
 
-test('a diff review flags 3DES, DNS, wallet, trading, and public server keys', () => {
+test('a diff review flags real secrets, DNS records, addresses, and sign code', () => {
   assert.deepEqual(reviewFile({ filename: 'notes.md', patch: '+\n+plain copy\n' }), []);
+  assert.deepEqual(reviewFile({ filename: 'desk.js', patch: '+wallet connect\n' }), []);
+  assert.deepEqual(reviewFile({ filename: 'trade.js', patch: '+live trading stays off\n' }), []);
+  assert.deepEqual(reviewFile({ filename: 'docs.md', patch: '+must not change DNS\n' }), []);
   assert.equal(reviewFile({ filename: 'crypto.js', patch: '+use 3DES\n' })[0].reason, '3DES');
-  assert.equal(reviewFile({ filename: 'dns.js', patch: '+add an A-record\n' })[0].reason, 'DNS or A-record');
-  assert.equal(reviewFile({ filename: 'desk.js', patch: '+wallet connect\n' })[0].reason, 'wallet or trading change');
-  assert.equal(reviewFile({ filename: 'trade.js', patch: '+live trading stays off\n' })[0].reason, 'wallet or trading change');
+  assert.equal(reviewFile({ filename: 'dns.js', patch: '+add an A-record\n' })[0].reason, 'DNS record');
+  assert.equal(reviewFile({ filename: 'chain.js', patch: '+const owner = So11111111111111111111111111111111111111112\n' })[0].reason, 'wallet address');
+  assert.equal(reviewFile({ filename: 'tx.js', patch: '+await wallet.signTransaction(tx)\n' })[0].reason, 'swap, sign, or execute code');
   const publicHit = reviewFile({ filename: 'website/os/ai.js', patch: '+const key = process.env.OPENROUTER_API_KEY\n' });
   assert.ok(publicHit.some(function (flag) { return flag.reason === 'server key referenced in a public file'; }));
   const htmlHit = reviewFile({ filename: 'website/index.html', patch: '+hf_examplekey\n' });
@@ -46,6 +48,7 @@ test('rollback waits six hours and never runs without a token or a verified depl
   assert.equal(rollbackDecision({ siteDown: true, hasToken: false, deploymentId: 'dpl_1', historyKnown: true, now: now }).reason, 'VERCEL_TOKEN is not set');
   assert.equal(rollbackDecision({ siteDown: true, hasToken: true, deploymentId: '', historyKnown: true, now: now }).reason, 'ZEUS_LAST_VERIFIED_DEPLOYMENT is not set');
   assert.equal(rollbackDecision({ siteDown: true, hasToken: true, deploymentId: 'dpl_1', historyKnown: false, now: now }).reason, 'rollback history could not be read');
+  assert.equal(rollbackDecision({ siteDown: true, hasToken: true, deploymentId: 'dpl_1', historyKnown: true, canWrite: false, now: now }).reason, 'rollback clock could not be written');
   assert.equal(rollbackDecision({ siteDown: true, hasToken: true, deploymentId: 'dpl_1', historyKnown: true, lastRollbackAt: now - SIX_HOURS + 1, now: now }).reason, 'a rollback already happened in the last 6 hours');
   assert.equal(rollbackDecision({ siteDown: true, hasToken: true, deploymentId: 'dpl_1', historyKnown: true, alreadyRolledBack: true, now: now }).reason, 'this run already rolled back once');
   const ready = rollbackDecision({ siteDown: true, hasToken: true, deploymentId: 'dpl_1', historyKnown: true, lastRollbackAt: now - SIX_HOURS, now: now });
@@ -107,8 +110,10 @@ test('the allowlist reader keeps only :free model ids', () => {
   assert.deepEqual(models, ['nvidia/nemotron-3.5-lightning:free', 'google/gemma-4-31b-it:free']);
 });
 
-test('a rejected promote does not start the cooldown', async () => {
-  let noted = 0;
+test('a rejected promote is a failed heal and health runs again', async () => {
+  const stamps = [];
+  let promoteCalls = 0;
+  let healthCalls = 0;
   const result = await run({
     VERCEL_TOKEN: 'token',
     ZEUS_LAST_VERIFIED_DEPLOYMENT: 'dpl_old'
@@ -117,34 +122,65 @@ test('a rejected promote does not start the cooldown', async () => {
     timeoutMs: 1000,
     now: Date.parse('2026-11-10T18:00:00Z'),
     fetchImpl: async function (url) {
-      if (String(url).includes('/promote/')) return { ok: false, status: 403 };
+      if (String(url).includes('/promote/')) {
+        promoteCalls += 1;
+        return { ok: false, status: 403 };
+      }
+      healthCalls += 1;
       return { status: 500 };
     },
-    readRollbackHistory: async function () { return { known: true, at: null }; },
-    recordRollback: async function () { noted += 1; },
+    readState: async function () { return { known: true, canWrite: true, at: null }; },
+    writeState: async function (stamp) { stamps.push(stamp); return true; },
     probeModels: async function () { return []; },
     reviewPulls: async function () { return []; },
     publishReport: async function () {}
   });
-  assert.equal(noted, 0);
+  assert.equal(promoteCalls, 1);
+  assert.ok(healthCalls > 18);
+  assert.deepEqual(stamps, ['2026-11-10T18:00:00.000Z', null]);
   assert.equal(result.exitCode, 1);
   assert.match(result.rollback, /promote failed status 403/);
 });
 
-test('the first rollback writes a cooldown comment when no status issue exists', async () => {
-  const calls = [];
-  const issue = await recordRollback({
-    GITHUB_TOKEN: 'token',
-    GITHUB_REPOSITORY: 'TokenJunction/eliza-valhalla'
-  }, async function (url, init) {
-    calls.push(String(url) + ' ' + (init && init.method));
-    if (init && init.method === 'POST' && String(url).endsWith('/issues')) {
-      return { ok: true, status: 201, text: async () => JSON.stringify({ number: 9 }) };
-    }
-    return { ok: true, status: 201, text: async () => '{}' };
-  }, null, '2026-11-10T18:00:00.000Z');
-  assert.equal(issue.number, 9);
-  assert.ok(calls.some(function (call) { return call.includes('/issues/9/comments POST'); }));
+test('an unreadable or unwritable clock does not promote', async () => {
+  let promoteCalls = 0;
+  const unread = await run({
+    VERCEL_TOKEN: 'token',
+    ZEUS_LAST_VERIFIED_DEPLOYMENT: 'dpl_old'
+  }, {
+    gapMs: 0,
+    timeoutMs: 1000,
+    now: Date.parse('2026-11-10T18:00:00Z'),
+    fetchImpl: async function (url) {
+      if (String(url).includes('/promote/')) promoteCalls += 1;
+      return { status: 500 };
+    },
+    readState: async function () { return { known: false, canWrite: false, at: null }; },
+    writeState: async function () { return true; },
+    probeModels: async function () { return []; },
+    reviewPulls: async function () { return []; },
+    publishReport: async function () {}
+  });
+  const unwritten = await run({
+    VERCEL_TOKEN: 'token',
+    ZEUS_LAST_VERIFIED_DEPLOYMENT: 'dpl_old'
+  }, {
+    gapMs: 0,
+    timeoutMs: 1000,
+    now: Date.parse('2026-11-10T18:00:00Z'),
+    fetchImpl: async function (url) {
+      if (String(url).includes('/promote/')) promoteCalls += 1;
+      return { status: 500 };
+    },
+    readState: async function () { return { known: true, canWrite: true, at: null }; },
+    writeState: async function () { return false; },
+    probeModels: async function () { return []; },
+    reviewPulls: async function () { return []; },
+    publishReport: async function () {}
+  });
+  assert.equal(promoteCalls, 0);
+  assert.match(unread.rollback, /could not be read/);
+  assert.match(unwritten.rollback, /could not be written/);
 });
 
 test('the workflow and the doc refuse merge, main, and a new deploy', () => {
@@ -154,13 +190,16 @@ test('the workflow and the doc refuse merge, main, and a new deploy', () => {
   assert.match(workflow, /cron:\s*['"]0 \*\/3 \* \* \*['"]/);
   assert.match(workflow, /workflow_dispatch/);
   assert.match(workflow, /contents:\s*read/);
-  assert.match(workflow, /issues:\s*write/);
   assert.match(workflow, /pull-requests:\s*write/);
+  assert.match(workflow, /actions:\s*write/);
+  assert.match(workflow, /actions\/cache\/restore/);
+  assert.match(workflow, /upload-artifact/);
+  assert.doesNotMatch(workflow, /issues:\s*write/);
   assert.doesNotMatch(workflow, /push:\s*\n\s*branches:\s*\[main\]|git push|vercel deploy/i);
   assert.match(doc, /never merge/i);
   assert.match(doc, /OPENROUTER_API_KEY/);
   assert.match(doc, /VERCEL_TOKEN/);
   assert.match(doc, /ZEUS_LAST_VERIFIED_DEPLOYMENT/);
   assert.doesNotMatch(script, /sk_live_|gh_pat_|BEGIN PRIVATE KEY/);
-  assert.doesNotMatch(script, /\/merge|APPROVE/);
+  assert.doesNotMatch(script, /\/merge|APPROVE|\/pin/);
 });
