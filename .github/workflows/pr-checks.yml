@@ -16,12 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
-          persist-credentials: false
-      - name: Fetch the pull request branch tips
-        run: |
-          git fetch --no-tags --filter=blob:none --depth=50 origin "${{ github.base_ref }}"
-          git fetch --no-tags --filter=blob:none --depth=50 origin "${{ github.head_ref }}:refs/remotes/origin/${{ github.head_ref }}"
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          fetch-depth: 50
+      - name: Fetch the base tip
+        run: git fetch --no-tags --filter=blob:none --depth=50 origin "${{ github.event.pull_request.base.sha }}:refs/remotes/origin/pr-base"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -42,24 +40,21 @@ jobs:
           tar -xzf gitleaks.tar.gz gitleaks
           install gitleaks /usr/local/bin/gitleaks
       - name: Fail on a secret in the pull request diff
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          if ! git merge-base "$BASE" "$HEAD" >/dev/null 2>&1; then
+          if ! MB=$(git merge-base HEAD refs/remotes/origin/pr-base); then
             echo "### Gitleaks" >> "$GITHUB_STEP_SUMMARY"
-            echo "Stopped. \`$BASE\` and \`$HEAD\` were not both in the shallow branch fetch, so \`${BASE}...${HEAD}\` was not scanned. The full history was not fetched." >> "$GITHUB_STEP_SUMMARY"
+            echo "Stopped. The pull request head and the base tip were not connected in the shallow fetch, so the diff was not scanned. The full history was not fetched." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          echo "merge-base $(git merge-base "$BASE" "$HEAD")"
+          echo "merge-base $MB"
           set +e
-          gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1 --log-opts="${BASE}...${HEAD}" > /tmp/gitleaks.txt 2>&1
+          gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1 --log-opts="${MB}..HEAD" > /tmp/gitleaks.txt 2>&1
           code=$?
           set -e
           {
             echo "### Gitleaks"
             echo
-            echo "Range: \`${BASE}...${HEAD}\`"
+            echo "Range: \`${MB}..HEAD\` (pull request commits only)"
             echo
             echo '```'
             cat /tmp/gitleaks.txt

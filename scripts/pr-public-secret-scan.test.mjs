@@ -40,7 +40,10 @@ test('the workflow verifies gitleaks, stays shallow, and writes a summary', () =
   assert.match(workflow, /551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb/);
   assert.match(workflow, /sha256sum -c/);
   assert.match(workflow, /GITHUB_STEP_SUMMARY/);
-  assert.match(workflow, /fetch-depth: 1/);
+  assert.match(workflow, /fetch-depth: 50/);
+  assert.match(workflow, /refs\/pull\/\$\{\{ github\.event\.pull_request\.number \}\}\/head/);
   assert.doesNotMatch(workflow, /fetch-depth: 0/);
-  assert.match(workflow, /base\.sha\}\.\.\.\$\{?HEAD|BASE\}\.\.\.\$\{HEAD/);
+  assert.doesNotMatch(workflow, /head_ref/);
+  assert.match(workflow, /\$\{MB\}\.\.HEAD/);
+  assert.doesNotMatch(workflow, /\$\{BASE\}\.\.\.\$\{HEAD\}/);
 });
