@@ -15,6 +15,8 @@ create table if not exists public.admin_uploads (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists admin_uploads_user_path on public.admin_uploads (user_id, path);
+
 alter table public.admin_uploads enable row level security;
 
 create table if not exists public.overseer_runs (

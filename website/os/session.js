@@ -53,7 +53,12 @@
       if (signOut) {
         signOut.hidden = false;
         signOut.addEventListener('click', function () {
-          supabase.auth.signOut().then(function () { leave(); }, leave);
+          fetch('/api/admin', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' },
+            body: '{"action":"leave"}'
+          }).then(function () { return supabase.auth.signOut(); }, function () { return supabase.auth.signOut(); }).then(leave, leave);
         });
       }
       return supabase.from('profiles').select('account_level').eq('id', user.id).maybeSingle().then(function (row) {

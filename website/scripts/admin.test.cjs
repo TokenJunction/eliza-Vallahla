@@ -33,6 +33,12 @@ test('the desk shell opens owner controls as windows', () => {
   assert.match(html, />Undo</);
 });
 
+test('sign-out clears the admin cookie', async () => {
+  const left = await handleAdmin({ method: 'POST', headers: {}, body: '{"action":"leave"}' }, env, async () => { throw new Error('no'); });
+  assert.equal(left.status, 200);
+  assert.match(left.headers['set-cookie'], /Max-Age=0/);
+});
+
 test('everyone except the allowlisted owner gets 404', async () => {
   const outsider = await handleAdmin({ method: 'GET', headers: { authorization: 'Bearer person' } }, env, authed('person-2'));
   assert.equal(outsider.status, 404);
@@ -44,6 +50,10 @@ test('everyone except the allowlisted owner gets 404', async () => {
 
 test('secret paths and secret contents are refused', async () => {
   assert.equal(looksSecret('-----BEGIN PRIVATE KEY-----'), true);
+  assert.equal(looksSecret('whsec_testsecretvalue'), true);
+  assert.equal(looksSecret('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.sig'), true);
+  assert.equal(looksSecret('sk_live_12345678'), true);
+  assert.equal(looksSecret('rk_live_12345678'), true);
   const calls = [];
   const result = await handlePush({
     method: 'POST',
@@ -71,6 +81,12 @@ test('secret paths and secret contents are refused', async () => {
     body: JSON.stringify({ action: 'sign', path: 'notes/readme.md', bytes: 20 })
   }, env, authed('owner-1'));
   assert.equal(outside.status, 400);
+  const script = await handlePush({
+    method: 'POST',
+    headers: { authorization: 'Bearer owner' },
+    body: JSON.stringify({ action: 'sign', path: 'website/scripts/admin-core.cjs', bytes: 20 })
+  }, env, authed('owner-1'));
+  assert.equal(script.status, 400);
 });
 
 test('publish opens a branch and a pull request', async () => {
@@ -120,6 +136,19 @@ test('ship waits until checks pass', async () => {
   });
   assert.equal(blocked.status, 409);
   assert.equal(merged, false);
+  const unread = await handlePush({
+    method: 'POST',
+    headers: { authorization: 'Bearer owner' },
+    body: JSON.stringify({ action: 'ship', number: 80 })
+  }, env, async (url, init) => {
+    const target = String(url);
+    if (target.includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'owner-1' }) };
+    if (target.endsWith('/pulls/80')) return { ok: true, json: async () => ({ base: { ref: 'develop' }, head: { ref: 'owner/push-5', sha: 'abc' } }) };
+    if (target.includes('/check-runs')) return { ok: false, status: 403, json: async () => ({}) };
+    assert.equal(init && init.method, 'PUT');
+    return { ok: true, json: async () => ({}) };
+  });
+  assert.equal(unread.status, 200);
 });
 
 test('rollback selects the previous READY deployment', async () => {

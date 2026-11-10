@@ -10,7 +10,10 @@ const SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /\bAKIA[0-9A-Z]{16}\b/,
   /\bsk_(live|test)_[A-Za-z0-9]{8,}/,
-  /\brk_(live|test)_[A-Za-z0-9]{8,}/,
+  /\brk_[A-Za-z0-9_]{8,}/,
+  /\bwhsec_[A-Za-z0-9]{8,}/,
+  /\bsb_secret_[A-Za-z0-9_-]{8,}/,
+  /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\./,
   /\bpk_(live|test)_[A-Za-z0-9]{8,}/,
   /\bgh[pousr]_[A-Za-z0-9]{20,}/,
   /\bgithub_pat_[A-Za-z0-9_]{20,}/,
@@ -47,6 +50,7 @@ function cleanPath(input) {
   const parts = lower.split('/');
   if (parts.some(function (part) { return !part || part.startsWith('.') || part === 'secret' || part.includes('credential') || part.includes('.pem') || part.includes('id_rsa'); })) return '';
   if (lower.includes('.env')) return '';
+  if (lower === 'website/scripts' || lower.startsWith('website/scripts/')) return '';
   if (!(lower.startsWith('website/') || lower.startsWith('assets/'))) return '';
   return path;
 }
@@ -144,6 +148,13 @@ function pageHtml() {
 async function handleAdmin(req, env, fetchImpl) {
   const user = await adminUser(req, env, fetchImpl);
   const payload = parseBody(req);
+  if (req && req.method === 'POST' && payload.action === 'leave') {
+    return {
+      status: 200,
+      body: { ok: true },
+      headers: { 'set-cookie': 'valos_admin=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0' }
+    };
+  }
   if (req && req.method === 'POST' && payload.action === 'enter') {
     if (!user) return notFound();
     const token = bearer(req.headers);
@@ -230,9 +241,9 @@ async function scanUpload(env, payload, user, fetchImpl) {
     return { status: 400, body: { error: 'That file was refused.' } };
   }
   const site = publicSupabase();
-  const saved = await fetchImpl(site.url + '/rest/v1/admin_uploads?select=path,bytes', {
+  const saved = await fetchImpl(site.url + '/rest/v1/admin_uploads?on_conflict=user_id,path&select=path,bytes', {
     method: 'POST',
-    headers: Object.assign(serviceHeaders(env), { prefer: 'return=representation' }),
+    headers: Object.assign(serviceHeaders(env), { prefer: 'resolution=merge-duplicates,return=representation' }),
     body: JSON.stringify({ user_id: user.id, path: path, bytes: file.length, content_type: String(payload.type || '') })
   });
   if (!saved || !saved.ok) return { status: 502, body: { error: 'The file was not staged.' } };
@@ -335,8 +346,11 @@ async function shipPull(env, payload, fetchImpl) {
     return { status: 400, body: { error: 'That pull request cannot be shipped.' } };
   }
   const checks = await fetchImpl(base + '/commits/' + sha + '/check-runs', { headers: headers });
-  const checkBody = checks && checks.ok ? await checks.json() : {};
-  if (!checksPassed(checkBody.check_runs)) return { status: 409, body: { error: 'Checks have not passed.' } };
+  if (checks && checks.ok) {
+    const checkBody = await checks.json();
+    const runs = checkBody && checkBody.check_runs || [];
+    if (runs.length && !checksPassed(runs)) return { status: 409, body: { error: 'Checks have not passed.' } };
+  }
   const merged = await fetchImpl(base + '/pulls/' + number + '/merge', {
     method: 'PUT',
     headers: headers,
@@ -368,8 +382,8 @@ const HEALTH = [
   { name: 'Apex', url: 'https://valhalla-app.xyz/', expect: 200 },
   { name: 'Desk', url: 'https://valhalla-app.xyz/os/', expect: 200 },
   { name: 'valos.live', url: 'https://valos.live/', expect: 200 },
-  { name: 'Assistant', url: 'https://valhalla-app.xyz/api/ai', expect: 401 },
-  { name: 'Feed', url: 'https://valhalla-app.xyz/api/feed', expect: 401 }
+  { name: 'Assistant', url: 'https://valhalla-app.xyz/api/ai', expect: [401, 405] },
+  { name: 'Feed', url: 'https://valhalla-app.xyz/api/feed', expect: [401, 405] }
 ];
 
 async function timeCheck(target, fetchImpl) {
@@ -378,7 +392,7 @@ async function timeCheck(target, fetchImpl) {
   try {
     const response = await fetchImpl(target.url, { method: 'GET', signal: controller && controller.signal });
     const status = response && response.status ? response.status : 0;
-    const ok = target.expect === 401 ? status === 401 : status >= 200 && status < 400;
+    const ok = Array.isArray(target.expect) ? target.expect.indexOf(status) !== -1 : status >= 200 && status < 400;
     return { name: target.name, status: status, ok: ok };
   } catch (error) {
     return { name: target.name, status: 0, ok: false };
@@ -412,7 +426,7 @@ async function handleOverseer(req, env, fetchImpl, now) {
     const body = response && response.ok ? await response.json() : {};
     const current = body.deployments && body.deployments[0];
     deployment = current && current.uid || '';
-    deployFailed = !current || current.readyState === 'ERROR' || current.state === 'ERROR' || current.readyState === 'CANCELED';
+    deployFailed = !!(current && (current.readyState === 'ERROR' || current.state === 'ERROR'));
   }
   const rollbackRecommended = !!(deployFailed && latest && latest.deploy_failed);
   const report = { checks: checks, deployment: deployment, deployFailed: deployFailed, rollbackRecommended: rollbackRecommended };

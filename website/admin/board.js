@@ -3,6 +3,11 @@
   var pending = document.getElementById('pending');
   var drop = document.getElementById('drop');
   var pr = { number: 0, branch: '' };
+  try { pr = JSON.parse(localStorage.getItem('valos-owner-pr') || '') || pr; } catch (error) { pr = { number: 0, branch: '' }; }
+  function remember(next) {
+    pr = next || { number: 0, branch: '' };
+    try { localStorage.setItem('valos-owner-pr', JSON.stringify({ number: pr.number || 0, branch: pr.branch || '' })); } catch (error) {}
+  }
 
   function say(text) { if (status) status.textContent = text; }
 
@@ -81,7 +86,7 @@
   if (publish) publish.addEventListener('click', function () {
     send('/api/push', { action: 'publish' }).then(function (body) {
       if (!body) return;
-      pr = body;
+      remember(body);
       var line = document.getElementById('pr');
       if (line) line.textContent = body.url || '';
       say('Pull request opened.');
