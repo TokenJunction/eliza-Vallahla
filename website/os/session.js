@@ -17,6 +17,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function (node) {
       var tool = node.getAttribute('data-tool');
       var allowed = window.ValhallaAccount.toolAllowed(level.level, tool);
+      if (node.hasAttribute('data-plan-panel')) node.hidden = !allowed;
       if (node.tagName === 'BUTTON') node.disabled = node.disabled || !allowed;
       if (!allowed) {
         node.setAttribute('aria-disabled', 'true');

@@ -74,7 +74,9 @@ test('public pages do not offer the paper desk, Clerk, or the repository', () =>
   function walk(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'vendor') walk(full);
+      }
       else if (entry.name.endsWith('.html') || entry.name.endsWith('.js')) files.push(full);
     }
   }
@@ -84,6 +86,10 @@ test('public pages do not offer the paper desk, Clerk, or the repository', () =>
   assert.doesNotMatch(blob, /Public desk|Preview the public paper desk|Explore the public ValhallaOS desk/);
   assert.match(read('website/index.html'), /Sign-in is not available yet/);
   assert.match(read('website/index.html'), /id="sign-in"/);
+  assert.match(read('website/index.html'), /vendor\/auth0-spa-js-2\.30\.0\.js/);
+  assert.doesNotMatch(read('website/auth0-gate.js'), /jsdelivr|cdn\./);
+  assert.match(read('website/os/index.html'), /data-open="swarm" data-tool="monitor"/);
+  assert.match(read('website/os/index.html'), /data-plan-panel/);
   assert.match(read('website/os/index.html'), /id="desktop" hidden/);
   assert.match(read('website/os/index.html'), /Wallet connect not configured yet/);
   assert.match(read('website/os/session.js'), /location\.replace\('\/'\)/);

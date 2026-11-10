@@ -94,7 +94,10 @@ export async function minifySite(directory = out) {
   if (Buffer.byteLength(trail) > 40 * 1024) throw new Error('trail is too large');
   fs.appendFileSync(appJs, '\n' + trail);
   const shipped = walk(directory).filter(file => /\.(html|js|css)$/.test(file));
-  for (const file of shipped) checkPublic(fs.readFileSync(file, 'utf8'), path.relative(directory, file));
+  for (const file of shipped) {
+    if (file.includes(`${path.sep}vendor${path.sep}`)) continue;
+    checkPublic(fs.readFileSync(file, 'utf8'), path.relative(directory, file));
+  }
   const workstation = ['os/index.html', 'os/app.js', 'os/bridge.js', 'os/os.css', 'desk.js', 'desk.css']
     .reduce((sum, name) => sum + fs.statSync(path.join(directory, name)).size, 0);
   if (workstation >= 1500000) throw new Error('workstation bundle is too large');

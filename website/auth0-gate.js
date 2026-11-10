@@ -40,18 +40,13 @@
     };
   }
 
-  function loadSdk() {
-    return import('https://cdn.jsdelivr.net/npm/@auth0/auth0-spa-js@2.30.0/+esm');
-  }
-
   function createClient(config, href) {
     var options = clientOptions(config, href);
-    if (!options) return Promise.reject(new Error('Sign-in is not available yet.'));
-    return loadSdk().then(function (sdk) {
-      var create = sdk.createAuth0Client;
-      if (typeof create !== 'function') throw new Error('Sign-in is not available yet.');
-      return create(options);
-    });
+    var sdk = root.auth0;
+    if (!options || !sdk || typeof sdk.createAuth0Client !== 'function') {
+      return Promise.reject(new Error('Sign-in is not available yet.'));
+    }
+    return Promise.resolve(sdk.createAuth0Client(options));
   }
 
   return {

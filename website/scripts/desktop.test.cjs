@@ -5,6 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const root = path.join(__dirname, '../..');
+const account = require('../account-level.js');
 const appSource = fs.readFileSync(path.join(root, 'site-build/os/app.js'), 'utf8');
 const bridgeSource = fs.readFileSync(path.join(root, 'site-build/os/bridge.js'), 'utf8');
 
@@ -39,6 +40,7 @@ function loadDesktop(fetchImpl, options = {}) {
   });
   node('start-menu').hidden = true;
   const document = {
+    body: { dataset: { session: options.session === undefined ? 'in' : options.session, level: options.level || 'UNLIMITED' } },
     getElementById: node,
     createElement() { return element('created-' + Math.random()); },
     querySelector(selector) {
@@ -60,7 +62,8 @@ function loadDesktop(fetchImpl, options = {}) {
     clearInterval() {},
     addEventListener() {},
     innerWidth: 1280,
-    innerHeight: 800
+    innerHeight: 800,
+    ValhallaAccount: account
   };
   vm.runInNewContext(appSource, {
     document, window, Date, AbortController,
@@ -94,6 +97,22 @@ test('desktop icons open and Escape closes without treating HTML health as live'
   });
   for (const fn of page.events.keydown) fn({ key: 'Escape', target: { tagName: 'TEXTAREA' } });
   assert.equal(page.node('window-status').hidden, false);
+});
+
+test('signed-out and FREE accounts cannot open a higher tool', () => {
+  function launch(page, name) {
+    click(page.node('desktop'), {
+      closest(selector) { return selector === '[data-open]' ? { dataset: { open: name } } : null; }
+    });
+  }
+  const signedOut = loadDesktop(async () => jsonResponse({ status: 'ok' }), { session: '' });
+  launch(signedOut, 'wallet');
+  assert.equal(signedOut.node('window-wallet').hidden, true);
+  const free = loadDesktop(async () => jsonResponse({ status: 'ok' }), { level: 'FREE' });
+  launch(free, 'swarm');
+  assert.equal(free.node('window-swarm').hidden, true);
+  launch(free, 'status');
+  assert.equal(free.node('window-status').hidden, false);
 });
 
 test('health accepts only an explicit service status and fails closed on timeout', async () => {
@@ -147,6 +166,7 @@ function loadChat(fetchImpl, site = { CHAT_URL: 'https://chat.example.test' }) {
   }
   const calls = [];
   const document = {
+    body: { dataset: { session: 'in', level: 'FREE' } },
     getElementById: node,
     querySelectorAll() { return []; },
     createElement(tag) { return { tag, textContent: '', children: [], appendChild(child) { this.children.push(child); return child; } }; },

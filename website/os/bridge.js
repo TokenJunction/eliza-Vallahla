@@ -119,6 +119,7 @@
     if (submitting) return;
     var text = input.value.trim();
     if (!text) return;
+    if (!document.body || document.body.dataset.session !== 'in') { chatStatus.textContent = 'Sign-in is required.'; return; }
     if (secretLike(text)) { chatStatus.textContent = 'Do not share a seed phrase or private key. Your message was not sent.'; return; }
     var base = String((window.VALHALLA_SITE || {}).CHAT_URL || '').replace(/\/+$/, '');
     if (!base) { chatStatus.textContent = 'Chat service is not configured.'; return; }
