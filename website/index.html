@@ -8,6 +8,7 @@
   <link rel="canonical" href="https://valhalla-app.xyz/">
   <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="preload" as="image" href="/assets/poster.jpg" fetchpriority="high">
+  <link rel="preload" as="image" href="/assets/heaven-poster.jpg">
   <link rel="stylesheet" href="/home.css">
   <title>ValhallaOS</title>
 </head>
@@ -17,6 +18,7 @@
       <a class="brand" href="/"><svg id="brand-mark" class="brand-mark" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><path fill="none" stroke="#E8B65A" stroke-width="1.6" d="M5 23c4.2-11 17.8-11 22 0"/><path fill="none" stroke="#C9963E" stroke-width="1.2" d="M9 23c2.8-7 11.2-7 14 0"/><path fill="#E8B65A" d="M15 13h2v10h-2z"/></svg><span>VALHALLAOS</span></a>
       <nav aria-label="Main navigation">
         <a href="/app/" data-enter-desk>Sign in</a>
+        <a href="/swap/">Swap</a>
         <a href="/os/">Public desk</a>
       </nav>
     </header>
@@ -25,8 +27,8 @@
       <figure class="stage-wrap backdrop" aria-label="Silent film. ValhallaOS visual introduction. It does not show the product.">
         <div class="stage">
           <div class="scene" id="hero-scene">
-            <img class="still" src="/assets/poster.jpg" alt="" width="1280" height="720">
-            <video id="hero-video" muted loop playsinline preload="none" poster="/assets/poster.jpg" aria-describedby="hero-note"></video>
+            <img class="still" src="/assets/heaven-poster.jpg" alt="" width="1280" height="720">
+            <video id="hero-video" muted loop playsinline preload="metadata" poster="/assets/heaven-poster.jpg" aria-describedby="hero-note"></video>
             <ol class="scenes" aria-label="Three scenes">
               <li>Your workspace.</li>
               <li>Your assistant.</li>

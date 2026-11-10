@@ -49,7 +49,7 @@ class SiteTests(unittest.TestCase):
         return urllib.request.urlopen(self.base + path)
 
     def test_routes_and_assets(self):
-        for route in ("/", "/app/", "/os/", "/volos/", "/terms/", "/api/"):
+        for route in ("/", "/app/", "/os/", "/volos/", "/swap/", "/terms/", "/api/"):
             with self.subTest(route=route), self.get(route) as response:
                 self.assertEqual(response.status, 200)
                 self.assertIn("text/html", response.headers["Content-Type"])
@@ -89,7 +89,7 @@ class SiteTests(unittest.TestCase):
             "node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs "
             "website/scripts/desk.test.cjs website/scripts/host-route.test.cjs "
             "website/scripts/journey.test.cjs website/scripts/desktop.test.cjs "
-            "website/scripts/minify.test.cjs",
+            "website/scripts/minify.test.cjs website/scripts/live-swap.test.cjs",
             "node website/scripts/minify-site.mjs",
         )
         position = -1
@@ -119,7 +119,7 @@ class SiteTests(unittest.TestCase):
         self.assertNotIn("Valhalla read-only preview", (OUT / "errors.js").read_text())
         for name in (".env", "scripts", "src", "experimental", "experiments"):
             self.assertFalse((OUT / name).exists())
-        self.assertIn('"/media/hero.mp4"', (OUT / "home-motion.js").read_text())
+        self.assertIn('"/media/hero-web.mp4"', (OUT / "home-motion.js").read_text())
 
     def test_build_rejects_missing_entry_points_and_assets(self):
         with tempfile.TemporaryDirectory() as temp:

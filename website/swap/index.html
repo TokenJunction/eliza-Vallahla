@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07110e">
+  <title>Swap · ValOS</title>
+  <link rel="icon" href="/assets/favicon-32.png">
+  <link rel="stylesheet" href="/swap/swap.css">
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="/">val<span>OS</span></a>
+    <nav aria-label="Swap">
+      <a href="/">Entrance</a>
+      <a href="/os/">Workstation</a>
+      <a href="/volos/">volOS</a>
+      <a href="/app/">Sign in</a>
+    </nav>
+  </header>
+  <main>
+    <section class="card" aria-labelledby="swap-title">
+      <p class="kicker" id="mode-label">Confirm to sign</p>
+      <h1 id="swap-title">Swap</h1>
+      <p id="gate-status" role="status">Checking sign-in…</p>
+      <form id="swap-form">
+        <label>You pay
+          <select id="pay-token" name="pay">
+            <option value="SOL">SOL</option>
+            <option value="USDC">USDC</option>
+            <option value="VOLOS">volOS — not published</option>
+          </select>
+          <input id="pay-amount" name="amount" inputmode="decimal" value="0.01" autocomplete="off">
+        </label>
+        <label>You receive
+          <select id="receive-token" name="receive">
+            <option value="USDC">USDC</option>
+            <option value="SOL">SOL</option>
+            <option value="VOLOS">volOS — not published</option>
+          </select>
+          <output id="receive-amount">Quote not loaded</output>
+        </label>
+        <label>Slippage
+          <input id="slippage" name="slippage" value="0.25" inputmode="decimal">
+          <span>%</span>
+        </label>
+        <p id="route-line">Route not loaded. Jupiter is checked only after sign-in.</p>
+        <p id="fee-line">No platform fee is configured.</p>
+        <div class="actions">
+          <button type="button" id="sign-in">Sign in</button>
+          <button type="button" id="connect-wallet" disabled>Connect wallet</button>
+          <button type="button" id="quote" disabled>Get quote</button>
+          <button type="submit" id="swap" disabled>Swap</button>
+        </div>
+      </form>
+      <p id="wallet-line">No wallet connected. Connecting does not request a signature.</p>
+    </section>
+    <section class="card side" aria-labelledby="prepare-title">
+      <h2 id="prepare-title">Prepare</h2>
+      <p>The overseer can fill a ticket here. It does not sign, send, or spend any wallet, including the one ending …C8sm.</p>
+      <button type="button" id="prepare">Prepare this ticket</button>
+      <h2>Connections</h2>
+      <ul id="plugins">
+        <li>Clerk: not checked</li>
+        <li>Jupiter: not checked</li>
+        <li>RPC: not checked</li>
+      </ul>
+      <h2>Transaction</h2>
+      <dl id="report">
+        <div><dt>Signature</dt><dd id="tx-signature">None. Nothing has been sent.</dd></div>
+        <div><dt>Confirmation</dt><dd id="tx-status">Not reported.</dd></div>
+      </dl>
+    </section>
+  </main>
+  <script src="/swap/swap-bundle.js" defer></script>
+</body>
+</html>

@@ -37,7 +37,7 @@
     if (sourcesReady) return;
     sourcesReady = true;
     var mp4 = document.createElement("source");
-    mp4.src = "/media/hero.mp4";
+    mp4.src = "/media/hero-web.mp4";
     mp4.type = "video/mp4";
     video.appendChild(mp4);
     video.preload = "metadata";

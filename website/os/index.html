@@ -7,14 +7,22 @@
   <meta name="description" content="ValhallaOS command desk for wallet connections and assistant chat.">
   <title>ValhallaOS · Workstation</title>
   <link rel="stylesheet" href="/os/os.css?v=1.4.2">
+  <link rel="stylesheet" href="/os/loader.css?v=1.4.2">
   <link rel="stylesheet" href="/desk.css?v=1.4.2">
   <script src="/home.js" defer></script>
   <script src="/site-config.js?v=1.4.2" defer></script>
+  <script src="/os/loader.js?v=1.4.2" defer></script>
   <script src="/os/app.js?v=1.4.2" defer></script>
   <script src="/os/bridge.js?v=1.4.2" defer></script>
   <script src="/desk.js?v=1.4.2" defer></script>
 </head>
 <body>
+  <div id="os-loader" role="status" aria-live="polite">
+    <video id="os-loader-video" muted loop playsinline poster="/assets/heaven-poster.jpg"></video>
+    <img id="os-loader-still" src="/assets/heaven-poster.jpg" alt="" hidden>
+    <p>Opening the workstation</p>
+    <button type="button" id="os-loader-continue" hidden>Continue</button>
+  </div>
   <svg class="icon-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
     <symbol id="icon-computer" viewBox="0 0 32 32">
       <path fill="#d4d0c8" stroke="#222" d="M3 4h26v19H3z"/><path fill="#000080" d="M5 6h22v14H5z"/>
@@ -45,6 +53,7 @@
       <div><h1>VALHALLA<span>OS</span></h1>
       <p>PAPER-FIRST WORKSTATION</p></div>
       <div class="header-state"><span class="state-dot"></span> PUBLIC DESK <span class="paper-badge">LIVE TRADING OFF</span></div>
+      <a class="classic-button" href="/swap/">Swap</a>
       <a class="classic-button menu-signin" href="/app/">Account</a>
     </header>
 
