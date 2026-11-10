@@ -92,6 +92,16 @@
         <h2 id="swap-title">Swap</h2>
         <p>Live trading on this page is off.</p>
         <button class="swap" type="button" disabled>Swap unavailable</button>
+        <h2 id="chain-proof-title">Cryptographic proof</h2>
+        <p>This is cryptographic proof. It is not a zero-knowledge proof. <a href="/proof/">Open the proof board</a></p>
+        <dl>
+          <dt>Mint</dt><dd id="chain-mint">—</dd>
+          <dt>Authorities</dt><dd id="chain-auth">—</dd>
+          <dt>Supply</dt><dd id="chain-supply">—</dd>
+          <dt>Lock</dt><dd id="chain-lock">—</dd>
+          <dt>Unlock</dt><dd id="chain-unlock">—</dd>
+        </dl>
+        <ul id="chain-receipts"></ul>
       </article>
       <article class="risk" aria-labelledby="risk-title">
         <h2 id="risk-title">Risk</h2>
@@ -109,6 +119,7 @@
     </footer>
   </div>
   <script src="/site-config.js" defer></script>
+  <script src="/proof/proof.js" defer></script>
   <script src="/volos/ads.js" defer></script>
   <script>
     document.getElementById('copy-contract').addEventListener('click', function () {

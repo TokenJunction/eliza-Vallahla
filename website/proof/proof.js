@@ -37,6 +37,30 @@
     });
     numbers.appendChild(line('Signed packages: median ' + Math.round(delivery.medianUs) + ' µs, p95 ' + Math.round(delivery.p95Us) + ' µs, lost ' + delivery.lost));
     if (body.region) numbers.appendChild(line('Region: ' + body.region));
+    var chain = body.chain || {};
+    text('proof-kind', chain.label || body.label || 'cryptographic proof');
+    if (!chain.configured) {
+      text('chain-mint', 'On-chain proof not configured');
+      text('chain-auth', '—');
+      text('chain-supply', '—');
+      text('chain-lock', '—');
+      text('chain-unlock', '—');
+    } else if (chain.error) {
+      text('chain-mint', chain.error);
+    } else {
+      text('chain-mint', '…' + chain.mint.last4);
+      text('chain-auth', chain.mint.authoritiesRevoked ? 'Revoked' : 'Not revoked');
+      text('chain-supply', chain.mint.supply || '—');
+      text('chain-lock', '…' + chain.lock.last4 + ' · ' + chain.lock.status);
+      text('chain-unlock', chain.lock.matchesRecord ? chain.lock.unlockAt : chain.lock.unlockAt + '. The Nov 8, 2027 record does not match.');
+      var receipts = document.getElementById('chain-receipts');
+      if (receipts) {
+        receipts.replaceChildren();
+        (chain.receipts || []).forEach(function (row) {
+          receipts.appendChild(line('Signed …' + row.signature + ' ' + row.status + '. Recommendation: ' + row.note));
+        });
+      }
+    }
   }).catch(function () {
     text('proof-status', 'Not checked.');
     text('proof-online', 'Not checked');

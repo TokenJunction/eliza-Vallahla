@@ -31,6 +31,7 @@
 <body>
   <main class="wrap">
     <h1>Live proof</h1>
+    <p class="lead">Cryptographic proof. This is not a zero-knowledge proof.</p>
     <p class="lead" id="proof-status">Checking now.</p>
     <dl>
       <div class="row"><dt>Status</dt><dd id="proof-online">—</dd></div>
@@ -38,7 +39,14 @@
       <div class="row"><dt>Delivered intact</dt><dd id="proof-intact">—</dd></div>
       <div class="row"><dt>Tampered package caught</dt><dd id="proof-tamper">—</dd></div>
       <div class="row"><dt>Last checked</dt><dd id="proof-time">—</dd></div>
+      <div class="row"><dt>Kind</dt><dd id="proof-kind">Cryptographic proof</dd></div>
+      <div class="row"><dt>Mint</dt><dd id="chain-mint">—</dd></div>
+      <div class="row"><dt>Authorities</dt><dd id="chain-auth">—</dd></div>
+      <div class="row"><dt>Supply</dt><dd id="chain-supply">—</dd></div>
+      <div class="row"><dt>Lock</dt><dd id="chain-lock">—</dd></div>
+      <div class="row"><dt>Unlock</dt><dd id="chain-unlock">—</dd></div>
     </dl>
+    <ul id="chain-receipts"></ul>
     <p class="compare">AI models are great at writing instructions, not at carrying data. In our Nov 10 test, AI-relayed data arrived 0% intact and took about 100 s, while signed packages arrived 100% intact in about 1 ms.</p>
     <div class="actions">
       <a class="trial" href="https://valhalla-app.xyz/">Try Pro free for 7 days</a>
