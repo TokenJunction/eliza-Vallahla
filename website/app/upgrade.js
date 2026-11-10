@@ -49,8 +49,8 @@
         return;
       }
       var payUrl = "solana:" + address + "?label=Valhalla&message=Pro%20subscription";
-      if (kind === "usdc" && usdc) payUrl += "&spl-token=" + encodeURIComponent(usdc) + "&amount=9.99";
-      if (kind === "usdt") payUrl += "&spl-token=" + encodeURIComponent(USDT) + "&amount=9.99";
+      if (kind === "usdc" && usdc) payUrl += "&spl-token=" + encodeURIComponent(usdc) + "&amount=12";
+      if (kind === "usdt") payUrl += "&spl-token=" + encodeURIComponent(USDT) + "&amount=12";
       note("This payment goes to the merchant address ending " + address.slice(-4) + ". It is a subscription, not a deposit. Not financial advice.");
       window.location.href = payUrl;
     } catch (err) {
