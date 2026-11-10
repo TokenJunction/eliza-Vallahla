@@ -97,17 +97,20 @@ test('the relay accepts one sealed package and refuses the replay', async () => 
   };
   const request = { method: 'POST', headers: {}, body: JSON.stringify(packet) };
   const stored = new Set();
+  let keptFor = 0;
   async function store(url, init) {
     const target = String(url);
     if (!target.includes('relay_nonces')) throw new Error('no');
     if (init && init.method === 'DELETE') return { ok: true, status: 200, json: async () => ({}) };
     const row = JSON.parse(init.body);
+    keptFor = Date.parse(row.expires_at) - Date.now();
     if (stored.has(row.id)) return { ok: false, status: 409, json: async () => ({}) };
     stored.add(row.id);
     return { ok: true, status: 201, json: async () => ({}) };
   }
   const first = await handleRelay(request, env, store);
   assert.equal(first.status, 200);
+  assert.equal(keptFor > 9 * 60 * 1000, true);
   assert.equal(first.body.ok, true);
   assert.equal(first.body.payload, undefined);
   assert.equal(JSON.stringify(first.body).includes('desk'), false);

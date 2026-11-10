@@ -150,7 +150,7 @@ async function claimNonce(env, id, fetchImpl, now) {
   const saved = await fetchImpl(site.url + '/rest/v1/relay_nonces', {
     method: 'POST',
     headers: Object.assign({ prefer: 'return=minimal' }, headers),
-    body: JSON.stringify({ id: id, expires_at: new Date(now + MAX_SKEW_MS).toISOString() })
+    body: JSON.stringify({ id: id, expires_at: new Date(now + (2 * MAX_SKEW_MS)).toISOString() })
   });
   if (saved && (saved.status === 409 || saved.status === 23505)) return { ok: false, configured: true };
   if (!saved || !saved.ok) return { ok: false, configured: true };
