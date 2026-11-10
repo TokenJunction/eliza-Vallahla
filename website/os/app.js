@@ -64,19 +64,28 @@
 
   function setIdle(node, sleeping) {
     if (!node) return;
+    var wasSleeping = node.dataset.idle === 'sleeping';
     node.dataset.idle = sleeping ? 'sleeping' : 'active';
     var frame = node.querySelector && node.querySelector('iframe');
     if (frame && frame.dataset) {
       if (sleeping) {
-        var current = frame.getAttribute ? frame.getAttribute('src') : frame.src;
-        var doc = frame.srcdoc || '';
-        if (current && current !== 'about:blank') frame.dataset.resume = current;
-        if (doc) frame.dataset.resumeDoc = doc;
-        if (current && current !== 'about:blank' && frame.setAttribute) frame.setAttribute('src', 'about:blank');
-        if (doc) frame.srcdoc = '';
-      } else {
-        if (frame.dataset.resume && frame.setAttribute) frame.setAttribute('src', frame.dataset.resume);
-        if (frame.dataset.resumeDoc) frame.srcdoc = frame.dataset.resumeDoc;
+        if (frame.dataset.paused !== '1') {
+          var current = frame.getAttribute ? frame.getAttribute('src') : frame.src;
+          var doc = frame.srcdoc || '';
+          if (current && current !== 'about:blank') frame.dataset.resume = current;
+          if (doc) frame.dataset.resumeDoc = doc;
+          if (current && current !== 'about:blank' && frame.setAttribute) frame.setAttribute('src', 'about:blank');
+          if (doc) frame.srcdoc = '';
+          frame.dataset.paused = '1';
+        }
+      } else if (wasSleeping && frame.dataset.paused === '1') {
+        var liveDoc = frame.srcdoc || '';
+        var liveSrc = frame.getAttribute ? frame.getAttribute('src') : frame.src;
+        if (liveDoc) frame.dataset.resumeDoc = liveDoc;
+        else if (frame.dataset.resumeDoc) frame.srcdoc = frame.dataset.resumeDoc;
+        if (liveSrc && liveSrc !== 'about:blank') frame.dataset.resume = liveSrc;
+        else if (frame.dataset.resume && frame.setAttribute) frame.setAttribute('src', frame.dataset.resume);
+        frame.dataset.paused = '';
       }
     }
     if (node.dataset.window === 'status') {

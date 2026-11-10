@@ -92,10 +92,11 @@ test('a srcdoc preview comes back when its window wakes', () => {
     querySelector(selector) { return selector === 'iframe' ? frame : (selector === '.title-bar h2' ? { textContent: 'Installer' } : null); },
     addEventListener() {}, setAttribute() {}, replaceChildren() {}, appendChild() {}, focus() {}
   };
+  const desktop = { dataset: {}, handlers: {}, addEventListener(type, fn) { (this.handlers[type] ||= []).push(fn); } };
   const document = {
     getElementById(id) {
       if (id === 'window-installer') return view;
-      if (id === 'desktop') return { dataset: {}, addEventListener() {} };
+      if (id === 'desktop') return desktop;
       if (id === 'taskbar-apps') return { replaceChildren() {}, appendChild() {}, querySelector() { return null; } };
       if (id === 'start-menu') return { hidden: true, contains() { return false; } };
       if (id === 'start-button') return { setAttribute() {}, contains() { return false; }, addEventListener() {} };
@@ -118,4 +119,9 @@ test('a srcdoc preview comes back when its window wakes', () => {
   assert.equal(frame.dataset.resumeDoc, '<p>kept</p>');
   assert.equal(frame.srcdoc, '<p>kept</p>');
   assert.equal(view.dataset.idle, 'active');
+  frame.srcdoc = '<p>new</p>';
+  for (const fn of desktop.handlers.click) {
+    fn({ target: { closest(selector) { return selector === '[data-window]' ? view : null; } }, preventDefault() {}, button: 0 });
+  }
+  assert.equal(frame.srcdoc, '<p>new</p>');
 });
