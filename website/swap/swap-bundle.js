@@ -16826,6 +16826,8 @@ Message: ${transactionMessage}.
   var swapButton = document.getElementById("swap");
   var form = document.getElementById("swap-form");
   var config = { clerk: "missing", liveTrading: false, platformFee: "none", rpc: "not-connected" };
+  var clerkClient = null;
+  var signedIn = false;
   var sessionToken = "";
   var walletAddress = "";
   var latestQuote = null;
@@ -16834,7 +16836,6 @@ Message: ${transactionMessage}.
     return text.length < 4 ? "\u2026" : "\u2026" + text.slice(-4);
   }
   function paint() {
-    const signedIn = Boolean(sessionToken);
     connect.disabled = !signedIn;
     quoteButton.disabled = !signedIn || !walletAddress;
     swapButton.disabled = !signedIn || !walletAddress || !latestQuote;
@@ -16863,11 +16864,31 @@ Message: ${transactionMessage}.
     if (!config.liveTrading) routeLine.textContent = "Live execution is not connected. A quote still requires production sign-in.";
     paint();
   }
+  async function bearer() {
+    if (clerkClient && clerkClient.session && typeof clerkClient.session.getToken === "function") {
+      sessionToken = await clerkClient.session.getToken() || "";
+      signedIn = Boolean(sessionToken);
+    }
+    return { "content-type": "application/json", authorization: "Bearer " + sessionToken };
+  }
+  function rememberSession(session) {
+    signedIn = Boolean(session);
+    sessionToken = "";
+    if (!session) {
+      gate.textContent = "Sign in to continue. A wallet connection does not sign you in.";
+      latestQuote = null;
+      paint();
+      return;
+    }
+    gate.textContent = "Signed in. Connect your own wallet. This does not spend the owner wallet.";
+    paint();
+  }
   async function startClerk() {
     if (config.clerk !== "production" || !config.clerkPublishableKey) return;
-    if (!window.Clerk) {
+    if (!clerkClient) {
       await new Promise(function(resolve, reject) {
         const script = document.createElement("script");
+        script.dataset.clerkPublishableKey = config.clerkPublishableKey;
         script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
         script.crossOrigin = "anonymous";
         script.onload = resolve;
@@ -16876,17 +16897,17 @@ Message: ${transactionMessage}.
         };
         document.head.appendChild(script);
       });
+      const ClerkClass = window.Clerk;
+      clerkClient = typeof ClerkClass === "function" ? new ClerkClass(config.clerkPublishableKey) : ClerkClass;
+      await clerkClient.load();
+      if (typeof clerkClient.addListener === "function") {
+        clerkClient.addListener(function(emission) {
+          rememberSession(emission && emission.session || clerkClient.session);
+        });
+      }
     }
-    window.Clerk = window.Clerk || window.clerk;
-    const clerk = window.Clerk;
-    await clerk.load({ publishableKey: config.clerkPublishableKey });
-    if (clerk.session) {
-      sessionToken = await clerk.session.getToken();
-      gate.textContent = "Signed in. Connect your own wallet. This does not spend the owner wallet.";
-    } else {
-      clerk.openSignIn();
-    }
-    paint();
+    rememberSession(clerkClient.session);
+    if (!clerkClient.session && typeof clerkClient.openSignIn === "function") clerkClient.openSignIn();
   }
   async function connectWallet() {
     const provider = window.solflare || window.solana;
@@ -16916,7 +16937,7 @@ Message: ${transactionMessage}.
     const slippageBps = Math.round(Number(document.getElementById("slippage").value) * 100);
     const response = await fetch("/api/valos-quote", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer " + sessionToken },
+      headers: await bearer(),
       body: JSON.stringify({ inputMint: pay, outputMint: out, amount, slippageBps })
     });
     const body = await response.json();
@@ -16937,7 +16958,7 @@ Message: ${transactionMessage}.
     const provider = window.solflare || window.solana;
     const built = await fetch("/api/valos-swap", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer " + sessionToken },
+      headers: await bearer(),
       body: JSON.stringify({ quoteResponse: latestQuote, userPublicKey: walletAddress })
     });
     const swapBody = await built.json();
@@ -16959,7 +16980,7 @@ Message: ${transactionMessage}.
     const raw = btoa(String.fromCharCode.apply(null, signed.serialize()));
     const sent = await fetch("/api/valos-send", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer " + sessionToken },
+      headers: await bearer(),
       body: JSON.stringify({ signedTransaction: raw })
     });
     const sentBody = await sent.json();
@@ -16970,12 +16991,23 @@ Message: ${transactionMessage}.
     document.getElementById("tx-signature").textContent = sentBody.signature;
     const report = await fetch("/api/valos-tx", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer " + sessionToken },
+      headers: await bearer(),
       body: JSON.stringify({ signature: sentBody.signature })
     });
     const reportBody = await report.json();
     document.getElementById("tx-status").textContent = report.ok ? reportBody.confirmation || "not-reported" : reportBody.error || "Not reported.";
   }
+  function clearQuote() {
+    latestQuote = null;
+    receive.textContent = "Quote not loaded";
+    routeLine.textContent = "Route not loaded. Get a new quote before swapping.";
+    paint();
+  }
+  ["pay-token", "receive-token", "pay-amount", "slippage"].forEach(function(id) {
+    const field = document.getElementById(id);
+    field.addEventListener("input", clearQuote);
+    field.addEventListener("change", clearQuote);
+  });
   document.getElementById("prepare").addEventListener("click", function() {
     routeLine.textContent = "Ticket prepared. Confirm in your wallet to sign. This did not send a transaction.";
   });

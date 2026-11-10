@@ -22,6 +22,26 @@ function jsonResponse(body, ok = true) {
   return { ok, json: async () => body };
 }
 
+test('session verification uses the session id from the token', async () => {
+  const payload = Buffer.from(JSON.stringify({ sid: 'sess_abc' })).toString('base64url');
+  const token = 'eyJhbGciOiJub25lIn0.' + payload + '.sig';
+  const calls = [];
+  const result = await swap.requireSession({
+    CLERK_PUBLISHABLE_KEY: 'pk_live_example',
+    CLERK_SECRET_KEY: 'sk_live_example'
+  }, async (url) => {
+    calls.push(String(url));
+    return { ok: true, json: async () => ({ status: 'active' }) };
+  }, token);
+  assert.equal(result.ok, true);
+  assert.equal(calls[0], 'https://api.clerk.com/v1/sessions/sess_abc/verify');
+  const missing = await swap.requireSession({
+    CLERK_PUBLISHABLE_KEY: 'pk_live_example',
+    CLERK_SECRET_KEY: 'sk_live_example'
+  }, async () => { throw new Error('should not fetch'); }, 'not-a-jwt');
+  assert.equal(missing.status, 401);
+});
+
 test('development Clerk keys are not treated as production', () => {
   const status = swap.publicStatus({
     CLERK_PUBLISHABLE_KEY: 'pk_test_example',

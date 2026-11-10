@@ -36,6 +36,18 @@ function readJson(response) {
   return response.json();
 }
 
+function sessionIdFromToken(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length < 2) return '';
+  try {
+    const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+    return typeof json.sid === 'string' && /^[A-Za-z0-9_]+$/.test(json.sid) ? json.sid : '';
+  } catch (error) {
+    return '';
+  }
+}
+
 async function requireSession(env, fetchImpl, token) {
   const status = publicStatus(env);
   if (status.clerk === 'development-only') {
@@ -44,8 +56,9 @@ async function requireSession(env, fetchImpl, token) {
   if (status.clerk !== 'production') {
     return { ok: false, status: 503, error: 'Production sign-in is not configured.' };
   }
-  if (!token) return { ok: false, status: 401, error: 'Sign-in required.' };
-  const response = await fetchImpl('https://api.clerk.com/v1/sessions/verify', {
+  const sessionId = sessionIdFromToken(token);
+  if (!sessionId) return { ok: false, status: 401, error: 'Sign-in required.' };
+  const response = await fetchImpl('https://api.clerk.com/v1/sessions/' + encodeURIComponent(sessionId) + '/verify', {
     method: 'POST',
     headers: {
       authorization: 'Bearer ' + env.CLERK_SECRET_KEY,
