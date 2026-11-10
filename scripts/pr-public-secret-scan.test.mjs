@@ -41,6 +41,7 @@ test('the workflow verifies gitleaks, stays shallow, and writes a summary', () =
   assert.match(workflow, /sha256sum -c/);
   assert.match(workflow, /GITHUB_STEP_SUMMARY/);
   assert.match(workflow, /fetch-depth: 50/);
+  assert.match(workflow, /persist-credentials:\s*false/);
   assert.match(workflow, /refs\/pull\/\$\{\{ github\.event\.pull_request\.number \}\}\/head/);
   assert.doesNotMatch(workflow, /fetch-depth: 0/);
   assert.doesNotMatch(workflow, /head_ref/);

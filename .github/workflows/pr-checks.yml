@@ -18,8 +18,16 @@ jobs:
         with:
           ref: refs/pull/${{ github.event.pull_request.number }}/head
           fetch-depth: 50
+          persist-credentials: false
       - name: Fetch the base tip
-        run: git fetch --no-tags --filter=blob:none --depth=50 origin "${{ github.event.pull_request.base.sha }}:refs/remotes/origin/pr-base"
+        env:
+          GIT_TOKEN: ${{ github.token }}
+        run: |
+          git -c "http.extraheader=AUTHORIZATION: bearer ${GIT_TOKEN}" fetch --no-tags --filter=blob:none --depth=50 "https://github.com/${GITHUB_REPOSITORY}.git" "${{ github.event.pull_request.base.sha }}:refs/remotes/origin/pr-base"
+          if git config --get-regexp 'http\..*\.extraheader' >/dev/null 2>&1; then
+            echo "Git credentials were left in config." >&2
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
