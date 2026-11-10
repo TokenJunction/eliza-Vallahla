@@ -22,6 +22,13 @@ test('production transform keeps desk hooks, drops console, and ships no padding
   const hashes = new Set([sha256(sample)]);
   assert.equal(scanShipped('safe page', hashes), '');
   assert.equal(scanShipped('token ' + sample + ' end', hashes), 'hash');
+  const host = 'local.name';
+  const mailbox = 'pre-fix@';
+  const prefixed = new Set([sha256(host), sha256(mailbox)]);
+  assert.equal(scanShipped('see ' + host + '@mail.test', prefixed), 'hash');
+  assert.equal(scanShipped('see user.' + host + '.example', prefixed), 'hash');
+  assert.equal(scanShipped('see ' + mailbox + 'host.example', prefixed), 'hash');
+  assert.equal(scanShipped('see other-name@mail.test', prefixed), '');
   assert.equal(scanShipped('pk_test_example', hashes), 'pattern');
   const core = fs.readFileSync(path.join(__dirname, 'minify-site.mjs'), 'utf8');
   assert.doesNotMatch(core, /generateTrail/);

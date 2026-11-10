@@ -40,12 +40,36 @@ export function candidateTokens(text) {
   return String(text || '').match(/[A-Za-z0-9@][A-Za-z0-9@._+-]{2,}/g) || [];
 }
 
+export function hashCandidates(token) {
+  const marks = [-1];
+  for (let i = 0; i < token.length; i += 1) {
+    const ch = token[i];
+    if (ch === '.' || ch === '@' || ch === '+' || ch === '-') marks.push(i);
+  }
+  marks.push(token.length);
+  const out = [];
+  for (let start = 0; start < marks.length; start += 1) {
+    for (let end = start + 1; end < marks.length; end += 1) {
+      const from = marks[start] + 1;
+      const piece = token.slice(from, marks[end]);
+      if (piece.length >= 3) out.push(piece);
+      if (marks[end] < token.length) {
+        const withSeparator = token.slice(from, marks[end] + 1);
+        if (withSeparator.length >= 3) out.push(withSeparator);
+      }
+    }
+  }
+  return out;
+}
+
 export function scanShipped(text, hashes) {
   for (const pattern of PLAIN_PATTERNS) {
     if (pattern.test(text)) return 'pattern';
   }
   for (const token of candidateTokens(text)) {
-    if (hashes.has(sha256(token))) return 'hash';
+    for (const candidate of hashCandidates(token)) {
+      if (hashes.has(sha256(candidate))) return 'hash';
+    }
   }
   return '';
 }
