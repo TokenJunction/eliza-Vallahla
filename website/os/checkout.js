@@ -4,10 +4,37 @@
   var status = document.getElementById('trial-status');
   if (!panel || !button) return;
 
-  function sync() {
+  async function sync() {
     var level = document.getElementById('account-level');
     var signedIn = document.body && document.body.dataset.session === 'in';
-    panel.hidden = !(signedIn && level && level.textContent === 'Free');
+    if (!signedIn || !window.ValhallaSupabase || !window.ValhallaSupabase.config) {
+      panel.hidden = true;
+      return;
+    }
+    var settings = window.ValhallaSupabase.config();
+    if (!settings) {
+      panel.hidden = !(level && level.textContent === 'Free');
+      return;
+    }
+    try {
+      var supabase = await window.ValhallaSupabase.client();
+      var session = await supabase.auth.getSession();
+      var access = session && session.data && session.data.session && session.data.session.access_token;
+      if (!access) {
+        panel.hidden = true;
+        return;
+      }
+      var response = await fetch(settings.url + '/rest/v1/entitlements?select=plan,status', {
+        headers: { authorization: 'Bearer ' + access, apikey: settings.key, accept: 'application/json' }
+      });
+      var rows = response.ok ? await response.json() : [];
+      var row = Array.isArray(rows) ? rows[0] : null;
+      var pro = row && row.plan === 'pro' && (row.status === 'active' || row.status === 'trialing');
+      if (level && pro) level.textContent = 'Pro';
+      panel.hidden = !!pro;
+    } catch (error) {
+      panel.hidden = !(level && level.textContent === 'Free');
+    }
   }
 
   window.addEventListener('valhalla-signed-in', sync);
