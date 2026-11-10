@@ -6,5 +6,7 @@ test('compiled binaries are rejected and text is not', () => {
   assert.equal(forbiddenReason('notes.md', Buffer.from('hello')), '');
   assert.equal(forbiddenReason('tool.exe', Buffer.from('text')), 'forbidden extension');
   assert.equal(forbiddenReason('app', Buffer.from([0x7f, 0x45, 0x4c, 0x46])), 'ELF');
+  assert.equal(forbiddenReason('universal', Buffer.from([0xca, 0xfe, 0xba, 0xbe])), 'Mach-O');
+  assert.equal(forbiddenReason('universal64', Buffer.from([0xca, 0xfe, 0xba, 0xbf])), 'Mach-O');
   assert.equal(scanTracked(new URL('..', import.meta.url).pathname).length, 0);
 });

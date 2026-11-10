@@ -14,7 +14,7 @@ export function forbiddenReason(filePath, head) {
   if (bytes.length >= 2 && bytes[0] === 0x4d && bytes[1] === 0x5a) return 'PE';
   if (bytes.length >= 4) {
     const magic = bytes.subarray(0, 4).toString('hex');
-    if (magic === 'feedface' || magic === 'feedfacf' || magic === 'cefaedfe' || magic === 'cffaedfe') return 'Mach-O';
+    if (magic === 'feedface' || magic === 'feedfacf' || magic === 'cefaedfe' || magic === 'cffaedfe' || magic === 'cafebabe' || magic === 'cafebabf') return 'Mach-O';
   }
   return '';
 }

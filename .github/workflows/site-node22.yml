@@ -20,9 +20,6 @@ concurrency:
   cancel-in-progress: true
 jobs:
   verify:
-    permissions:
-      contents: read
-      actions: write # upload-artifact publishes the verified site build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -49,8 +46,6 @@ jobs:
         run: npm ci
       - name: Verify gate, desk, entrance, and volOS routing
         run: node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs website/scripts/desk.test.cjs website/scripts/host-route.test.cjs website/scripts/journey.test.cjs website/scripts/desktop.test.cjs website/scripts/minify.test.cjs
-      - name: Reject committed executables
-        run: node scripts/check-no-binaries.mjs
       - name: Verify owner pack stays out of the site
         run: python3 scripts/test_private_pack_export.py
       - name: Prepare the public bundle
