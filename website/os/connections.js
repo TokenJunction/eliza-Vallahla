@@ -1,15 +1,13 @@
 (function () {
-  var panel = document.getElementById('connections-panel');
   var form = document.getElementById('connections-form');
   var status = document.getElementById('connections-status');
-  if (!panel || !form) return;
+  if (!form) return;
 
-  function sync() {
-    var signedIn = document.body && document.body.dataset.session === 'in';
-    panel.hidden = !signedIn;
-  }
-  window.addEventListener('valhalla-signed-in', function () { sync(); load(); });
-  sync();
+  window.addEventListener('valhalla-signed-in', function () { load(); });
+  document.addEventListener('click', function (event) {
+    var opener = event.target.closest && event.target.closest('[data-open="connections"], [data-open="packs"]');
+    if (opener) load();
+  });
 
   var service = document.getElementById('connections-service');
   var baseLabel = document.getElementById('connections-base-label');

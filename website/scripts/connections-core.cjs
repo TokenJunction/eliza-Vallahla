@@ -51,15 +51,30 @@ function hashKey(secret) {
   return crypto.createHash('sha256').update(String(secret)).digest('hex');
 }
 
+function privateHost(host) {
+  const name = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!name || name === 'localhost' || name.endsWith('.localhost') || name.endsWith('.local') || name.endsWith('.internal')) return true;
+  if (name === '::1' || name === '0:0:0:0:0:0:0:1') return true;
+  if (/^(fc|fd|fe[89ab])/.test(name) && name.includes(':')) return true;
+  const parts = name.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(function (part) { return !Number.isInteger(part) || part < 0 || part > 255; })) return false;
+  const a = parts[0];
+  const b = parts[1];
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  return false;
+}
+
 function safeBase(url) {
   let parsed;
   try { parsed = new URL(String(url || '')); }
   catch (error) { return ''; }
   if (parsed.protocol !== 'https:') return '';
   if (parsed.username || parsed.password) return '';
-  const host = parsed.hostname.toLowerCase();
-  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return '';
-  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.|::1$)/.test(host)) return '';
+  if (privateHost(parsed.hostname)) return '';
   return parsed.origin;
 }
 
@@ -111,7 +126,10 @@ async function ping(service, secret, base, fetchImpl) {
     } else {
       const origin = safeBase(base);
       if (!origin) return { ok: false, error: 'Use a public https address.' };
-      response = await fetchImpl(origin + '/', { headers: { authorization: 'Bearer ' + secret }, signal: controller && controller.signal });
+      response = await fetchImpl(origin + '/', { headers: { authorization: 'Bearer ' + secret }, redirect: 'manual', signal: controller && controller.signal });
+    }
+    if (response && (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400))) {
+      return { ok: false, error: 'Use a public https address.' };
     }
     if (!response || !response.ok) return { ok: false, error: plainError(response && response.status) };
     return { ok: true };
@@ -186,10 +204,14 @@ async function handleConnections(req, env, fetchImpl) {
     let secret = String(payload.key || '');
     if (!secret && payload.id) {
       if (!key) return { status: 503, body: { error: 'Connections not configured' } };
-      const loaded = await fetchImpl(site.url + '/rest/v1/connections?id=eq.' + encodeURIComponent(payload.id) + '&user_id=eq.' + encodeURIComponent(user.id) + '&select=ciphertext,service,base_url', rest(site, token));
-      const rows = loaded && loaded.ok ? await loaded.json() : [];
-      if (!rows[0]) return { status: 404, body: { error: 'That connection was not found.' } };
-      try { secret = decryptSecret(rows[0].ciphertext, key); }
+      const loaded = await fetchImpl(site.url + '/rest/v1/rpc/connection_secret', rest(site, token, '', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ row_id: payload.id })
+      }));
+      const packed = loaded && loaded.ok ? await loaded.json() : '';
+      if (!packed || typeof packed !== 'string') return { status: 404, body: { error: 'That connection was not found.' } };
+      try { secret = decryptSecret(packed, key); }
       catch (error) { return { status: 400, body: { error: 'That saved key could not be read.' } }; }
     }
     if (service === 'custom' && !safeBase(payload.baseUrl) && action === 'save') {

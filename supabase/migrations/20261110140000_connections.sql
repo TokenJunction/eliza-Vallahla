@@ -76,9 +76,24 @@ set search_path = public
 as $$
   select k.last4
   from public.valos_api_keys as k
-  where k.key_hash = encode(digest(raw, 'sha256'), 'hex')
+  where k.key_hash = encode(extensions.digest(raw, 'sha256'), 'hex')
   limit 1;
 $$;
 
 revoke all on function public.valos_key_status(text) from public;
 grant execute on function public.valos_key_status(text) to anon, authenticated;
+
+create or replace function public.connection_secret(row_id uuid)
+returns text
+language sql
+security definer
+set search_path = public
+as $$
+  select ciphertext
+  from public.connections
+  where id = row_id
+    and user_id = auth.uid();
+$$;
+
+revoke all on function public.connection_secret(uuid) from public;
+grant execute on function public.connection_secret(uuid) to authenticated;

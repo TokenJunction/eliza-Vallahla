@@ -59,5 +59,43 @@ test('row policies keep each user on their own rows', () => {
   const sql = fs.readFileSync(path.join(__dirname, '../../supabase/migrations/20261110140000_connections.sql'), 'utf8');
   assert.match(sql, /auth\.uid\(\) = user_id/);
   assert.match(sql, /revoke all on public\.connections from authenticated/);
+  assert.match(sql, /extensions\.digest/);
+  assert.match(sql, /connection_secret/);
   assert.doesNotMatch(sql, /grant select \(id, user_id, service, base_url, last4, ciphertext/);
+});
+
+test('a custom address cannot target a private host or follow a redirect', async () => {
+  let called = false;
+  const blocked = await handleConnections({
+    method: 'POST',
+    headers: { authorization: 'Bearer good' },
+    body: JSON.stringify({ action: 'test', service: 'custom', key: secret, baseUrl: 'https://172.16.4.4/' })
+  }, env, async (url) => {
+    if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-1' }) };
+    called = true;
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  assert.equal(blocked.status, 400);
+  assert.equal(called, false);
+  let redirect = '';
+  const bounced = await handleConnections({
+    method: 'POST',
+    headers: { authorization: 'Bearer good' },
+    body: JSON.stringify({ action: 'test', service: 'custom', key: secret, baseUrl: 'https://example.com' })
+  }, env, async (url, init) => {
+    if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-1' }) };
+    redirect = init && init.redirect;
+    return { ok: false, status: 302, json: async () => ({}) };
+  });
+  assert.equal(redirect, 'manual');
+  assert.equal(bounced.status, 400);
+  assert.equal(bounced.body.error, 'Use a public https address.');
+});
+
+test('connections and packs are desk windows', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../os/index.html'), 'utf8');
+  assert.match(html, /data-window="connections"/);
+  assert.match(html, /data-window="packs"/);
+  assert.match(html, /data-open="connections"/);
+  assert.match(html, /data-open="packs"/);
 });
