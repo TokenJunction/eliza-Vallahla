@@ -7,6 +7,19 @@
     window.location.replace('/');
   }
 
+  function offerAdmin(access) {
+    var link = document.getElementById('admin-link');
+    if (!link || !access) return;
+    fetch('/api/admin', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { authorization: 'Bearer ' + access, 'content-type': 'application/json' },
+      body: '{"action":"enter"}'
+    }).then(function (response) {
+      if (response && response.ok) link.hidden = false;
+    }, function () {});
+  }
+
   function show(user, level) {
     document.body.dataset.session = 'in';
     var email = document.getElementById('account-email');
@@ -32,6 +45,7 @@
         return;
       }
       show(user, 'Free');
+      offerAdmin(session.access_token);
       var signOut = document.getElementById('sign-out');
       if (signOut) {
         signOut.hidden = false;
