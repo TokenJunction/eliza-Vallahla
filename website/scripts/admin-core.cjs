@@ -173,8 +173,17 @@ async function handleAdmin(req, env, fetchImpl) {
       const file = await downloadStaged(env, preview, fetchImpl);
       if (!file) return notFound();
       const ext = (preview.split('.').pop() || '').toLowerCase();
-      const types = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
-      return { status: 200, raw: file, type: types[ext] || 'application/octet-stream' };
+      const types = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
+      const scriptable = ext === 'svg' || ext === 'html' || ext === 'htm' || !types[ext];
+      return {
+        status: 200,
+        raw: file,
+        type: types[ext] || 'application/octet-stream',
+        headers: scriptable ? {
+          'content-disposition': 'attachment',
+          'content-security-policy': "default-src 'none'; sandbox"
+        } : { 'content-security-policy': "default-src 'none'; sandbox" }
+      };
     }
     return { status: 200, html: pageHtml(), type: 'text/html; charset=utf-8' };
   }

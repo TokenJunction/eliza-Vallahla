@@ -30,7 +30,7 @@
     pending.replaceChildren();
     (rows || []).forEach(function (row) {
       var item = document.createElement('li');
-      if (/\.(png|jpe?g|gif|webp|svg)$/i.test(row.path)) {
+      if (/\.(png|jpe?g|gif|webp)$/i.test(row.path)) {
         var image = document.createElement('img');
         image.alt = '';
         image.src = '/api/admin?preview=' + encodeURIComponent(row.path);

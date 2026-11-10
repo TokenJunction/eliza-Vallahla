@@ -39,6 +39,23 @@ test('sign-out clears the admin cookie', async () => {
   assert.match(left.headers['set-cookie'], /Max-Age=0/);
 });
 
+test('a staged svg preview cannot run as a page', async () => {
+  const result = await handleAdmin({
+    method: 'GET',
+    headers: { authorization: 'Bearer owner' },
+    url: '/api/admin?preview=website/mark.svg'
+  }, env, async (url) => {
+    if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'owner-1' }) };
+    return { ok: true, arrayBuffer: async () => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>') };
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.type, 'application/octet-stream');
+  assert.match(result.headers['content-disposition'], /attachment/);
+  assert.match(result.headers['content-security-policy'], /sandbox/);
+  const page = fs.readFileSync(path.join(__dirname, '../admin/board.js'), 'utf8');
+  assert.doesNotMatch(page, /svg\)\$/);
+});
+
 test('everyone except the allowlisted owner gets 404', async () => {
   const outsider = await handleAdmin({ method: 'GET', headers: { authorization: 'Bearer person' } }, env, authed('person-2'));
   assert.equal(outsider.status, 404);
