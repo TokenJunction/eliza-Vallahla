@@ -54,13 +54,15 @@
     }
     busy = true;
     if (input) input.disabled = true;
-    send({ task: task }).then(function (body) {
+    function unlock() {
       busy = false;
       if (input) input.disabled = false;
+    }
+    send({ task: task }).then(function (body) {
       if (!body) return;
       var reply = document.getElementById('mecha-reply');
       if (reply) reply.textContent = (body.mecha ? body.mecha + ': ' : '') + (body.reply || '');
       if (input) input.value = '';
-    });
+    }).then(unlock, unlock);
   });
 })();
