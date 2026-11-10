@@ -2,7 +2,7 @@ import { appendFileSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-// Shapes only. A prefix such as risk_ or a short hf_ fragment is not a key.
+// Shapes only. A prefix such as risk_ or a short hf_ fragment is not a key by itself.
 export const PATTERNS = [
   { name: 'sk_live_/sk_test_', re: /sk_(?:live|test)_[A-Za-z0-9]{20,}/ },
   { name: 'sb_secret_', re: /sb_secret_[A-Za-z0-9]{20,}/ },
