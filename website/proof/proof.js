@@ -44,8 +44,8 @@
       text('chain-mint', '…' + chain.mint.last4);
       text('chain-auth', chain.mint.authoritiesRevoked === true ? 'Revoked' : (chain.mint.authoritiesRevoked === false ? 'Not revoked' : 'Not read'));
       text('chain-supply', chain.mint.supply || '—');
-      text('chain-lock', '…' + chain.lock.last4 + ' · ' + chain.lock.status);
-      text('chain-unlock', chain.lock.matchesRecord ? chain.lock.unlockAt : chain.lock.unlockAt + '. The Nov 8, 2027 record does not match.');
+      text('chain-lock', (chain.lock.status === 'Locked' ? chain.lock.label : chain.lock.status) + '. …' + chain.lock.last4);
+      text('chain-unlock', chain.lock.unlockAt || '—');
       var receipts = document.getElementById('chain-receipts');
       if (receipts) {
         receipts.replaceChildren();

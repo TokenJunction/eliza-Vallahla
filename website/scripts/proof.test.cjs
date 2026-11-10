@@ -52,9 +52,11 @@ test('a hung check times out and the other results still return', async () => {
 
 test('Helius reports the mint, the lock, and swap receipts without full addresses', async () => {
   const unlock = Buffer.alloc(200);
-  const cliff = Math.floor(Date.parse('2027-11-08T15:32:42Z') / 1000);
-  unlock.writeBigInt64LE(BigInt(cliff), 144);
-  unlock.writeBigInt64LE(BigInt(cliff - 86400 * 30), 192);
+  const record = Math.floor(Date.parse('2027-11-08T15:32:42Z') / 1000);
+  const frequency = 15768000;
+  unlock.writeBigUInt64LE(BigInt(record - frequency), 144);
+  unlock.writeBigUInt64LE(BigInt(frequency), 152);
+  unlock.writeBigUInt64LE(BigInt(1), 176);
   const signature = 'jFgUp1TvrvAf6BvJxUVQ3PNiuXYDSekedWyLqgGvHnLVUxNjFuYsBjMX3xXWfbmwGbWjVpa2Gg6cDngDVjaBTa1';
   const body = await measureProof(async (url, init) => {
     const target = String(url);
@@ -76,6 +78,8 @@ test('Helius reports the mint, the lock, and swap receipts without full addresse
   assert.equal(body.chain.mint.supply, '1,000,000,000');
   assert.equal(body.chain.lock.matchesRecord, true);
   assert.equal(body.chain.lock.status, 'Locked');
+  assert.match(body.chain.lock.unlockAt, /Nov 8, 2027/);
+  assert.match(body.chain.lock.cliffAt, /May 9, 2027/);
   assert.equal(body.chain.receipts[0].signature, signature.slice(-4));
   assert.equal(body.chain.receipts[0].status, 'confirmed');
   assert.equal(body.chain.receipts[0].recommendation, 'abcd');
@@ -93,6 +97,9 @@ test('the proof page does not load ads', () => {
   assert.match(page, /Delivered intact/);
   assert.match(page, /Try Pro free for 7 days/);
   assert.match(page, /AI models are great at writing instructions/);
+  assert.match(page, /100% intact/);
+  assert.doesNotMatch(page, /about 1 ms/);
+  assert.match(page, /Founder lock/);
   assert.match(page, /Cryptographic proof/);
   assert.match(volos, /Cryptographic proof/);
   assert.match(volos, /Live trading on this page is off/);
@@ -101,6 +108,7 @@ test('the proof page does not load ads', () => {
   assert.match(volos, /See live proof/);
   const client = fs.readFileSync(path.join(root, 'website/proof/proof.js'), 'utf8');
   assert.doesNotMatch(client, /cache:\s*'no-store'/);
+  assert.doesNotMatch(client, /does not match/);
 });
 
 test('proof reads are limited and a query does not call Helius', async () => {

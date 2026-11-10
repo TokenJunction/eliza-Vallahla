@@ -131,11 +131,24 @@ function revoked(value) {
   return value == null || value === '' || value === '11111111111111111111111111111111';
 }
 
+function readU64(buf, offset) {
+  if (buf.length < offset + 8) return 0;
+  const value = buf.readBigUInt64LE(offset);
+  return value > BigInt(Number.MAX_SAFE_INTEGER) ? 0 : Number(value);
+}
+
+function stampOk(value) {
+  return value > 1700000000 && value < 2000000000;
+}
+
 function unlockFrom(data) {
   const buf = Buffer.isBuffer(data) ? data : Buffer.from(String(data || ''), 'base64');
-  if (buf.length < 152) return 0;
-  const stamp = Number(buf.readBigInt64LE(144));
-  return stamp > 1700000000 && stamp < 2000000000 ? stamp : 0;
+  const cliff = readU64(buf, 144);
+  const frequency = readU64(buf, 152);
+  const periods = readU64(buf, 176);
+  if (!stampOk(cliff)) return { cliff: 0, unlock: 0 };
+  const unlock = cliff + frequency * periods;
+  return { cliff: cliff, unlock: stampOk(unlock) ? unlock : 0 };
 }
 
 function etStamp(seconds) {
@@ -160,7 +173,8 @@ async function readChain(fetchImpl, key, now) {
   const swaps = await fetchImpl('https://api.helius.xyz/v0/addresses/' + MINT + '/transactions?api-key=' + encodeURIComponent(key) + '&type=SWAP&limit=5');
   const rows = swaps && swaps.ok && typeof swaps.json === 'function' ? await swaps.json() : [];
   const info = asset && asset.token_info;
-  const unlock = account && account.value && account.value.data ? unlockFrom(account.value.data[0]) : 0;
+  const schedule = account && account.value && account.value.data ? unlockFrom(account.value.data[0]) : { cliff: 0, unlock: 0 };
+  const unlock = schedule.unlock;
   const receipts = (Array.isArray(rows) ? rows : []).slice(0, 5).map(function (tx) {
     const recommendation = tx && tx.recommendationSignature ? last4(tx.recommendationSignature) : '';
     return {
@@ -181,7 +195,9 @@ async function readChain(fetchImpl, key, now) {
     },
     lock: {
       last4: last4(ESCROW),
+      label: 'The founder wallet\'s valOS is locked',
       status: unlock && now && unlock * 1000 > now.getTime() ? 'Locked' : (unlock ? 'Unlock time has passed' : 'Not read'),
+      cliffAt: schedule.cliff ? etStamp(schedule.cliff) : '',
       unlockAt: unlock ? etStamp(unlock) : '',
       recordAt: etStamp(RECORD_UNLOCK),
       matchesRecord: unlock === RECORD_UNLOCK
