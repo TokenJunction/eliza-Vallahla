@@ -14,6 +14,7 @@ const form = document.getElementById('swap-form');
 let config = { clerk: 'missing', liveTrading: false, platformFee: 'none', rpc: 'not-connected' };
 let clerkClient = null;
 let clerkReady = false;
+let clerkStart = null;
 let clerkScript = null;
 let signedIn = false;
 let sessionToken = '';
@@ -88,40 +89,48 @@ function rememberSession(session) {
   paint();
 }
 
+async function loadClerk() {
+  if (!clerkScript) {
+    clerkScript = document.createElement('script');
+    clerkScript.dataset.clerkPublishableKey = config.clerkPublishableKey;
+    clerkScript.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
+    clerkScript.crossOrigin = 'anonymous';
+    try {
+      await new Promise(function (resolve, reject) {
+        clerkScript.onload = resolve;
+        clerkScript.onerror = function () { reject(new Error('Clerk did not load.')); };
+        document.head.appendChild(clerkScript);
+      });
+    } catch (error) {
+      if (clerkScript.parentNode) clerkScript.parentNode.removeChild(clerkScript);
+      clerkScript = null;
+      throw error;
+    }
+  }
+  const ClerkClass = window.Clerk;
+  const client = typeof ClerkClass === 'function' ? new ClerkClass(config.clerkPublishableKey) : ClerkClass;
+  await client.load();
+  if (typeof client.addListener === 'function') {
+    client.addListener(function (emission) {
+      rememberSession((emission && emission.session) || client.session);
+    });
+  }
+  clerkClient = client;
+  clerkReady = true;
+}
+
 async function startClerk() {
   if (config.clerk !== 'production' || !config.clerkPublishableKey) return;
   if (!clerkReady) {
-    if (!clerkScript) {
-      clerkScript = document.createElement('script');
-      clerkScript.dataset.clerkPublishableKey = config.clerkPublishableKey;
-      clerkScript.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
-      clerkScript.crossOrigin = 'anonymous';
-      try {
-        await new Promise(function (resolve, reject) {
-          clerkScript.onload = resolve;
-          clerkScript.onerror = function () { reject(new Error('Clerk did not load.')); };
-          document.head.appendChild(clerkScript);
-        });
-      } catch (error) {
-        if (clerkScript.parentNode) clerkScript.parentNode.removeChild(clerkScript);
-        clerkScript = null;
+    if (!clerkStart) {
+      clerkStart = loadClerk().catch(function (error) {
+        clerkStart = null;
+        clerkClient = null;
+        clerkReady = false;
         throw error;
-      }
+      });
     }
-    const ClerkClass = window.Clerk;
-    const client = typeof ClerkClass === 'function' ? new ClerkClass(config.clerkPublishableKey) : ClerkClass;
-    try {
-      await client.load();
-      if (typeof client.addListener === 'function') {
-        client.addListener(function (emission) {
-          rememberSession((emission && emission.session) || client.session);
-        });
-      }
-    } catch (error) {
-      throw new Error('Clerk did not load. Sign in was not started.');
-    }
-    clerkClient = client;
-    clerkReady = true;
+    await clerkStart;
   }
   rememberSession(clerkClient.session);
   if (!clerkClient.session && typeof clerkClient.openSignIn === 'function') clerkClient.openSignIn();
@@ -144,6 +153,7 @@ async function connectWallet() {
 
 async function requestQuote() {
   latestQuote = null;
+  paint();
   receive.textContent = 'Quote not loaded';
   const pay = document.getElementById('pay-token').value;
   const out = document.getElementById('receive-token').value;
@@ -239,6 +249,7 @@ connect.addEventListener('click', function () { connectWallet().catch(function (
 quoteButton.addEventListener('click', function () {
   requestQuote().catch(function (error) {
     routeLine.textContent = error && error.valhallaAuth ? error.message : 'Jupiter quote is not connected.';
+    paint();
   });
 });
 form.addEventListener('submit', function (event) {
