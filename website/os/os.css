@@ -1,6 +1,6 @@
 :root {
-  color-scheme: light;
-  font-family: Tahoma, "MS Sans Serif", Geneva, sans-serif;
+  color-scheme: dark;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
   color: #111;
   background: #008080;
   font-synthesis: none;
@@ -26,9 +26,10 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
   height: 100dvh;
   min-height: 420px;
   overflow: hidden;
-  background-color: #008080;
-  background-image: radial-gradient(rgba(255,255,255,.07) .65px, transparent .65px);
-  background-size: 4px 4px;
+  background-color: #07080d;
+  background-image:
+    radial-gradient(ellipse 40% 30% at 10% 0%, rgba(56, 189, 248, .16), transparent 24rem),
+    radial-gradient(ellipse 36% 28% at 90% 10%, rgba(226, 176, 85, .18), transparent 22rem);
 }
 .desktop-heading {
   position: absolute;
@@ -392,7 +393,7 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
 .start-menu button { color: #eee5d9; }
 .start-menu button:hover, .start-menu button:focus-visible { background: #302313; color: #fff; }
 .start-menu p { color: #c6bdaf; }
-.taskbar { position: fixed; height: 46px; border-top: 1px solid #423623; background: #0c0e0e; }
+.taskbar { position: fixed; z-index: 30; height: 46px; border-top: 1px solid #423623; background: #0c0e0e; }
 .start-button { min-width: 82px; height: 36px; }
 .start-button[aria-expanded="true"], .taskbar-app[aria-pressed="true"] { border-color: #ffc66d; background: #302313; }
 .taskbar-clock { border: 1px solid #423623; color: #d3c7b5; }
@@ -444,4 +445,33 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
     max-height: calc(100dvh - 76px);
   }
   .window-body { max-height: calc(100dvh - 130px); }
+}
+#os-pretest { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 32px; background: radial-gradient(ellipse at 50% 20%, rgba(226, 176, 85, .16), transparent 22rem), #07080d; color: #f6edd8; }
+#os-pretest[hidden] { display: none; }
+#os-pretest h2 { margin: 0; font-weight: 560; letter-spacing: .04em; }
+.pretest-kicker { margin: 0; color: #e2b055; letter-spacing: .18em; text-transform: uppercase; font-size: 12px; }
+#pretest-list { margin: 0; padding: 0; list-style: none; max-width: 40rem; }
+#pretest-list li { margin: 0 0 6px; color: #d9d0c2; font-size: 14px; }
+#pretest-result { margin: 0; max-width: 42rem; line-height: 1.45; }
+#pretest-retry { min-height: 44px; width: fit-content; padding: 0 16px; border: 0; border-radius: 999px; background: #e2b055; color: #1a1408; font: inherit; font-weight: 700; }
+.spotlight-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.spotlight { min-height: 36px; width: min(220px, 28vw); margin-left: 12px; padding: 0 12px; border: 1px solid rgba(226, 176, 85, .45); border-radius: 999px; background: rgba(8, 10, 16, .72); color: #f6edd8; }
+.quality-readout { margin: 0 14px 14px; color: #8eb4d4; font-size: 12px; }
+.pulse-dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: #38bdf8; animation: valos-pulse 1.2s ease-in-out infinite; vertical-align: 1px; }
+.window[data-idle="sleeping"] .pulse-dot { animation-play-state: paused; opacity: .35; }
+.window[data-idle="sleeping"] .title-bar h2::after { content: " · Idle"; color: #8eb4d4; font-size: 11px; font-weight: 560; }
+#install-preview { width: 100%; height: 140px; margin-top: 8px; border: 1px solid #514735; background: #090b0a; }
+#install-list { margin: 8px 0 0; padding-left: 18px; }
+@keyframes valos-pulse { 50% { opacity: .35; } }
+@media (min-width: 721px) {
+  .desktop-icons.dock { left: 50%; right: auto; top: auto; bottom: 62px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 24px); flex-direction: row; gap: 4px; padding: 8px; border: 1px solid rgba(226, 176, 85, .35); border-radius: 18px; background: rgba(12, 14, 20, .82); }
+  .desktop-icon { width: auto; min-width: 72px; min-height: 58px; flex-direction: column; }
+  .window { border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 0, .45); }
+  .title-bar { border-radius: 12px 12px 0 0; }
+  .window-controls button { width: 14px; height: 14px; padding: 0; border-radius: 50%; }
+  .window-controls button[data-action="close"] { background: #ff5f57; color: transparent; }
+  .window-controls button[data-action="minimize"] { background: #febc2e; color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot { animation: none; }
 }

@@ -90,7 +90,8 @@ class SiteTests(unittest.TestCase):
             "website/scripts/desk.test.cjs website/scripts/host-route.test.cjs "
             "website/scripts/journey.test.cjs website/scripts/desktop.test.cjs "
             "website/scripts/minify.test.cjs self-healing/quality-matrix.test.mjs "
-            "website/scripts/overseer-gui.test.cjs",
+            "website/scripts/overseer-gui.test.cjs website/scripts/installer.test.cjs "
+            "website/scripts/node-shell.test.cjs website/scripts/idle.test.cjs",
             "node website/scripts/minify-site.mjs",
         )
         position = -1

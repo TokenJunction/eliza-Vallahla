@@ -102,6 +102,21 @@
     author.textContent = label; row.appendChild(author); row.appendChild(document.createElement('br'));
     row.appendChild(document.createTextNode(text)); log.appendChild(row); log.scrollTop = log.scrollHeight;
   }
+  function rememberTurn(userText, assistantText) {
+    history.push({ role: 'user', content: String(userText).slice(0, 500) }, { role: 'assistant', content: String(assistantText).slice(0, 500) });
+    history = history.slice(-8);
+  }
+  var lastLog = null;
+  function paintJudge(judged) {
+    var readout = document.getElementById('quality-readout');
+    if (!readout || !judged) return;
+    var names = ['goal', 'evidence', 'safety', 'speed', 'honesty'];
+    var failed = names.filter(function (name) { return judged.axes && judged.axes[name] === 'fail'; });
+    readout.textContent = judged.reward === 1
+      ? 'Critic +1. All five axes passed on the last action.'
+      : 'Critic -1. Failed: ' + failed.join(', ') + '. Patch proposed, not applied.';
+    readout.dataset.reward = String(judged.reward);
+  }
   form.addEventListener('submit', async function (event) {
     event.preventDefault();
     if (submitting) return;
@@ -113,7 +128,7 @@
     function finish(answer, extra) {
       extra = extra || {};
       if (!overseer || typeof overseer.review !== 'function') return;
-      var judged = overseer.review({
+      lastLog = {
         goal: text,
         answer: answer,
         evidence: extra.evidence || [],
@@ -125,7 +140,9 @@
         inventedContract: Boolean(extra.inventedContract),
         unapprovedLiveTrade: Boolean(extra.unapprovedLiveTrade),
         raw: answer
-      });
+      };
+      var judged = overseer.review(lastLog);
+      paintJudge(judged);
       if (judged && judged.reward === -1 && judged.patch) {
         chatStatus.textContent = (chatStatus.textContent ? chatStatus.textContent + ' ' : '') + 'Proposed patch, not applied: ' + judged.patch;
       }
@@ -135,15 +152,17 @@
       if (local && local.handled) {
         message('OS', local.answer);
         input.value = '';
+        var evidence = Array.isArray(local.evidence) ? local.evidence.slice() : [];
         if (local.open === 'tools') {
           var startBtn = document.getElementById('start-button');
-          if (startBtn) startBtn.click();
+          if (startBtn) { startBtn.click(); evidence.push('Tools control clicked'); }
         } else if (local.open) {
           var launcher = document.querySelector('.dock [data-open="' + local.open + '"]');
-          if (launcher) launcher.click();
+          if (launcher) { launcher.click(); evidence.push('dock opened ' + local.open); }
         }
+        rememberTurn(text, local.answer);
         chatStatus.textContent = 'Workstation reply. No transaction was requested.';
-        finish(local.answer, {});
+        finish(local.answer, { evidence: evidence });
         return;
       }
     }
@@ -158,13 +177,27 @@
     var timeout = window.setTimeout(function () { controller.abort(); }, 25000);
     try {
       var endpoint = base + '/chat';
-      var response = await fetch(endpoint, {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: text, history: history, stream: false, rules: overseer && overseer.rulesForModel ? overseer.rulesForModel() : '' }), signal: controller.signal
-      });
-      var type = response.headers.get('content-type') || '';
-      if (!response.ok || type.indexOf('application/json') === -1) {
-        var closed = new Error('The chat service did not return a reply.');
+      var payload = JSON.stringify({ text: text, history: history, stream: false, rules: overseer && overseer.rulesForModel ? overseer.rulesForModel() : '' });
+      var response = null;
+      var attemptError = null;
+      for (var attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          var candidate = await fetch(endpoint, {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: payload, signal: controller.signal
+          });
+          var attemptType = candidate.headers.get('content-type') || '';
+          if (candidate.ok && attemptType.indexOf('application/json') !== -1) { response = candidate; break; }
+        } catch (error) {
+          attemptError = error;
+          if (error.name === 'AbortError') break;
+        }
+      }
+      if (!response) {
+        var closed = attemptError && attemptError.name === 'AbortError'
+          ? attemptError
+          : new Error('The chat service did not return a reply. No reply was generated.');
+        if (closed === attemptError) throw closed;
         closed.valhallaClosed = true;
         throw closed;
       }
@@ -183,6 +216,7 @@
       var screened = overseer && overseer.screenReply ? overseer.screenReply(reply) : { ok: true, text: reply };
       if (!screened.ok) {
         message('OVERSEER', screened.text);
+        rememberTurn(text, screened.text);
         chatStatus.textContent = 'The model reply was not shown. Not financial advice.';
         finish(screened.text, { inventedContract: screened.inventedContract, claimedLive: screened.claimedLive, evidence: ['screened model reply'] });
         return;
@@ -197,16 +231,24 @@
           chatStatus.textContent = 'Reply received, but browser speech failed. Try voice again.';
         }
       }
-      history.push({ role: 'user', content: text }, { role: 'assistant', content: screened.text.slice(0, 500) }); history = history.slice(-8);
+      rememberTurn(text, screened.text);
       if (!speechFailed) chatStatus.textContent = 'Reply received from ' + (body.provider || response.headers.get('x-valhalla-provider') || 'the configured service') + '. Not financial advice.';
       finish(screened.text, { evidence: ['configured chat service'] });
     } catch (error) {
       chatStatus.textContent = error.name === 'AbortError'
         ? 'Chat timed out. No reply was generated.'
         : (error.valhallaClosed ? error.message : 'Chat service did not return a reply. Nothing was generated.');
-      finish(chatStatus.textContent, { evidence: [], errors: ['no reply'] });
+      finish(chatStatus.textContent, { evidence: ['chat service did not return JSON'], errors: ['no reply'] });
     } finally {
       window.clearTimeout(timeout); submitting = false; form.querySelector('button').disabled = false; input.disabled = false; input.focus();
     }
   });
+  if (typeof window.setInterval === 'function') {
+    var tick = window.ValhallaQuality && window.ValhallaQuality.TICK_MS || 5000;
+    window.setInterval(function () {
+      var overseer = window.ValhallaOverseer;
+      if (!lastLog || !overseer || typeof overseer.review !== 'function') return;
+      paintJudge(overseer.review(lastLog));
+    }, tick);
+  }
 })();

@@ -57,6 +57,13 @@ test('overseer playbook fails closed and the critic only proposes a patch', asyn
   const opened = overseer.prepare('Open system status');
   assert.equal(opened.open, 'status');
   assert.match(opened.answer, /not connected/i);
+  const signIn = overseer.prepare('How do I sign-in?');
+  assert.match(signIn.answer, /\/app\//);
+  assert.doesNotMatch(signIn.answer, /will not request a transaction/);
+  const memoryQuestion = overseer.prepare('How does memory work?');
+  assert.equal(memoryQuestion.handled, false);
+  const tradeOff = overseer.prepare('What are the trade-offs?');
+  assert.equal(tradeOff.handled, false);
   const market = overseer.prepare('What is the hardware reading?');
   assert.match(market.answer, /not connected/i);
   assert.doesNotMatch(market.answer, /%|GHz|SOL/);

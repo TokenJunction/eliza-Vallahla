@@ -10,6 +10,9 @@
   var windows = Array.prototype.slice.call(document.querySelectorAll('[data-window]'));
   var topZ = 10;
   var healthTimer = 0;
+  var clockTimer = 0;
+  var warm = [];
+  var WARM_CAP = 2;
 
   function getWindow(name) {
     return windows.find(function (node) { return node.dataset.window === name; });
@@ -24,6 +27,84 @@
     startButton.setAttribute('aria-expanded', String(open));
   }
 
+  function paintRuntime() {
+    if (desktop) desktop.dataset.polling = healthTimer ? 'on' : 'off';
+    if (desktop) desktop.dataset.clock = clockTimer ? 'on' : 'off';
+    if (document.documentElement) document.documentElement.dataset.doze = document.hidden ? 'yes' : 'no';
+  }
+
+  function stopHealth() {
+    if (healthTimer) window.clearInterval(healthTimer);
+    healthTimer = 0;
+    paintRuntime();
+  }
+
+  function startHealth() {
+    if (healthTimer || document.hidden) return;
+    var status = getWindow('status');
+    if (!status || status.hidden || status.dataset.idle === 'sleeping') return;
+    healthTimer = window.setInterval(function () {
+      if (document.hidden || status.hidden || status.dataset.idle === 'sleeping') { stopHealth(); return; }
+      checkHealth();
+    }, 30000);
+    paintRuntime();
+  }
+
+  function stopClock() {
+    if (clockTimer) window.clearInterval(clockTimer);
+    clockTimer = 0;
+    paintRuntime();
+  }
+
+  function startClock() {
+    if (clockTimer || document.hidden) return;
+    clockTimer = window.setInterval(updateClock, 30000);
+    paintRuntime();
+  }
+
+  function setIdle(node, sleeping) {
+    if (!node) return;
+    node.dataset.idle = sleeping ? 'sleeping' : 'active';
+    var frame = node.querySelector && node.querySelector('iframe');
+    if (frame && frame.dataset) {
+      if (sleeping) {
+        var current = frame.getAttribute ? frame.getAttribute('src') : frame.src;
+        var doc = frame.srcdoc || '';
+        if (current && current !== 'about:blank') frame.dataset.resume = current;
+        if (doc) frame.dataset.resumeDoc = doc;
+        if (current && current !== 'about:blank' && frame.setAttribute) frame.setAttribute('src', 'about:blank');
+        if (doc) frame.srcdoc = '';
+      } else if (frame.dataset.resume && frame.setAttribute) {
+        frame.setAttribute('src', frame.dataset.resume);
+        if (frame.dataset.resumeDoc) frame.srcdoc = frame.dataset.resumeDoc;
+      }
+    }
+    if (node.dataset.window === 'status') {
+      if (sleeping || document.hidden) stopHealth();
+      else startHealth();
+    }
+    paintRuntime();
+  }
+
+  function scheduleWarm(node) {
+    warm = warm.filter(function (item) { return item !== node; });
+    if (!node.hidden) warm.push(node);
+    var apply = function () {
+      if (document.hidden) {
+        windows.forEach(function (item) { setIdle(item, true); });
+        stopClock();
+        return;
+      }
+      var keep = {};
+      warm.slice(-WARM_CAP).forEach(function (item) { keep[item.dataset.window] = true; });
+      windows.forEach(function (item) {
+        setIdle(item, item.hidden || !keep[item.dataset.window]);
+      });
+    };
+    apply();
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(apply, { timeout: 50 });
+  }
+
   function focusWindow(node) {
     topZ += 1;
     node.style.zIndex = String(topZ);
@@ -31,6 +112,7 @@
       var button = taskbarApps.querySelector('[data-task="' + item.dataset.window + '"]');
       if (button) button.setAttribute('aria-pressed', String(item === node && !item.hidden));
     });
+    scheduleWarm(node);
   }
 
   function updateTaskbar() {
@@ -74,6 +156,8 @@
   function closeWindow(node) {
     node.hidden = true;
     node.dataset.minimized = 'false';
+    warm = warm.filter(function (item) { return item !== node; });
+    setIdle(node, true);
     updateTaskbar();
     announce(node.querySelector('.title-bar h2').textContent + ' closed.');
   }
@@ -81,6 +165,8 @@
   function minimizeWindow(node) {
     node.hidden = true;
     node.dataset.minimized = 'true';
+    warm = warm.filter(function (item) { return item !== node; });
+    setIdle(node, true);
     updateTaskbar();
     announce(node.querySelector('.title-bar h2').textContent + ' minimized.');
   }
@@ -201,7 +287,21 @@
     var page = event.target.value === '/status/' ? '/status/' : '/';
     var iframe = document.querySelector('#window-browser iframe');
     iframe.src = page;
+    if (iframe.dataset) iframe.dataset.resume = page;
     document.querySelector('#window-browser .address-row a').href = page;
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      windows.forEach(function (node) { setIdle(node, true); });
+      stopClock();
+      return;
+    }
+    startClock();
+    var open = windows.filter(function (node) { return !node.hidden; }).sort(function (a, b) {
+      return Number(a.style.zIndex || 0) - Number(b.style.zIndex || 0);
+    });
+    warm = open.slice(-WARM_CAP);
+    if (warm.length) scheduleWarm(warm[warm.length - 1]);
   });
 
   function updateClock() {
@@ -210,16 +310,73 @@
     clock.textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   }
 
+  windows.forEach(function (node) { setIdle(node, true); });
   updateClock();
-  window.setInterval(updateClock, 30_000);
+  startClock();
   updateTaskbar();
   var initiallyOpen = windows.find(function (node) { return !node.hidden; });
   if (initiallyOpen) focusWindow(initiallyOpen);
   checkHealth();
-  healthTimer = window.setInterval(function () {
-    if (!getWindow('status').hidden) checkHealth();
-  }, 30_000);
+  var spotlight = document.getElementById('spotlight');
+  if (spotlight && spotlight.addEventListener) spotlight.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter') return;
+    var query = String(spotlight.value || '').trim().toLowerCase();
+    if (!query) return;
+    var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-open]'));
+    var match = buttons.find(function (button) {
+      return button.dataset.open === query || String(button.textContent || '').toLowerCase().indexOf(query) !== -1;
+    });
+    if (match) openWindow(match.dataset.open);
+  });
+  function storedRole() {
+    try {
+      var search = window.location && window.location.search || '';
+      var requested = (new URLSearchParams(search).get('node') || '').toLowerCase();
+      if (requested === 'laptop' || requested === 'full-time') {
+        if (window.localStorage) window.localStorage.setItem('valhalla-node-role', requested);
+        return requested;
+      }
+      var saved = window.localStorage ? window.localStorage.getItem('valhalla-node-role') : '';
+      return saved === 'laptop' || saved === 'full-time' ? saved : '';
+    } catch (error) { return ''; }
+  }
+  function showRole(role) {
+    var label = document.getElementById('node-label');
+    var header = document.getElementById('header-node');
+    var text = role ? 'This window: ' + role + '. Other nodes are not connected.' : 'Node label not set. This window only.';
+    if (label) label.textContent = text;
+    if (header) header.textContent = role ? role.toUpperCase() : 'THIS WINDOW';
+  }
+  showRole(storedRole());
+  document.addEventListener('click', function (event) {
+    var roleButton = event.target.closest && event.target.closest('[data-node-role]');
+    if (!roleButton) return;
+    var role = roleButton.getAttribute('data-node-role');
+    if (role !== 'laptop' && role !== 'full-time') return;
+    try { if (window.localStorage) window.localStorage.setItem('valhalla-node-role', role); } catch (error) { /* label still updates */ }
+    showRole(role);
+  });
+  var nodeCheck = document.getElementById('node-check');
+  if (nodeCheck && nodeCheck.addEventListener) nodeCheck.addEventListener('click', async function () {
+    var output = document.getElementById('node-reach');
+    if (output) output.textContent = 'Checking this desk copy…';
+    try {
+      var response = await fetch('/os/', { cache: 'no-store', credentials: 'same-origin' });
+      var body = response.ok ? await response.text() : '';
+      var version = (body.match(/name="valhalla-desk-version" content="([^"]+)"/) || [])[1] || '';
+      if (!response.ok || !version) {
+        if (output) output.textContent = 'Desk copy not verified. HTTP ' + response.status + '. Not reported as live.';
+        return;
+      }
+      if (output) output.textContent = 'This desk copy is reachable. Version ' + version + '. That is this page, not a cluster.';
+      var seen = document.getElementById('node-seen');
+      if (seen) seen.textContent = new Date().toLocaleString();
+    } catch (error) {
+      if (output) output.textContent = 'Desk copy was not reachable. Not reported as live.';
+    }
+  });
   window.addEventListener('pagehide', function () {
-    window.clearInterval(healthTimer);
+    stopHealth();
+    stopClock();
   }, { once: true });
 })();

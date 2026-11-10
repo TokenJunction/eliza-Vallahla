@@ -35,17 +35,18 @@
   }
 
   function navigation(q) {
-    var routes = [
-      ['status', /\b(system status|status window|health probe)\b|\bopen status\b/],
-      ['wallet', /\b(open|show)\b[^.]{0,40}\bwallet\b|\bwallet window\b/],
-      ['memory', /\bmemory\b/],
-      ['browser', /\b(web shell|browser)\b|\bopen web\b/],
-      ['swarm', /\b(monitor|swarm)\b/],
-      ['tools', /\b(tools menu|start menu|open tools)\b/]
-    ];
-    for (var i = 0; i < routes.length; i += 1) {
-      if (routes[i][1].test(q)) return routes[i][0];
+    function named(noun) {
+      return new RegExp('\\b(open|show|launch)\\b[^.]{0,48}\\b' + noun + '\\b|\\b' + noun + ' window\\b').test(q);
     }
+    if (named('status') || /\b(system status|status window|health probe)\b/.test(q)) return 'status';
+    if (named('wallet') || /\bwallet window\b/.test(q)) return 'wallet';
+    if (named('memory') || /\bmemory window\b/.test(q)) return 'memory';
+    if ((named('browser') || named('web') || /\bweb shell\b/.test(q)) && /\b(open|show|launch)\b/.test(q)) return 'browser';
+    if (named('monitor') || named('swarm') || /\bmonitor window\b/.test(q)) return 'swarm';
+    if (named('installer') || named('install')) return 'installer';
+    if (named('settings') || named('node') || /\bnode window\b/.test(q)) return 'settings';
+    if (named('tools') || /\b(tools menu|start menu)\b/.test(q)) return 'tools';
+    if (named('volos') || named('coin') || (/\bcoin station\b/.test(q) && /\b(open|show|launch)\b/.test(q))) return 'volos';
     return '';
   }
 
@@ -64,25 +65,31 @@
     }
     var destination = navigation(q);
     if (destination === 'tools') {
-      return { handled: true, open: 'tools', answer: 'Opening Tools. Choose Status, Wallet, Memory, Web, or Monitor from the menu.' };
+      return { handled: true, open: 'tools', evidence: ['Tools menu'], answer: 'Opening Tools. Choose Status, Wallet, Memory, Web, Monitor, Installer, or Settings. Feeds that are missing stay not connected.' };
     }
     if (destination) {
-      return { handled: true, open: destination, answer: 'Opening ' + destination + '. If that panel has no feed, it stays not connected. No transaction is requested.' };
+      var label = { swarm: 'Monitor', browser: 'Web', settings: 'Settings', installer: 'Installer', volos: 'volOS' }[destination] || destination;
+      return { handled: true, open: destination, evidence: ['dock ' + destination], answer: 'Opening ' + label + '. If that panel has no feed, it stays not connected. No transaction is requested.' };
     }
-    if (/\b(market|hardware|cpu|gpu)\b/.test(q)) {
-      return { handled: true, answer: 'Market and hardware are not connected. No price, volume, or vital is available from this workstation.' };
+    if (/\b(market|hardware|cpu|gpu|cluster|tok\/s)\b/.test(q)) {
+      return { handled: true, evidence: ['no hardware feed on this page'], answer: 'Market and hardware are not connected. No price, volume, cluster vital, or token rate is available from this workstation.' };
     }
-    if (/\bsign in\b|\baccount gate\b|\bhuman check\b/.test(q)) {
-      return { handled: true, answer: 'Sign-in starts on the Citadel entrance, then the human check. This workstation does not complete sign-in. Use Account to open the gate.' };
+    if (/\bsign[\s-]?in\b|\baccount gate\b|\bhuman check\b/.test(q)) {
+      return { handled: true, evidence: ['Account control links to /app/'], answer: 'Sign-in starts on the Citadel entrance, then the human check at /app/. This workstation does not complete sign-in. Use Account to open the gate.' };
+    }
+    if (/\b(laptop|full-time|node label|desk version)\b/.test(q)) {
+      return { handled: true, open: 'settings', evidence: ['local node label only'], answer: 'The node label is local to this window: laptop or full-time. Other nodes are not connected. Settings checks whether this desk copy is reachable. A failed check is not reported as live. No vendor model is running on this page.' };
     }
     if (/c8sm|\$5\.58|owner wallet|which wallet|wallet balance/.test(q)) {
-      return { handled: true, blocked: true, answer: 'The only wallet I will acknowledge ends in …' + OWNER_LAST4 + '. The balance to use is ' + OWNER_BALANCE + '. This desk is not connected to that wallet and will not request a transaction.' };
+      return { handled: true, blocked: true, evidence: ['owner note, not a connected wallet'], answer: 'The only wallet I will acknowledge ends in …' + OWNER_LAST4 + '. The balance to use is ' + OWNER_BALANCE + '. This desk is not connected to that wallet and will not request a transaction.' };
     }
     if (/\bpaper\b/.test(q)) {
-      return { handled: true, blocked: true, answer: 'Paper tools are a side desk, not the workstation. Live trading is off. No transaction or signature is requested.' };
+      return { handled: true, blocked: true, evidence: ['LIVE_TRADING is false'], answer: 'Paper tools are a side desk, not the workstation. Live trading is off. No transaction or signature is requested.' };
     }
-    if (/\b(buy|swap|sell|trade|broadcast|sign)\b/.test(q)) {
-      return { handled: true, blocked: true, answer: 'Live trading is off. This desk will not request a transaction or signature. Stand down.' };
+    var tradeOff = /\btrade-offs?\b/.test(q);
+    var signIn = /\bsign[\s-]?in\b/.test(q);
+    if (!tradeOff && !signIn && (/\b(buy|swap|sell|broadcast)\b/.test(q) || /\btrades?\b/.test(q) || /\bsign\b/.test(q))) {
+      return { handled: true, blocked: true, evidence: ['live trading flag is off'], answer: 'Live trading is off. This desk will not request a transaction or signature. Stand down.' };
     }
     return { handled: false, rules: rulesForModel() };
   }

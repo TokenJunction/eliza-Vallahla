@@ -1,5 +1,8 @@
 {
   "private": true,
+  "scripts": {
+    "desk": "bun website/scripts/serve-site.ts"
+  },
   "dependencies": {
     "@vercel/functions": "^2.2.13",
     "esbuild": "^0.25.12"
