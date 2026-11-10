@@ -28,25 +28,37 @@
     });
   }
 
+  function publishWallet(config) {
+    window.VALHALLA_WALLET = config && config.wallet === 'external'
+      ? { configured: true, appId: config.privyAppId }
+      : { configured: false };
+    window.dispatchEvent(new Event('valhalla-wallet'));
+  }
+
   fetch('/api/entrance-config', { cache: 'no-store' }).then(function (response) {
     if (!response || !response.ok) throw new Error('unavailable');
     return response.json();
   }).then(function (config) {
-    var key = window.ValhallaClerk.productionKey(config);
-    if (!key) {
+    publishWallet(config);
+    if (!window.ValhallaAuth.clientOptions(config, 'https://valhalla-app.xyz/')) {
       leave();
       return;
     }
-    return window.ValhallaClerk.loadClerk(key).then(function (clerk) {
-      if (!clerk.user) {
-        leave();
-        return;
-      }
-      showLevel(window.ValhallaAccount.levelFromUser(clerk.user));
-      var menu = document.getElementById('account-menu');
-      if (menu && typeof clerk.mountUserButton === 'function') {
-        clerk.mountUserButton(menu, { afterSignOutUrl: '/' });
-      }
+    return window.ValhallaAuth.createClient(config, 'https://valhalla-app.xyz/').then(function (client) {
+      var restore = client.getTokenSilently ? client.getTokenSilently().catch(function () { return null; }) : Promise.resolve(null);
+      return restore.then(function () { return client.getUser(); }).then(function (user) {
+        if (!user) {
+          leave();
+          return;
+        }
+        showLevel(window.ValhallaAccount.levelFromUser(user));
+        var signOut = document.getElementById('sign-out');
+        if (signOut) {
+          signOut.addEventListener('click', function () {
+            client.logout({ logoutParams: { returnTo: window.ValhallaAuth.logoutReturnTo } });
+          });
+        }
+      });
     });
   }).catch(leave);
 })();

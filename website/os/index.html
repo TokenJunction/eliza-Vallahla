@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/desk.css?v=1.4.2">
   <script src="/site-config.js?v=1.4.2" defer></script>
   <script src="/account-level.js" defer></script>
-  <script src="/clerk-gate.js" defer></script>
+  <script src="/auth0-gate.js" defer></script>
   <script src="/os/session.js" defer></script>
   <script src="/os/app.js?v=1.4.2" defer></script>
   <script src="/os/bridge.js?v=1.4.2" defer></script>
@@ -48,7 +48,7 @@
       <div><h1>VALHALLA<span>OS</span></h1>
       <p id="account-level">Account level: FREE. Plans are not configured.</p></div>
       <div class="header-state"><span class="state-dot"></span> SIGNED IN <span class="paper-badge">LIVE TRADING OFF</span></div>
-      <div id="account-menu"></div>
+      <button id="sign-out" class="classic-button menu-signin" type="button">Sign out</button>
     </header>
 
     <nav class="desktop-icons dock" aria-label="Desktop applications">
@@ -262,14 +262,12 @@
         </div>
       </header>
       <div class="window-body">
-        <p>Connect an installed wallet to share its public address. Your wallet controls permissions; this desk will not request a transaction or signature.</p>
+        <p>A wallet can connect only after sign-in. Connecting a wallet does not sign you in, and nothing is sent until you confirm it.</p>
         <div class="wallet-actions">
-          <button type="button" class="classic-button" data-wallet="solflare">Connect Solflare</button>
-          <button type="button" class="classic-button" data-wallet="metamask">Connect MetaMask</button>
-          <button type="button" class="classic-button" disabled>Privy unavailable</button>
+          <button type="button" class="classic-button" data-wallet="phantom" disabled>Connect Phantom</button>
+          <button type="button" class="classic-button" data-wallet="solflare" disabled>Connect Solflare</button>
         </div>
-        <p class="fine-print">Privy requires an application ID and a configured integration. MetaMask connects an Ethereum address; Solflare connects a Solana address.</p>
-        <p class="inset-panel" id="wallet-status" role="status">No wallet connected.</p>
+        <p class="inset-panel" id="wallet-status" role="status">Wallet connect not configured yet.</p>
         <button type="button" class="classic-button" id="wallet-disconnect" hidden>Disconnect</button>
         <p class="fine-print">Live trading is disabled. This bridge does not request, store, or transmit private keys.</p>
       </div>

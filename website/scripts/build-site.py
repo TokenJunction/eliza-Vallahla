@@ -11,7 +11,7 @@ directories = (
     "updates whitepaper"
 ).split()
 files = (
-    "404.html account-level.js ads.txt app-ads.txt changelog.json clerk-gate.js connect-core.js consent.js "
+    "404.html account-level.js ads.txt app-ads.txt auth-callback.js auth0-gate.js changelog.json connect-core.js consent.js "
     "desk.css desk.js disclaimer.md errors.js faq.json googlec12e36a98a292c4c.html hive-core.js "
     "home-motion.js home.css home.js index.html landing.css manifest.webmanifest "
     "merch-promo.js monetization.json nacl.min.js offers.json privacy-policy.md "

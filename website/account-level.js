@@ -19,8 +19,16 @@
     return RANK[text] ? text : '';
   }
 
+  function metadata(user) {
+    if (!user || typeof user !== 'object') return {};
+    if (user.app_metadata && typeof user.app_metadata === 'object') return user.app_metadata;
+    if (user.appMetadata && typeof user.appMetadata === 'object') return user.appMetadata;
+    var claim = user['https://valhalla-app.xyz/app_metadata'];
+    return claim && typeof claim === 'object' ? claim : {};
+  }
+
   function levelFromUser(user) {
-    var meta = user && user.publicMetadata && typeof user.publicMetadata === 'object' ? user.publicMetadata : {};
+    var meta = metadata(user);
     var features = Array.isArray(meta.features) ? meta.features : [];
     var named = namedLevel(meta.plan || meta.level || meta.accountLevel);
     var fromFeature = '';

@@ -12,7 +12,7 @@ test('homepage continue stores the return preference and opens sign-in', () => {
 });
 
 test('blocked storage does not pretend the entrance completed sign-in', () => {
-  assert.match(homeSource, /catch\(unavailable\)/);
+  assert.match(homeSource, /unavailable\('Sign-in is not available yet\.'\)/);
   assert.doesNotMatch(homeSource, /sessionStorage/);
 });
 
@@ -20,7 +20,8 @@ test('entrance and volOS copy stay honest', () => {
   const home = fs.readFileSync(path.join(root, 'website/index.html'), 'utf8');
   const volos = fs.readFileSync(path.join(root, 'website/volos/index.html'), 'utf8');
   assert.match(home, /Sign-in is not available yet/);
-  assert.match(home, /id="clerk-sign-in"/);
+  assert.match(home, /id="sign-in"/);
+  assert.doesNotMatch(home, /clerk/i);
   assert.match(home, /\/assets\/heaven-poster\.jpg/);
   assert.doesNotMatch(home, /Trade Solana|Public desk|Preview the public|Continue to sign-in|github\.com/);
   const desk = fs.readFileSync(path.join(root, 'website/os/index.html'), 'utf8');

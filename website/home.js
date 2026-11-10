@@ -1,33 +1,49 @@
 (function () {
-  var mount = document.getElementById('clerk-sign-in');
   var note = document.getElementById('sign-in-status');
-  if (!mount || !note) return;
+  var button = document.getElementById('sign-in');
+  if (!note || !button || !window.ValhallaAuth) return;
 
-  function unavailable() {
+  function unavailable(message) {
     note.hidden = false;
-    note.textContent = 'Sign-in is not available yet.';
+    note.textContent = message || 'Sign-in is not available yet.';
+    button.hidden = true;
   }
 
   fetch('/api/entrance-config', { cache: 'no-store' }).then(function (response) {
     if (!response || !response.ok) throw new Error('unavailable');
     return response.json();
   }).then(function (config) {
-    var key = window.ValhallaClerk.productionKey(config);
-    if (!key) {
-      unavailable();
+    if (!config || config.auth0 !== 'configured') {
+      unavailable('Sign-in is not available yet.');
       return;
     }
-    return window.ValhallaClerk.loadClerk(key).then(function (clerk) {
-      if (clerk.user) {
-        window.location.replace('/os/');
-        return;
+    var redirect = window.ValhallaAuth.redirectUri(window.location.href);
+    if (!redirect) {
+      unavailable('Sign-in cannot return to this address.');
+      return;
+    }
+    return window.ValhallaAuth.createClient(config, window.location.href).then(function (client) {
+      if (window.ValhallaAuth.hasCallback(window.location.search)) {
+        return client.handleRedirectCallback().then(function (result) {
+          var next = result && result.appState && result.appState.returnTo === '/os/' ? '/os/' : '/os/';
+          window.history.replaceState({}, document.title, redirect);
+          window.location.replace(next);
+        });
       }
-      note.hidden = true;
-      if (typeof clerk.mountSignIn === 'function') {
-        clerk.mountSignIn(mount, { afterSignInUrl: '/os/', afterSignUpUrl: '/os/' });
-      } else {
-        unavailable();
-      }
+      return client.isAuthenticated().then(function (ready) {
+        if (ready) {
+          window.location.replace('/os/');
+          return;
+        }
+        note.hidden = true;
+        button.hidden = false;
+        button.addEventListener('click', function () {
+          client.loginWithRedirect({
+            authorizationParams: { redirect_uri: redirect },
+            appState: { returnTo: '/os/' }
+          });
+        });
+      });
     });
-  }).catch(unavailable);
+  }).catch(function () { unavailable('Sign-in is not available yet.'); });
 })();
