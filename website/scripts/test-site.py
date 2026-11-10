@@ -78,6 +78,7 @@ class SiteTests(unittest.TestCase):
         self.assertIn({"source": "/app/", "destination": "/", "permanent": False}, config["redirects"])
         self.assertEqual(config["proxy"]["entrypoint"], "website/proxy.js")
         self.assertEqual(config["proxy"]["matcher"], ["/", "/index.html"])
+        self.assertEqual(config["installCommand"], "npm ci")
         command = config["buildCommand"]
         self.assertLessEqual(len(command), 256)
         self.assertEqual(command, "bash website/scripts/vercel-build.sh")
