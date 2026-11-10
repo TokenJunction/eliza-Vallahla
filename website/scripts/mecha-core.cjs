@@ -1,12 +1,24 @@
 'use strict';
 
-const fs = require('node:fs');
-const path = require('node:path');
 const { publicSupabase } = require('./feed-core.cjs');
 const { DEFAULT_MODEL, FALLBACK_MODEL } = require('./ai-core.cjs');
 
-const ROOT = path.join(__dirname, '../../characters');
+const CHARACTERS = {
+  wren: require('../../characters/wren.json'),
+  droid: require('../../characters/droid.json'),
+  forge: require('../../characters/forge.json'),
+  sentinel: require('../../characters/sentinel.json'),
+  gauge: require('../../characters/gauge.json'),
+  skald: require('../../characters/skald.json'),
+  herald: require('../../characters/herald.json'),
+  muse: require('../../characters/muse.json'),
+  tinker: require('../../characters/tinker.json'),
+  ledger: require('../../characters/ledger.json'),
+  conductor: require('../../characters/conductor.json')
+};
 const ROSTER = ['wren', 'droid', 'forge', 'sentinel', 'gauge', 'skald', 'herald', 'muse', 'tinker', 'ledger'];
+const MAX_INPUT = 2000;
+const hits = new Map();
 const ROUTES = [
   ['wren', /\b(ops|health|outage|deploy|status)\b/i],
   ['droid', /\b(research|source|paper|study)\b/i],
@@ -27,12 +39,27 @@ function bearer(headers) {
 }
 
 function loadCharacter(id) {
-  if (id === 'zeus' || !/^[a-z]+$/.test(id)) return null;
-  const file = path.join(ROOT, id + '.json');
-  if (!fs.existsSync(file)) return null;
-  const character = JSON.parse(fs.readFileSync(file, 'utf8'));
-  if (!character || /zeus/i.test(character.name || '')) return null;
+  if (id === 'zeus' || !CHARACTERS[id]) return null;
+  const character = CHARACTERS[id];
+  if (/zeus/i.test(character.name || '')) return null;
   return character;
+}
+
+function secretLike(text) {
+  const words = String(text || '').trim().toLowerCase().split(/\s+/);
+  const phrase = words.length >= 12 && words.length <= 24 && words.every(function (word) { return /^[a-z]+$/.test(word); });
+  return phrase || /[1-9A-HJ-NP-Za-km-z]{64,}/.test(String(text || ''));
+}
+
+function allow(userId, now) {
+  const recent = (hits.get(userId) || []).filter(function (at) { return now - at < 60000; });
+  if (recent.length >= 6) {
+    hits.set(userId, recent);
+    return false;
+  }
+  recent.push(now);
+  hits.set(userId, recent);
+  return true;
 }
 
 function routeTask(text) {
@@ -132,14 +159,14 @@ async function readHealth(env, fetchImpl) {
   const key = String(env && env.SUPABASE_SERVICE_ROLE_KEY || '');
   const site = publicSupabase();
   if (!key || !site.url) return { connected: false, label: 'Overseer not connected' };
-  const response = await fetchImpl(site.url + '/rest/v1/overseer_runs?select=report,rollback_recommended,created_at&order=created_at.desc&limit=1', {
+  const response = await fetchImpl(site.url + '/rest/v1/overseer_runs?select=rollback_recommended,created_at&order=created_at.desc&limit=1', {
     headers: { authorization: 'Bearer ' + key, apikey: key, accept: 'application/json' }
   });
   if (!response || !response.ok) return { connected: false, label: 'Overseer not connected' };
   const rows = await response.json();
   const latest = Array.isArray(rows) ? rows[0] : null;
   if (!latest) return { connected: true, label: 'No overseer check stored yet.' };
-  return { connected: true, label: latest.rollback_recommended ? 'Roll back recommended' : 'Last check stored.', report: latest.report || null };
+  return { connected: true, label: latest.rollback_recommended ? 'Roll back recommended' : 'Last check stored.' };
 }
 
 async function storeApproval(env, user, item, fetchImpl) {
@@ -154,7 +181,7 @@ async function storeApproval(env, user, item, fetchImpl) {
   return { stored: !!(response && response.ok) };
 }
 
-async function handleMechas(req, env, fetchImpl) {
+async function handleMechas(req, env, fetchImpl, now) {
   if (!req || (req.method !== 'GET' && req.method !== 'POST')) return { status: 405, body: { error: 'Method not allowed.' } };
   const token = bearer(req.headers);
   if (!token) return { status: 401, body: { error: 'Sign-in required.' } };
@@ -164,14 +191,18 @@ async function handleMechas(req, env, fetchImpl) {
   if (!user) return { status: 401, body: { error: 'Sign-in required.' } };
   const roster = ROSTER.map(loadCharacter).filter(Boolean).map(function (character) { return character.name; });
   const health = await readHealth(env, fetchImpl);
+  const deskHealth = { connected: health.connected, label: health.label };
   if (req.method === 'GET') {
-    return { status: 200, body: { supervisor: 'Conductor', mechas: roster, health: health, zeus: false } };
+    return { status: 200, body: { supervisor: 'Conductor', mechas: roster, health: deskHealth, zeus: false } };
   }
   let payload = {};
   try { payload = JSON.parse(req.body || '{}'); }
   catch (error) { return { status: 400, body: { error: 'The request was not understood.' } }; }
   const task = String(payload.task || '').trim();
   if (!task) return { status: 400, body: { error: 'A task is required.' } };
+  if (task.length > MAX_INPUT) return { status: 400, body: { error: 'That task is too long.' } };
+  if (secretLike(task)) return { status: 400, body: { error: 'Do not share a seed phrase or private key.' } };
+  if (!allow(user.id, now || Date.now())) return { status: 429, body: { error: 'Too many Mecha requests.' } };
   if (/zeus/i.test(task) || payload.mecha === 'zeus') {
     return { status: 400, body: { error: 'Zeus does not run on customer nodes.' } };
   }
@@ -184,7 +215,8 @@ async function handleMechas(req, env, fetchImpl) {
   if (!character || !supervisor) return { status: 500, body: { error: 'That Mecha is not available.' } };
   const action = classify(task);
   if (action.mode === 'approval') {
-    await storeApproval(env, user, { kind: action.kind, mecha: character.name, task: task }, fetchImpl);
+    const saved = await storeApproval(env, user, { kind: action.kind, mecha: character.name, task: task }, fetchImpl);
+    if (!saved.stored) return { status: 503, body: { error: 'That approval was not saved.', pending: false, executed: false } };
     return {
       status: 200,
       body: {
@@ -218,5 +250,6 @@ module.exports = {
   routeTask: routeTask,
   loadCharacter: loadCharacter,
   handleMechas: handleMechas,
-  customerNode: customerNode
+  customerNode: customerNode,
+  resetMechaLimits: function () { hits.clear(); }
 };

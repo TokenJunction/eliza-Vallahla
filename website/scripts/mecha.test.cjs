@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { classify, routeTask, loadCharacter, handleMechas, customerNode } = require('./mecha-core.cjs');
+const { classify, routeTask, loadCharacter, handleMechas, customerNode, resetMechaLimits } = require('./mecha-core.cjs');
 
 test('the supervisor routes Mechas and never loads Zeus', () => {
   assert.equal(routeTask('check the deploy health'), 'wren');
@@ -17,12 +17,13 @@ test('merge, money, DNS, posting, and trading wait for approval', async () => {
   assert.equal(classify('change the dns').kind, 'dns');
   assert.equal(classify('post this').kind, 'post');
   assert.equal(classify('trade the position').kind, 'trade');
+  resetMechaLimits();
   let calledModel = false;
   const result = await handleMechas({
     method: 'POST',
     headers: { authorization: 'Bearer person' },
     body: JSON.stringify({ task: 'merge the pull request' })
-  }, { NODE_ROLE: 'customer' }, async (url) => {
+  }, { NODE_ROLE: 'customer', SUPABASE_SERVICE_ROLE_KEY: 'service' }, async (url) => {
     const target = String(url);
     if (target.includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-1' }) };
     if (target.includes('openrouter.ai') || target.includes('/v1/chat/completions')) calledModel = true;
@@ -33,9 +34,20 @@ test('merge, money, DNS, posting, and trading wait for approval', async () => {
   assert.equal(result.body.executed, false);
   assert.equal(result.body.kind, 'merge');
   assert.equal(calledModel, false);
+  const missed = await handleMechas({
+    method: 'POST',
+    headers: { authorization: 'Bearer person' },
+    body: JSON.stringify({ task: 'merge the pull request' })
+  }, { NODE_ROLE: 'customer' }, async (url) => {
+    if (String(url).includes('/auth/v1/user')) return { ok: true, json: async () => ({ id: 'user-2' }) };
+    return { ok: false, json: async () => ({}) };
+  });
+  assert.equal(missed.status, 503);
+  assert.equal(missed.body.pending, false);
 });
 
 test('a customer node refuses Zeus and a busy free model falls through', async () => {
+  resetMechaLimits();
   const refused = await handleMechas({
     method: 'POST',
     headers: { authorization: 'Bearer person' },

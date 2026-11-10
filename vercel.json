@@ -6,6 +6,11 @@
     "entrypoint": "website/proxy.js",
     "matcher": ["/", "/index.html"]
   },
+  "functions": {
+    "api/mechas.js": {
+      "includeFiles": "characters/**"
+    }
+  },
   "redirects": [
     { "source": "/app", "destination": "/", "permanent": false },
     { "source": "/app/", "destination": "/", "permanent": false }

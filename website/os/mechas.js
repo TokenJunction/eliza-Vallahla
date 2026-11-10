@@ -39,11 +39,24 @@
     if (opener) send().then(show);
   });
 
+  var busy = false;
   form.addEventListener('submit', function (event) {
     event.preventDefault();
+    if (busy) return;
     var input = document.getElementById('mecha-task');
-    var task = input && input.value;
+    var task = input && input.value.trim();
+    if (!task) return;
+    var words = task.toLowerCase().split(/\s+/);
+    var phrase = words.length >= 12 && words.length <= 24 && words.every(function (word) { return /^[a-z]+$/.test(word); });
+    if (phrase || /[1-9A-HJ-NP-Za-km-z]{64,}/.test(task)) {
+      say('Do not share a seed phrase or private key.');
+      return;
+    }
+    busy = true;
+    if (input) input.disabled = true;
     send({ task: task }).then(function (body) {
+      busy = false;
+      if (input) input.disabled = false;
       if (!body) return;
       var reply = document.getElementById('mecha-reply');
       if (reply) reply.textContent = (body.mecha ? body.mecha + ': ' : '') + (body.reply || '');
