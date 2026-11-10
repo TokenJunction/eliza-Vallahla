@@ -228,6 +228,7 @@ test('a failed invoice uses the subscription parent', async () => {
     headers: { 'stripe-signature': sign(payload, secret) },
     body: payload
   }, { STRIPE_WEBHOOK_SECRET: secret, SUPABASE_SERVICE_ROLE_KEY: 'service-role', STRIPE_SECRET_KEY: 'sk_test_only' }, async (url, init) => {
+    if (String(url).includes('/subscriptions/')) return { ok: true, status: 200, json: async () => ({ id: 'sub_9', status: 'past_due', metadata: { user_id: '22222222-2222-2222-2222-222222222222' } }) };
     if (String(url).includes('/entitlements')) saved = JSON.parse(init.body);
     return { ok: true, status: 200, json: async () => ({}) };
   });
@@ -235,6 +236,26 @@ test('a failed invoice uses the subscription parent', async () => {
   assert.equal(saved.status, 'past_due');
   assert.equal(saved.id, '22222222-2222-2222-2222-222222222222');
   assert.equal(saved.stripe_subscription_id, 'sub_9');
+});
+
+test('a failed invoice does not reopen a canceled subscription', async () => {
+  const secret = 'whsec_test';
+  const payload = JSON.stringify({
+    type: 'invoice.payment_failed',
+    data: { object: { id: 'in_2', customer: 'cus_1', parent: { subscription_details: { subscription: 'sub_closed', metadata: { user_id: '33333333-3333-3333-3333-333333333333' } } } } }
+  });
+  let wrote = false;
+  const result = await handleWebhook({
+    method: 'POST',
+    headers: { 'stripe-signature': sign(payload, secret) },
+    body: payload
+  }, { STRIPE_WEBHOOK_SECRET: secret, SUPABASE_SERVICE_ROLE_KEY: 'service-role', STRIPE_SECRET_KEY: 'sk_test_only' }, async (url, init) => {
+    if (String(url).includes('/subscriptions/')) return { ok: true, status: 200, json: async () => ({ id: 'sub_closed', status: 'canceled', metadata: { user_id: '33333333-3333-3333-3333-333333333333' } }) };
+    if (String(url).includes('/entitlements')) wrote = true;
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  assert.equal(result.status, 200);
+  assert.equal(wrote, false);
 });
 
 test('the desk explains the one dollar hold', () => {

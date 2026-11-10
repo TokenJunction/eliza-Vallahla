@@ -197,9 +197,16 @@ async function handleWebhook(req, env, fetchImpl) {
     const parent = object.parent && object.parent.subscription_details;
     let userId = object.metadata && object.metadata.user_id || object.client_reference_id || (parent && parent.metadata && parent.metadata.user_id);
     const subId = object.subscription || (parent && parent.subscription) || '';
-    if (!userId && subId && stripeKey) {
+    let subStatus = '';
+    if (subId && stripeKey) {
       const subscription = await stripeRequest(stripeKey, 'GET', 'subscriptions/' + encodeURIComponent(subId), null, fetchImpl);
-      userId = subscription.ok && subscription.body && subscription.body.metadata && subscription.body.metadata.user_id;
+      if (subscription.ok && subscription.body) {
+        subStatus = subscription.body.status || '';
+        if (!userId && subscription.body.metadata) userId = subscription.body.metadata.user_id;
+      }
+    }
+    if (failed && subStatus !== 'past_due' && subStatus !== 'unpaid' && subStatus !== 'active' && subStatus !== 'trialing') {
+      return { status: 200, body: { received: true } };
     }
     if (!userId) return { status: 200, body: { received: true } };
     const saved = await writeEntitlement(env, {
