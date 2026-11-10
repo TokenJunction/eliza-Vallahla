@@ -123,7 +123,7 @@
   if (toggle) toggle.addEventListener('click', async function () {
     var access = await token();
     if (!access) return;
-    var keys = await fetch('/api/push').then(function (response) { return response.json(); });
+    var keys = await fetch('/api/notify').then(function (response) { return response.json(); });
     if (!keys.publicKey || !navigator.serviceWorker) {
       toggle.textContent = 'Alerts are not configured.';
       return;
@@ -138,7 +138,7 @@
     var registration = await navigator.serviceWorker.ready;
     var current = await registration.pushManager.getSubscription();
     if (current) {
-      var removed = await fetch('/api/push', {
+      var removed = await fetch('/api/notify', {
         method: 'POST',
         headers: { authorization: 'Bearer ' + access, 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'unsubscribe', subscription: current.toJSON() })
@@ -155,7 +155,7 @@
       userVisibleOnly: true,
       applicationServerKey: keyBytes(keys.publicKey)
     });
-    var saved = await fetch('/api/push', {
+    var saved = await fetch('/api/notify', {
       method: 'POST',
       headers: { authorization: 'Bearer ' + access, 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'subscribe', subscription: subscription.toJSON() })

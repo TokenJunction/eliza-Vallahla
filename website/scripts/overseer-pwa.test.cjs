@@ -29,6 +29,10 @@ test('the overseer manifest and service worker are a standalone app', () => {
   assert.match(page, /Add to Home screen/);
   assert.match(page, /Ship it/);
   assert.match(page, /Undo/);
+  assert.match(script, /\/api\/notify/);
+  assert.doesNotMatch(script, /\/api\/push/);
+  assert.equal(fs.existsSync(path.join(root, 'api/notify.js')), true);
+  assert.equal(fs.existsSync(path.join(root, 'api/push.js')), false);
 });
 
 test('push subscribe and unsubscribe stay behind sign-in', async () => {
