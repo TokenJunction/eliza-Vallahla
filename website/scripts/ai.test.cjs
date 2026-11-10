@@ -101,6 +101,28 @@ test('a free-model failure falls back to the other free model and hides the key'
   assert.deepEqual(models, [DEFAULT_MODEL, FALLBACK_MODEL]);
 });
 
+test('a 429 from the primary free model falls through to gemma', async () => {
+  resetAiLimits();
+  assert.equal(DEFAULT_MODEL, 'nvidia/nemotron-3.5-lightning:free');
+  assert.equal(FALLBACK_MODEL, 'google/gemma-4-31b-it:free');
+  const calls = [];
+  const result = await handleAi({
+    method: 'POST',
+    headers: { authorization: 'Bearer good' },
+    body: ask('What is the desk?')
+  }, { OPENROUTER_API_KEY: 'server-only-key' }, async (url, init) => {
+    calls.push(String(url) + (init && init.body ? ' ' + JSON.parse(init.body).model : ''));
+    if (String(url).includes('/auth/v1/user')) return supabase(true);
+    const model = JSON.parse(init.body).model;
+    assert.equal(model.endsWith(':free'), true);
+    if (model === DEFAULT_MODEL) return { ok: false, status: 429, json: async () => ({}) };
+    return { ok: true, json: async () => ({ choices: [{ message: { content: 'From the fallback free model.' } }] }) };
+  }, 7_000);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.model, FALLBACK_MODEL);
+  assert.equal(calls.filter(call => call.includes('openrouter')).join(' | '), 'https://openrouter.ai/api/v1/chat/completions ' + DEFAULT_MODEL + ' | https://openrouter.ai/api/v1/chat/completions ' + FALLBACK_MODEL);
+});
+
 test('a seed-like message is refused before OpenRouter is called', async () => {
   resetAiLimits();
   const calls = [];
