@@ -22,7 +22,7 @@ jobs:
   verify:
     permissions:
       contents: read
-      actions: write
+      actions: write # upload-artifact publishes the verified site build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

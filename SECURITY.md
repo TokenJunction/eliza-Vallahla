@@ -4,14 +4,13 @@
 
 Do not open a public defect report for a security issue.
 
-- Use GitHub private vulnerability reporting: https://github.com/TokenJunction/eliza-valhalla/security/advisories/new
-- Or email security@valos.live. That mailbox is monitored.
+Open this repository's **Security** tab and choose **Report a vulnerability**. That starts a private GitHub security advisory.
 
 We aim to acknowledge a report within 7 days.
 
 ## Supported versions
 
-The site deployed at https://valhalla-app.xyz tracks the `develop` branch. Older commits are not supported.
+The current default branch is supported. Older commits are not.
 
 ## Disclosure
 
@@ -19,6 +18,6 @@ We confirm the report, prepare a fix, and then publish the advisory. Please give
 
 ## Secret commits
 
-Pull request job `pr-checks` runs Gitleaks on the commits that belong to the pull request. A finding fails that job. The job blocks a merge only after `pr-checks` is a required check. That branch-protection setting is not changed in this repository's files. The workflow is `.github/workflows/pr-checks.yml` in pull request #84.
+The pull request job named `pr-checks` runs Gitleaks on the commits that belong to the pull request. A finding fails that job. The job blocks a merge only after `pr-checks` is a required check. That branch-protection setting is not changed in these files. The workflow is `.github/workflows/pr-checks.yml`.
 
 Workflow logs must not print secret values. Actions mask `github.token` and repository secrets.

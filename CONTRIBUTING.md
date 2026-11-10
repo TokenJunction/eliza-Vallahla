@@ -4,7 +4,7 @@ Work on a branch. Open a pull request into `develop`. There is no `main` branch.
 
 ## Checks
 
-Pull requests that change the site run "Verify ValhallaOS website on Node 22". Pull requests that change the deployment scripts run "Test Valhalla deployment repair". The `pr-checks` job, added in pull request #84, runs the site tests and Gitleaks.
+Pull requests that change the site run "Verify ValhallaOS website on Node 22". Pull requests that change the deployment scripts run "Test Valhalla deployment repair". The `pr-checks` job runs the site tests and Gitleaks.
 
 ## Review
 

@@ -13,7 +13,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      actions: write
+      actions: write # upload-artifact stores the lockfile candidate
     if: github.repository == 'TokenJunction/eliza-valhalla' && github.ref == 'refs/heads/copilot/fix-350450408-1440217645-36eef3f4-91a2-4723-b0b7-872e5b817e41'
     runs-on: ubuntu-latest
     timeout-minutes: 12
