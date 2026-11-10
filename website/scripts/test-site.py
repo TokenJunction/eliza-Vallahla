@@ -76,8 +76,9 @@ class SiteTests(unittest.TestCase):
         config = json.loads((ROOT / "vercel.json").read_text())
         self.assertIn({"source": "/app", "destination": "/", "permanent": False}, config["redirects"])
         self.assertIn({"source": "/app/", "destination": "/", "permanent": False}, config["redirects"])
-        self.assertEqual(config["proxy"]["entrypoint"], "website/proxy.js")
-        self.assertEqual(config["proxy"]["matcher"], ["/", "/index.html"])
+        self.assertNotIn("proxy", config)
+        self.assertIn({"source": "/", "has": [{"type": "host", "value": "valos.live"}], "destination": "/volos/index.html"}, config["rewrites"])
+        self.assertTrue(any(row.get("key") == "Cache-Control" and "max-age=2592000" in row.get("value", "") for group in config["headers"] for row in group["headers"]))
         command = config["buildCommand"]
         self.assertLessEqual(len(command), 256)
         self.assertEqual(command, "bash website/scripts/vercel-build.sh")
