@@ -10,3 +10,7 @@ paths = ['''(?:^|/)site-build/''']
 [[allowlists]]
 description = "The Supabase publishable key is public client configuration, not a server secret."
 regexes = ['''sb_publishable_[A-Za-z0-9_\-]+''']
+
+[[allowlists]]
+description = "The public secret-shape test contains example headers and prefixes. It is not a credential."
+paths = ['''scripts/pr-public-secret-scan\.test\.mjs''']

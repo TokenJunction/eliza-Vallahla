@@ -9,13 +9,17 @@ const service = 'sb_secret_' + 'c'.repeat(20);
 const hugging = 'hf_' + 'd'.repeat(30);
 const bearer = 'Bearer ' + 'e'.repeat(20);
 
+function header(kind) {
+  return '-----BEGIN ' + (kind ? kind + ' ' : '') + 'PRIVATE KEY-----';
+}
+
 test('ordinary words do not look like keys', () => {
   assert.deepEqual(scanText('risk_assessment skill_check hf_short sk_live_short'), []);
   assert.deepEqual(scanText('sk_test_' + 'a'.repeat(19)), []);
   assert.deepEqual(scanText('sb_secret_' + 'a'.repeat(19)), []);
   assert.deepEqual(scanText('hf_' + 'a'.repeat(29)), []);
   assert.deepEqual(scanText('Bearer short'), []);
-  assert.deepEqual(scanText('-----BEGIN DSA PRIVATE KEY-----'), []);
+  assert.deepEqual(scanText(header('DSA')), []);
 });
 
 test('real key shapes are rejected', () => {
@@ -23,10 +27,10 @@ test('real key shapes are rejected', () => {
   assert.ok(scanText(testKey).includes('sk_live_/sk_test_'));
   assert.ok(scanText(service).includes('sb_secret_'));
   assert.ok(scanText(hugging).includes('hf_'));
-  assert.ok(scanText('-----BEGIN PRIVATE KEY-----').includes('private key'));
-  assert.ok(scanText('-----BEGIN RSA PRIVATE KEY-----').includes('private key'));
-  assert.ok(scanText('-----BEGIN EC PRIVATE KEY-----').includes('private key'));
-  assert.ok(scanText('-----BEGIN OPENSSH PRIVATE KEY-----').includes('private key'));
+  assert.ok(scanText(header('')).includes('private key'));
+  assert.ok(scanText(header('RSA')).includes('private key'));
+  assert.ok(scanText(header('EC')).includes('private key'));
+  assert.ok(scanText(header('OPENSSH')).includes('private key'));
   assert.ok(scanText(bearer).includes('bearer token'));
 });
 

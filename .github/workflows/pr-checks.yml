@@ -18,6 +18,10 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+      - name: Fetch the pull request branch tips
+        run: |
+          git fetch --no-tags --filter=blob:none --depth=50 origin "${{ github.base_ref }}"
+          git fetch --no-tags --filter=blob:none --depth=50 origin "${{ github.head_ref }}:refs/remotes/origin/${{ github.head_ref }}"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -42,19 +46,12 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          git fetch --no-tags --depth=1 origin "$BASE"
-          git fetch --no-tags --depth=1 origin "$HEAD"
-          deepened=0
-          while ! git merge-base "$BASE" "$HEAD" >/dev/null 2>&1; do
-            if [ "$deepened" -ge 200 ]; then
-              echo "### Gitleaks" >> "$GITHUB_STEP_SUMMARY"
-              echo "Stopped. The merge base of \`$BASE...$HEAD\` was not in the first 200 commits, and the full history is not fetched." >> "$GITHUB_STEP_SUMMARY"
-              exit 1
-            fi
-            git fetch --no-tags --deepen=20 origin "$HEAD"
-            git fetch --no-tags --deepen=20 origin "$BASE"
-            deepened=$((deepened + 20))
-          done
+          if ! git merge-base "$BASE" "$HEAD" >/dev/null 2>&1; then
+            echo "### Gitleaks" >> "$GITHUB_STEP_SUMMARY"
+            echo "Stopped. \`$BASE\` and \`$HEAD\` were not both in the shallow branch fetch, so \`${BASE}...${HEAD}\` was not scanned. The full history was not fetched." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "merge-base $(git merge-base "$BASE" "$HEAD")"
           set +e
           gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1 --log-opts="${BASE}...${HEAD}" > /tmp/gitleaks.txt 2>&1
           code=$?
