@@ -1,53 +1,83 @@
 import esbuild from 'esbuild';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 const out = path.join(root, 'site-build');
-const trailTarget = 28 * 1024;
-const forbidden = [
-  'enterWorkstationSession',
-  'keene.jos',
-  'operator-01@',
-  'Valhalla2033',
-  'pk_test_',
-  'BEGIN PRIVATE KEY',
-  'BEGIN RSA PRIVATE KEY',
-  'sourceMappingURL',
-  'AKIA'
+const hashFile = path.join(root, 'website/scripts/ship-canary-hashes.json');
+const PLAIN_PATTERNS = [
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
+  /AKIA/,
+  /pk_test_/,
+  /sk_live/,
+  /sb_secret_/,
+  /sourceMappingURL/
 ];
 
-const words = [
-  'workstation-dock',
-  'telemetry-unconfigured',
-  'sign-in-required',
-  'paper-desk',
-  'wallet-bridge',
-  'status-probe',
-  'viewport-frame',
-  'no-live-trade'
-];
+export function sha256(value) {
+  return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
+}
 
-export function generateTrail(target = trailTarget) {
-  let body = '';
-  let i = 0;
-  while (Buffer.byteLength(body) < target) {
-    const left = words[i % words.length];
-    const right = words[(i + 3) % words.length];
-    body += `function vho${i}(a){var b="${left}";var c="${right}";if(false){return b+c+(a|0)}return(a|0)^${i % 7};}`;
-    i += 1;
-    if (i > 5000) break;
+export function loadCanaryHashes(file) {
+  if (!file || !fs.existsSync(file)) throw new Error('ship canary hash file is missing');
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    throw new Error('ship canary hash file is invalid');
   }
-  return body;
+  const hashes = Array.isArray(parsed) ? parsed : parsed && parsed.hashes;
+  if (!Array.isArray(hashes) || hashes.length === 0) throw new Error('ship canary hash file is empty');
+  const clean = hashes.map(function (hash) { return String(hash).trim().toLowerCase(); }).filter(Boolean);
+  if (!clean.length || clean.some(function (hash) { return !/^[0-9a-f]{64}$/.test(hash); })) {
+    throw new Error('ship canary hash file is invalid');
+  }
+  return new Set(clean);
+}
+
+export function candidateTokens(text) {
+  return String(text || '').match(/[A-Za-z0-9@][A-Za-z0-9@._+-]{2,}/g) || [];
+}
+
+export function hashCandidates(token) {
+  const starts = [0];
+  for (let i = 0; i < token.length; i += 1) {
+    const ch = token[i];
+    if (ch === '.' || ch === '@' || ch === '+' || ch === '-') starts.push(i + 1);
+  }
+  const out = [];
+  for (const start of starts) {
+    for (let end = start + 3; end <= token.length; end += 1) {
+      out.push(token.slice(start, end));
+    }
+  }
+  return out;
+}
+
+export function scanShipped(text, hashes) {
+  for (const pattern of PLAIN_PATTERNS) {
+    if (pattern.test(text)) return 'pattern';
+  }
+  for (const token of candidateTokens(text)) {
+    for (const candidate of hashCandidates(token)) {
+      if (hashes.has(sha256(candidate))) return 'hash';
+    }
+  }
+  return '';
 }
 
 export async function minifySource(code, loader) {
   const result = await esbuild.transform(code, {
     loader,
     minify: true,
+    minifyIdentifiers: true,
     legalComments: 'none',
     sourcemap: false,
-    target: 'es2020'
+    target: 'es2020',
+    drop: ['console', 'debugger'],
+    mangleProps: /^_/,
+    mangleQuoted: false
   });
   if (result.map) throw new Error('source map was produced');
   return result.code;
@@ -63,13 +93,8 @@ function walk(dir, files = []) {
   return files;
 }
 
-function checkPublic(text, file) {
-  for (const item of forbidden) {
-    if (text.includes(item)) throw new Error(file + ' contains ' + item);
-  }
-}
-
-export async function minifySite(directory = out) {
+export async function minifySite(directory = out, hashesPath = hashFile) {
+  const hashes = loadCanaryHashes(hashesPath);
   if (!fs.existsSync(directory)) throw new Error('missing build directory');
   const files = walk(directory);
   for (const file of files) {
@@ -89,19 +114,21 @@ export async function minifySite(directory = out) {
       fs.writeFileSync(file, minifyHtml(fs.readFileSync(file, 'utf8')));
     }
   }
-  const appJs = path.join(directory, 'os', 'app.js');
-  const trail = generateTrail();
-  if (Buffer.byteLength(trail) > 40 * 1024) throw new Error('trail is too large');
-  fs.appendFileSync(appJs, '\n' + trail);
   const shipped = walk(directory).filter(file => /\.(html|js|css)$/.test(file));
-  for (const file of shipped) checkPublic(fs.readFileSync(file, 'utf8'), path.relative(directory, file));
+  for (const file of shipped) {
+    if (scanShipped(fs.readFileSync(file, 'utf8'), hashes)) throw new Error(path.relative(directory, file) + ' contains a forbidden ship canary');
+  }
+  const appJs = path.join(directory, 'os', 'app.js');
+  if (fs.existsSync(appJs) && fs.readFileSync(appJs, 'utf8').includes('function vho' + '0')) {
+    throw new Error('padding trail was shipped');
+  }
   const workstation = ['os/index.html', 'os/app.js', 'os/bridge.js', 'os/os.css', 'desk.js', 'desk.css']
     .reduce((sum, name) => sum + fs.statSync(path.join(directory, name)).size, 0);
   if (workstation >= 1500000) throw new Error('workstation bundle is too large');
   if (files.some(file => file.includes('private-export') || file.endsWith('.tar.gz'))) {
     throw new Error('private pack reached the public build');
   }
-  return { trailBytes: Buffer.byteLength(trail), workstation };
+  return { trailBytes: 0, workstation };
 }
 
 function minifyHtml(html) {
