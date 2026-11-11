@@ -41,22 +41,15 @@ export function candidateTokens(text) {
 }
 
 export function hashCandidates(token) {
-  const marks = [-1];
+  const starts = [0];
   for (let i = 0; i < token.length; i += 1) {
     const ch = token[i];
-    if (ch === '.' || ch === '@' || ch === '+' || ch === '-') marks.push(i);
+    if (ch === '.' || ch === '@' || ch === '+' || ch === '-') starts.push(i + 1);
   }
-  marks.push(token.length);
   const out = [];
-  for (let start = 0; start < marks.length; start += 1) {
-    for (let end = start + 1; end < marks.length; end += 1) {
-      const from = marks[start] + 1;
-      const piece = token.slice(from, marks[end]);
-      if (piece.length >= 3) out.push(piece);
-      if (marks[end] < token.length) {
-        const withSeparator = token.slice(from, marks[end] + 1);
-        if (withSeparator.length >= 3) out.push(withSeparator);
-      }
+  for (const start of starts) {
+    for (let end = start + 3; end <= token.length; end += 1) {
+      out.push(token.slice(start, end));
     }
   }
   return out;
