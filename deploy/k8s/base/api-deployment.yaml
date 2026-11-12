@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: valhalla-api
+  namespace: valhalla
+  labels:
+    app.kubernetes.io/name: valhalla-api
+    app.kubernetes.io/component: api-producer
+    app.kubernetes.io/part-of: valhallaos
+spec:
+  replicas: 0
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 180
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector:
+    matchLabels: {app.kubernetes.io/name: valhalla-api}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: valhalla-api
+        app.kubernetes.io/component: api-producer
+        app.kubernetes.io/part-of: valhallaos
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      nodeSelector: {kubernetes.io/os: linux}
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: api
+          # Replace with a tested image pinned by digest before activation.
+          image: registry.invalid/valhalla/api:replace-before-activation
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: [node]
+          args: [valhallaMasterEngineV35.js]
+          ports:
+            - {name: http, containerPort: 10000, protocol: TCP}
+          envFrom:
+            - configMapRef: {name: valhalla-config}
+          env:
+            - {name: NODE_ENV, value: "production"}
+            - {name: PORT, value: "10000"}
+            - {name: VALHALLA_QUEUE_ROLE, value: "producer"}
+            - {name: VALHALLA_EXECUTION_MODE, value: "paper"}
+            - {name: VALHALLA_TRADING_ENABLED, value: "false"}
+            - {name: VALHALLA_SOCIAL_ENABLED, value: "false"}
+            - {name: VALHALLA_KEY_STORAGE_ENABLED, value: "false"}
+            - {name: ZEUS_IDLE_ENABLED, value: "false"}
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef: {name: valhalla-api-secrets, key: REDIS_URL, optional: false}
+            - name: VALHALLA_DISPATCH_TOKEN
+              valueFrom:
+                secretKeyRef: {name: valhalla-api-secrets, key: VALHALLA_DISPATCH_TOKEN, optional: false}
+            - name: ELIZA_URL
+              valueFrom:
+                configMapKeyRef: {name: valhalla-api-config, key: ELIZA_URL, optional: false}
+          # Estimates only; qualify under actual load.
+          resources:
+            requests: {cpu: "100m", memory: "128Mi"}
+            limits: {cpu: "500m", memory: "256Mi"}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 12
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          # Process-level only: does not establish Redis or worker readiness.
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+            successThreshold: 1
+          volumeMounts:
+            - {name: temporary-files, mountPath: /tmp}
+          terminationMessagePolicy: FallbackToLogsOnError
+      volumes:
+        - name: temporary-files
+          emptyDir: {sizeLimit: "64Mi"}

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: valhalla-config
+  namespace: valhalla
+  labels:
+    app.kubernetes.io/name: valhalla
+    app.kubernetes.io/part-of: valhallaos
+data:
+  NODE_ENV: "production"
+  VALHALLA_EXECUTION_MODE: "paper"
+  VALHALLA_TRADING_ENABLED: "false"
+  VALHALLA_SOCIAL_ENABLED: "false"
+  VALHALLA_KEY_STORAGE_ENABLED: "false"
+  ZEUS_IDLE_ENABLED: "false"
+  VALHALLA_QUEUE_ENABLED: "false"
+  PUBLIC_ORIGIN: "https://valhalla-app.xyz"
+  PORT: "10000"
+  SERVER_PORT: "10000"

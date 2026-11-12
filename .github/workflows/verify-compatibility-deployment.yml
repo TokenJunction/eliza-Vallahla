@@ -1,0 +1,68 @@
+name: Verify compatibility publication
+on:
+  push:
+    branches: [docs/site]
+    paths: ['.github/workflows/verify-compatibility-deployment.yml']
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+concurrency:
+  group: valhalla-compatibility-publication-verification
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.repository == 'TokenJunction/eliza-valhalla' && github.ref == 'refs/heads/docs/site'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for existing Pages pipeline and verify the published adapter
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const owner='TokenJunction',repo='eliza-valhalla',target='876bbacbfdd9cb6f3354ef73bc477e89223b7be2';
+            const workflowPath='.github/workflows/verify-compatibility-deployment.yml';
+            if(context.repo.owner!==owner||context.repo.repo!==repo||context.ref!=='refs/heads/docs/site')throw Error('Unexpected repository or branch');
+            const {createHash}=require('node:crypto');
+            const hash=data=>createHash('sha256').update(data).digest('hex');
+            const report={source_commit:target,publication_commit:context.sha,scope:'Pages publication and public adapter verification only; no Worker deployment, WAF changes, inference or browser-readiness claim'};
+            const origins=['https://valhalla-app.xyz','https://www.valhalla-app.xyz'];
+            async function probe(origin,path){
+              try{
+                let url=new URL(path,origin);
+                let response=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+                if([301,302,307,308].includes(response.status)&&response.headers.get('location')){
+                  const next=new URL(response.headers.get('location'),url);
+                  if(origins.includes(next.origin)&&next.pathname===url.pathname){url=next;response=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(15000)});}
+                }
+                return {origin,path:url.pathname,status:response.status,sha256:hash(Buffer.from(await response.arrayBuffer())),challenge:response.headers.get('cf-mitigated')==='challenge'};
+              }catch{return {origin,path:new URL(path,origin).pathname,error:'Public request failed'};}
+            }
+            try{
+              const comparison=await github.request('GET /repos/{owner}/{repo}/compare/{basehead}',{owner,repo,basehead:target+'...'+context.sha});
+              if(comparison.data.total_commits!==1||comparison.data.files?.length!==1||comparison.data.files[0].filename!==workflowPath)throw Error('Application revision changed');
+              const source=await github.rest.repos.getContent({owner,repo,path:'os/bridge.js',ref:target});
+              if(source.data.type!=='file'||source.data.encoding!=='base64')throw Error('Unexpected source format');
+              report.expected_adapter_sha256=hash(Buffer.from(source.data.content,'base64'));
+              for(let attempt=0;attempt<20;attempt++){
+                const result=await github.rest.actions.listWorkflowRuns({owner,repo,workflow_id:'pages.yml',branch:'docs/site',head_sha:context.sha,per_page:5});
+                const run=result.data.workflow_runs.find(r=>r.head_sha===context.sha);
+                if(run)report.pages={id:run.id,head_sha:run.head_sha,status:run.status,conclusion:run.conclusion,html_url:run.html_url};
+                if(run?.status==='completed')break;
+                if(attempt<19)await new Promise(resolve=>setTimeout(resolve,15000));
+              }
+              report.adapters=[];report.shells=[];
+              for(const origin of origins){
+                const adapter=await probe(origin,'/os/bridge.js?publication='+encodeURIComponent(context.runId));
+                adapter.matches_source=adapter.status===200&&adapter.sha256===report.expected_adapter_sha256;
+                report.adapters.push(adapter);
+                report.shells.push(await probe(origin,'/os/'));
+              }
+              report.publication_verified=report.pages?.conclusion==='success'&&report.adapters.every(r=>r.matches_source);
+            }catch(error){report.publication_verified=false;report.error=error.message==='Application revision changed'?'Unexpected application changes; verification refused':'Verification could not complete; inspect this Actions run';}
+            report.run_url=context.serverUrl+'/'+owner+'/'+repo+'/actions/runs/'+context.runId;
+            const rendered=JSON.stringify(report,null,2),fence=String.fromCharCode(96,96,96);
+            core.info(rendered);
+            await core.summary.addHeading('Compatibility publication receipt').addCodeBlock(rendered,'json').write();
+            await github.rest.issues.createComment({owner,repo,issue_number:29,body:['Compatibility publication receipt. Shell challenge status is separate from successful publication; chat/browser readiness is not established.','',fence+'json',rendered,fence].join('\n')});
+            if(!report.publication_verified)core.setFailed('Pages publication or live adapter hash is not verified; do not claim deployment success');

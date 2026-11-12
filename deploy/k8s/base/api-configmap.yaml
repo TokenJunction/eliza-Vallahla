@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: valhalla-api-config
+  namespace: valhalla
+  labels:
+    app.kubernetes.io/name: valhalla-api
+    app.kubernetes.io/component: api-producer
+    app.kubernetes.io/part-of: valhallaos
+data:
+  ELIZA_URL: "http://valhalla-eliza:10000"

@@ -30,6 +30,14 @@ function publicFile(dir, pathname) {
 }
 
 function serve(dir) {
+  const contentTypes = new Map([
+    [".css", "text/css; charset=utf-8"],
+    [".html", "text/html; charset=utf-8"],
+    [".jpg", "image/jpeg"],
+    [".js", "text/javascript; charset=utf-8"],
+    [".mp4", "video/mp4"],
+    [".svg", "image/svg+xml"]
+  ]);
   const server = createServer((req, res) => {
     const file = publicFile(dir, new URL(req.url, "http://127.0.0.1").pathname);
     if (!file) {
@@ -44,7 +52,9 @@ function serve(dir) {
       }
       return;
     }
-    res.writeHead(200);
+    res.writeHead(200, {
+      "content-type": contentTypes.get(path.extname(file)) || "application/octet-stream"
+    });
     res.end(readFileSync(file));
   });
   return new Promise((resolve) => {
@@ -68,10 +78,13 @@ test("public preview keeps the site pages and leaves backend out", async () => {
     "home.js",
     "home.css",
     "home-motion.js",
+    "desk.css",
+    "desk.js",
     "app/index.html",
     "app/gate.js",
     "os/index.html",
     "os/os.css",
+    "kernel/index.html",
     "faq/index.html",
     "contact/index.html",
     "pay/index.html",
@@ -136,7 +149,7 @@ test("public preview keeps the site pages and leaves backend out", async () => {
       const response = await fetch("http://127.0.0.1:" + port + pathname, { headers: { accept: "text/html" } });
       assert.equal(response.headers.get("www-authenticate"), null);
       const text = await response.text();
-      return { status: response.status, text };
+      return { status: response.status, text, contentType: response.headers.get("content-type") };
     }
 
     const home = await status("/");
@@ -149,9 +162,13 @@ test("public preview keeps the site pages and leaves backend out", async () => {
     const mark = await status("/assets/mark.svg");
     assert.equal(mark.status, 200);
     assert.match(mark.text, /<svg/);
+    assert.equal((await status("/home.css")).contentType, "text/css; charset=utf-8");
+    assert.equal((await status("/desk.js")).contentType, "text/javascript; charset=utf-8");
+    assert.equal((await status("/assets/hero-ascent.mp4")).contentType, "video/mp4");
+    assert.equal((await status("/assets/hero-ascent-poster.jpg")).contentType, "image/jpeg");
     assert.equal((await status("/assets/")).status, 404);
 
-    for (const pathname of ["/app/", "/os/", "/faq/", "/contact/", "/pay/", "/shop/", "/terms/", "/privacy/", "/cookies/", "/disclaimer.html"]) {
+    for (const pathname of ["/app/", "/os/", "/kernel/", "/faq/", "/contact/", "/pay/", "/shop/", "/terms/", "/privacy/", "/cookies/", "/disclaimer.html"]) {
       const page = await status(pathname);
       assert.equal(page.status, 200, pathname);
     }
@@ -175,7 +192,7 @@ test("public preview keeps the site pages and leaves backend out", async () => {
     assert.match(gate, /ux_mode:\s*"popup"/);
     assert.doesNotMatch(gate, /ux_mode:\s*"redirect"|pending iframe|oidc iframe/i);
 
-    for (const pathname of ["/workers/auth.js", "/package.json", "/render.yaml", "/admin", "/admin/", "/adminsource", "/docs/", "/source/", "/api/health", "/auth/google", "/valhallaMasterEngineV35.js", "/.env"]) {
+    for (const pathname of ["/workers/auth.js", "/package.json", "/render.yaml", "/admin", "/admin/", "/adminsource", "/docs/", "/source/", "/api/health", "/auth/google", "/valhallaMasterEngineV35.js", "/.env", "/.env.production.example", "/privacy-policy.md", "/terms.md"]) {
       const blocked = await status(pathname);
       assert.equal(blocked.status, 404, pathname);
       assert.notEqual(blocked.text, home.text, pathname);

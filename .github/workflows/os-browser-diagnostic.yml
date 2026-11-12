@@ -1,0 +1,114 @@
+name: Public OS browser diagnosis
+on:
+  push:
+    branches: [docs/site]
+    paths: ['.github/workflows/os-browser-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: valhalla-os-browser-diagnostic
+  cancel-in-progress: false
+jobs:
+  browser:
+    if: github.repository == 'TokenJunction/eliza-valhalla' && github.ref == 'refs/heads/docs/site'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OS_DIAGNOSTIC_DIR: ${{ runner.temp }}/valhalla-os-browser-report
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24.15.0'
+      - name: Install pinned browser test dependency in runner scratch space
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/valhalla-os-browser-test"
+          mkdir -p "$work"
+          printf '%s' '{"private":true,"type":"commonjs"}' > "$work/package.json"
+          npm install --prefix "$work" --no-save --package-lock=false --ignore-scripts --no-audit --no-fund playwright@1.64.1
+          "$work/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Test actual public OS shell without login or a wallet
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/valhalla-os-browser-test"
+          cat > "$work/diagnose.cjs" <<'NODE'
+          const {chromium}=require('playwright');
+          const fs=require('node:fs');
+          const path=require('node:path');
+          const SITE='https://valhalla-app.xyz';
+          function safeUrl(value){try{const u=new URL(value);return u.origin+u.pathname;}catch{return 'invalid-url';}}
+          async function probe(browser,refreshConfig){
+            const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
+            const page=await context.newPage();
+            const result={mode:refreshConfig?'fresh-config':'normal',failed_requests:[],chat_http:[],browser_errors:[]};
+            page.on('requestfailed',r=>{if(result.failed_requests.length<20)result.failed_requests.push({url:safeUrl(r.url()),error:String(r.failure()?.errorText||'network failure').slice(0,160)});});
+            page.on('response',r=>{const url=safeUrl(r.url());if(url.includes('.valhalla-app.workers.dev/')&&result.chat_http.length<20)result.chat_http.push({url,status:r.status()});});
+            page.on('pageerror',e=>{if(result.browser_errors.length<10)result.browser_errors.push(String(e.name||'Error'));});
+            if(refreshConfig)await page.route('**/site-config.js*',route=>{
+              const u=new URL(route.request().url());
+              if(![SITE,'https://www.valhalla-app.xyz'].includes(u.origin)||u.pathname!=='/site-config.js')return route.continue();
+              u.searchParams.set('os-diagnostic',String(Date.now()));return route.continue({url:u.href});
+            });
+            try{
+              const response=await page.goto(SITE+'/os/',{waitUntil:'domcontentloaded',timeout:30000});
+              result.page_status=response?.status();
+              if(!response||response.status()!==200||![SITE,'https://www.valhalla-app.xyz'].includes(new URL(page.url()).origin)){result.passed=false;result.reason='Page did not return HTTP 200; no challenge bypass attempted';return result;}
+              await page.locator('#chat-input').waitFor({state:'visible',timeout:15000});
+              result.configured_chat=await page.evaluate(()=>{try{const u=new URL(String(window.VALHALLA_SITE?.CHAT_URL||''));return u.origin+u.pathname;}catch{return 'missing-or-invalid';}});
+              await page.locator('#chat-input').fill('Hello. Reply with one short greeting.');
+              await page.locator('#chat-form button[type="submit"]').click();
+              await page.waitForFunction(()=>{const s=document.querySelector('#chat-status')?.textContent||'';return s.startsWith('Reply received')||s.startsWith('Chat:')||s.includes('timed out')||s.includes('not configured')||s.includes('invalid');},null,{timeout:40000});
+              result.status_text=await page.locator('#chat-status').innerText();
+              result.status_text=result.status_text.replace(/[A-Za-z0-9_-]{32,}/g,'[redacted-long-token]').slice(0,300);
+              result.assistant_row=await page.evaluate(()=>Array.from(document.querySelectorAll('#chat-log > p')).some(p=>p.querySelector('strong')?.textContent==='ASSISTANT'));
+              result.passed=result.status_text.startsWith('Reply received')&&result.assistant_row===true;
+            }catch(e){result.passed=false;result.reason=String(e.name||'Browser diagnostic failed');}
+            finally{
+              try{await page.screenshot({path:path.join(process.env.OS_DIAGNOSTIC_DIR,result.mode+'.png'),fullPage:true,timeout:10000});}catch{}
+              await context.close();
+            }
+            return result;
+          }
+          (async()=>{
+            fs.mkdirSync(process.env.OS_DIAGNOSTIC_DIR,{recursive:true});
+            const browser=await chromium.launch({headless:true});
+            const report={scope:'Fresh Chromium mobile-viewport emulation; not the user Android device',runs:[],passed:false};
+            try{
+              report.runs.push(await probe(browser,false));
+              if(!report.runs[0].passed)report.runs.push(await probe(browser,true));
+              report.passed=report.runs[0].passed===true;
+              report.fresh_config_passed=report.runs.find(r=>r.mode==='fresh-config')?.passed;
+              report.cache_comparison_note=report.fresh_config_passed?'Fresh-config run passed; compare both configurations and network evidence before concluding cache was the cause':undefined;
+            }finally{await browser.close();fs.writeFileSync(path.join(process.env.OS_DIAGNOSTIC_DIR,'report.json'),JSON.stringify(report,null,2));}
+            if(!report.passed)process.exitCode=1;
+          })();
+          NODE
+          node "$work/diagnose.cjs"
+      - name: Upload fresh-profile diagnostic screenshots and receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: public-os-browser-diagnosis
+          path: ${{ env.OS_DIAGNOSTIC_DIR }}
+          if-no-files-found: warn
+          retention-days: 3
+      - name: Post receipt to release tracking PR
+        if: always()
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const fs=require('node:fs');
+            const path=require('node:path');
+            const dir=process.env.OS_DIAGNOSTIC_DIR;
+            let report;
+            try{report=JSON.parse(fs.readFileSync(path.join(dir,'report.json'),'utf8'));}catch{report={passed:false,reason:'Browser report unavailable; inspect install/run steps'};}
+            report.commit=context.sha;
+            report.run_url=context.serverUrl+'/TokenJunction/eliza-valhalla/actions/runs/'+context.runId;
+            const fence=String.fromCharCode(96,96,96);
+            const rendered=JSON.stringify(report,null,2);
+            await core.summary.addHeading('Public OS browser diagnosis').addCodeBlock(rendered,'json').write();
+            await github.rest.issues.createComment({owner:'TokenJunction',repo:'eliza-valhalla',issue_number:29,body:['OS browser diagnostic receipt. No production changes or real-device success implied.','',fence+'json',rendered,fence].join(String.fromCharCode(10))});

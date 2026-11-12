@@ -3,9 +3,11 @@
   "private": true,
   "scripts": {
     "start": "node valhallaMasterEngineV35.js",
-    "build": "python scripts/build-site.py",
+    "start:worker": "node valhallaWorker.js",
+    "preflight:worker": "node scripts/workerPreflight.js",
+    "build": "node scripts/workerPreflight.js --structure && python scripts/build-site.py",
     "validate:env": "node scripts/validateEnv.js",
-    "test": "node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs valhallaQueueEngine.test.cjs scripts/validateEnv.test.cjs"
+    "test": "node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs valhallaQueueEngine.test.cjs valhallaWorker.test.cjs valhallaRedis.integration.test.cjs scripts/validateEnv.test.cjs"
   },
   "engines": {
     "node": ">=22"

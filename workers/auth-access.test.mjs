@@ -30,14 +30,36 @@ async function issue(payload) {
   return body + "." + base64url(signature);
 }
 
-async function request(payload) {
-  var token = await issue(Object.assign({ exp: Date.now() + 60000 }, payload));
-  return new Request("https://auth.example/auth/access", {
-    headers: {
-      authorization: "Bearer " + token,
-      origin: "https://valhalla-app.xyz"
-    }
-  });
+async function request(payload, rows) {
+  var claims = Object.assign({
+    did: "device",
+    exp: Date.now() + 60000,
+    code: false,
+    google: false,
+    sid: crypto.randomUUID(),
+    sv: 1,
+    use: "access"
+  }, payload);
+  rows["sess:" + claims.sid] = {
+    sid: claims.sid,
+    v: claims.sv,
+    eh: claims.eh,
+    did: claims.did,
+    exp: claims.exp,
+    code: claims.code === true,
+    google: claims.google === true,
+    use: claims.use
+  };
+  var token = await issue(claims);
+  return {
+    request: new Request("https://auth.example/auth/access", {
+      headers: {
+        authorization: "Bearer " + token,
+        origin: "https://valhalla-app.xyz"
+      }
+    }),
+    claims: claims
+  };
 }
 
 function env(rows) {
@@ -46,37 +68,53 @@ function env(rows) {
     GOOGLE_CLIENT_ID: "test-client",
     LEADER_EMAIL: EMAIL,
     AUTH_KV: {
-      get: async function (key) { return JSON.stringify(rows[key] || null); }
+      get: async function (key) {
+        if (!Object.prototype.hasOwnProperty.call(rows, key)) return null;
+        return JSON.stringify(rows[key]);
+      }
     }
   };
 }
 
 test("returns Pro status from the server account record", async () => {
   var emailHash = await hash("member@example.test");
-  var response = await worker.fetch(await request({ eh: emailHash, code: true }), env({
-    ["acct:" + emailHash]: { plan: "pro" }
-  }));
+  var rows = { ["acct:" + emailHash]: { plan: "pro" } };
+  var live = await request({ eh: emailHash, code: true }, rows);
+  var response = await worker.fetch(live.request, env(rows));
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     ok: true,
     plan: "pro",
     subscriber: true,
-    leader: false
+    leader: false,
+    subject: emailHash,
+    sessionId: live.claims.sid,
+    google: false,
+    code: true,
+    expires: live.claims.exp
   });
 });
 
 test("keeps free accounts locked and requires Google plus a verified code for owner access", async () => {
   var emailHash = await hash(EMAIL);
-  var emailOnly = await worker.fetch(await request({ eh: emailHash, code: true }), env({}));
+  var emailRows = {};
+  var emailOnly = await worker.fetch((await request({ eh: emailHash, code: true }, emailRows)).request, env(emailRows));
   assert.equal((await emailOnly.json()).leader, false);
 
-  var response = await worker.fetch(await request({ eh: emailHash, code: true, google: true }), env({}));
+  var rows = {};
+  var live = await request({ eh: emailHash, code: true, google: true }, rows);
+  var response = await worker.fetch(live.request, env(rows));
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     ok: true,
     plan: "free",
     subscriber: false,
-    leader: true
+    leader: true,
+    subject: emailHash,
+    sessionId: live.claims.sid,
+    google: true,
+    code: true,
+    expires: live.claims.exp
   });
 });
 

@@ -18,6 +18,8 @@ const ROOT_FILES = [
   "nacl.min.js",
   "connect-core.js",
   "site-wallet.js",
+  "desk.css",
+  "desk.js",
   "styles.css",
   "trust.js",
   "faq.json",
@@ -30,6 +32,7 @@ const ROOT_FILES = [
 const ROOT_DIRS = [
   "app",
   "os",
+  "kernel",
   "assets",
   "faq",
   "contact",
