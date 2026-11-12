@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import importlib.util
 import os
-from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 path = Path(__file__).resolve().parents[1] / "scripts/verify_valhalla_release.py"

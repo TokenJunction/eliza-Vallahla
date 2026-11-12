@@ -3,8 +3,6 @@ import gzip
 import hashlib
 import io
 import json
-from contextlib import nullcontext
-from pathlib import Path
 import shutil
 import stat
 import struct
@@ -14,9 +12,11 @@ import tarfile
 import tempfile
 import time
 import unittest
-from unittest import mock
 import urllib.request
 import zipfile
+from contextlib import nullcontext
+from pathlib import Path
+from unittest import mock
 
 import release_artifact as release
 
@@ -341,6 +341,7 @@ class DownloadTest(unittest.TestCase):
 
     def test_deadline_terminates_stalled_worker(self):
         run = subprocess.run
+
         def stalled_worker(_command, **kwargs):
             return run([sys.executable, "-c", "import time; time.sleep(5)"], **kwargs)
         started = time.monotonic()

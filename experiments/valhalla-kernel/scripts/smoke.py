@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Boot the actual ISO; fail on panic, hang, missing milestones, or bad exit."""
 import argparse
-from pathlib import Path
 import subprocess
+from pathlib import Path
+
 p=argparse.ArgumentParser()
 p.add_argument('--qemu',default='qemu-system-x86_64')
 p.add_argument('--memory',default='128M')
@@ -14,7 +15,7 @@ try:
 except subprocess.TimeoutExpired as e:
     output=(e.stdout or b'').decode('utf-8',errors='replace')
     Path('build/serial.log').write_text(output)
-    raise SystemExit('QEMU timed out. See build/serial.log.')
+    raise SystemExit('QEMU timed out. See build/serial.log.') from None
 Path('build/serial.log').write_text(output)
 print(output,end='')
 expected=['PASS physical memory and virtual mapping','PASS heap and daemon boundaries','PASS scheduler and daemon delivery','SELFTEST PASS']

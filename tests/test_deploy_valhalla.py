@@ -1,12 +1,11 @@
 import json
 import os
-from pathlib import Path
 import secrets
 import socketserver
 import subprocess
 import threading
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "deploy-valhalla.sh"

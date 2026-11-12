@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Boot the actual ISO and require serial evidence plus QEMU's debug-exit status."""
 import argparse
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
+
 p=argparse.ArgumentParser()
 p.add_argument('--qemu',default='qemu-system-x86_64')
 p.add_argument('--memory',default='128M')

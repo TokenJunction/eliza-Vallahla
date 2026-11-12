@@ -5,7 +5,6 @@ import functools
 import http.server
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tempfile
@@ -13,6 +12,7 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 import release_artifact as release
 from test_release_artifact import REQUEST_ID, SHA, digest, reviewed, zip_bytes
@@ -41,6 +41,7 @@ class BrowserSmokeTest(unittest.TestCase):
         release.assemble(data, digest(data), files, output, SHA, REQUEST_ID)
 
         requested = []
+
         class Handler(http.server.SimpleHTTPRequestHandler):
             def do_GET(self):
                 requested.append(self.path)

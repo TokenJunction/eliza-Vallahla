@@ -2,6 +2,7 @@
 """Download and assemble a release only from an explicitly reviewed manifest."""
 
 import argparse
+import functools
 import gzip
 import hashlib
 import io
@@ -13,12 +14,10 @@ import struct
 import subprocess
 import sys
 import tarfile
-import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
-
 
 DRIVE_ID = "1_rFRoaRKhbqHB0CXOVygtYUtfVYH18jO"
 DEFAULT_URL = f"https://drive.google.com/uc?export=download&id={DRIVE_ID}"
@@ -53,7 +52,7 @@ def https_url(url):
             or parts.username is not None or parts.password is not None):
         raise ReleaseError("download URL and redirects must be credential-free HTTPS")
     try:
-        parts.port
+        _ = parts.port
     except ValueError as exc:
         raise ReleaseError("invalid URL port") from exc
     return url
@@ -148,6 +147,7 @@ def load_manifest(path, expected):
         raw = f.read(MAX_MANIFEST + 1)
     if len(raw) > MAX_MANIFEST:
         raise ReleaseError("manifest exceeds size limit")
+
     def no_duplicates(pairs):
         result = {}
         for key, value in pairs:
@@ -272,14 +272,14 @@ def validate_archive(data, expected, files):
                 if entry.flag_bits & 1:
                     raise ReleaseError("encrypted archive entry")
                 size = entry.file_size
-                get_stream = lambda e=entry: archive.open(e)
+                get_stream = functools.partial(archive.open, entry)
             else:
                 directory = entry.isdir()
                 name = safe_path(entry.name, directory)
                 if not (directory or entry.isreg()) or entry.sparse is not None:
                     raise ReleaseError(f"link or special entry: {name}")
                 size = entry.size
-                get_stream = lambda e=entry: archive.extractfile(e)
+                get_stream = functools.partial(archive.extractfile, entry)
             if name in paths:
                 raise ReleaseError(f"duplicate archive path: {name}")
             paths[name] = directory
