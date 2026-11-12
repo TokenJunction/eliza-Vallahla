@@ -12,6 +12,7 @@
   <script src="/site-config.js?v=1.4.2" defer></script>
   <script src="/supabase.js" defer></script>
   <script src="/os/session.js" defer></script>
+  <script src="/os/checkout.js" defer></script>
   <script src="/os/feed.js" defer></script>
   <script src="/os/ai.js" defer></script>
   <script src="/os/app.js?v=1.4.2" defer></script>
@@ -75,6 +76,12 @@
     </nav>
 
     <div class="workspace">
+      <section class="workspace-panel trial-panel" id="trial-panel" hidden>
+        <div class="panel-heading"><h2>Pro</h2><span>7 DAY TRIAL</span></div>
+        <p>A $1 hold verifies your card and is released right away. It isn't a charge. Some banks show it as pending for a few days. After your trial, Pro is $12 a month unless you cancel.</p>
+        <button id="start-trial" class="classic-button accent-button" type="button">Start 7-day free trial</button>
+        <p id="trial-status" role="status"></p>
+      </section>
       <section class="workspace-panel feed-panel" aria-labelledby="feed-title">
         <div class="panel-heading"><h2 id="feed-title">Live feed</h2><span id="feed-state">NOT CONNECTED</span></div>
         <p id="feed-status" role="status">Feed not connected</p>
