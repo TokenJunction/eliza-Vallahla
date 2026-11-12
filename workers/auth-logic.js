@@ -4,8 +4,9 @@ export function needSecondFactor(input) {
   var source = input || {};
   if (source.codeThisLogin === true) return false;
   if (source.baseVerified !== true) return true;
-  if (source.alwaysAsk === true || source.leader === true || source.revoked === true) return true;
-  return source.knownDevice !== true;
+  if (source.alwaysAsk === true || source.leader === true || source.revoked === true ||
+      source.knownDevice !== true || source.knownIp !== true) return true;
+  return source.secondFactor !== false;
 }
 
 export function codeDecision(record, now) {

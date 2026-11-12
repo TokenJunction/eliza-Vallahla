@@ -1,5 +1,5 @@
 import { createServer as createHttp, request as httpRequest } from "node:http";
-import { randomBytes } from "node:crypto";
+import { createHash, createPublicKey, KeyObject, timingSafeEqual } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { bearer, isRoot, issueSession, normalizeEmail, readSession, resolveRoot } from "./authz.js";
 import { ADAPTER_VERSION, PROVIDER_CATALOG, blankProvider, testProvider } from "./adapters.js";
@@ -40,13 +40,30 @@ async function readJson(req) {
   return { raw, json: JSON.parse(raw) };
 }
 
+function bootstrapCodeHash(value) {
+  const code = String(value || "");
+  if (!/^[\da-f]{64}$/i.test(code)) return null;
+  return createHash("sha256").update(code, "utf8").digest();
+}
+
+function licenseVerificationKey(value) {
+  if (!value) return null;
+  try {
+    const key = value instanceof KeyObject ? value : createPublicKey(value);
+    return key.type === "public" && key.asymmetricKeyType === "ed25519" ? key : null;
+  } catch {
+    return null;
+  }
+}
+
 function createState(env) {
   const providers = {};
   for (const spec of PROVIDER_CATALOG) providers[spec.id] = blankProvider(spec);
   return {
     env,
     startedAt: Date.now(),
-    bootstrapCode: randomBytes(16).toString("hex"),
+    bootstrapCodeHash: bootstrapCodeHash(env.VALHALLA_BOOTSTRAP_CODE),
+    bootstrapUsed: false,
     supabase: false,
     redis: false,
     setup: {
@@ -85,12 +102,14 @@ function admin(req, state) {
 }
 
 function cloudAllowed(state) {
-  return Boolean(state.setup.license && state.setup.license.edition === "pro");
+  const license = state.setup.license;
+  return Boolean(license && license.edition === "pro" && Number(license.exp) > Date.now());
 }
 
 export function createServer(options = {}) {
   const env = options.env || process.env;
   const state = options.state || createState(env);
+  const licensePublicKey = licenseVerificationKey(options.licensePublicKey ?? env.VALHALLA_LICENSE_PUBLIC_KEY);
   const fetchImpl = options.fetchImpl || fetch;
   const bus = createBus({
     privateKey: env.VALHALLA_SIGNING_PRIVATE_KEY ? privateKeyFromPem(env.VALHALLA_SIGNING_PRIVATE_KEY) : null,
@@ -144,7 +163,10 @@ export function createServer(options = {}) {
         const { json: body } = await readJson(req);
         const email = normalizeSafe(body.email);
         if (!env.SESSION_SECRET) return json(res, 503, { ok: false, error: "unavailable", code: "V-AUTH" }, origin);
-        if (body.code !== state.bootstrapCode) return json(res, 403, { ok: false, error: "denied", code: "V-AUTH" }, origin);
+        const suppliedCodeHash = bootstrapCodeHash(body.code);
+        if (state.bootstrapUsed || !state.bootstrapCodeHash || !suppliedCodeHash || !timingSafeEqual(suppliedCodeHash, state.bootstrapCodeHash)) {
+          return json(res, 403, { ok: false, error: "denied", code: "V-AUTH" }, origin);
+        }
         const root = resolveRoot(env, { rootEmail: email });
         if (!root || email !== root) return json(res, 403, { ok: false, error: "denied", code: "V-AUTH" }, origin);
         const device = deviceId(body.deviceId || "local");
@@ -152,6 +174,9 @@ export function createServer(options = {}) {
         if (state.devices.size >= rights.deviceLimit && !state.devices.has(device)) {
           return json(res, 403, { ok: false, error: "device-limit", code: "V-LIC" }, origin);
         }
+        state.bootstrapUsed = true;
+        state.bootstrapCodeHash = null;
+        Reflect.deleteProperty(env, "VALHALLA_BOOTSTRAP_CODE");
         state.devices.add(device);
         if (String(env.VALHALLA_FACTORY) !== "1") state.setup.rootEmail = root;
         return json(res, 200, { ok: true, token: issueSession(env.SESSION_SECRET, root), email: root }, origin);
@@ -248,8 +273,7 @@ export function createServer(options = {}) {
           return json(res, 200, { ok: true, edition: "core" }, origin);
         }
         if (body.edition !== "pro") return json(res, 400, { ok: false, error: "edition", code: "V-LIC" }, origin);
-        const publicKey = options.licensePublicKey || null;
-        const checked = verifyLicense(publicKey, body.license);
+        const checked = verifyLicense(licensePublicKey, body.license);
         if (!checked.ok || checked.license.edition !== "pro") return json(res, 403, { ok: false, error: checked.reason || "license", code: "V-LIC" }, origin);
         state.setup.license = checked.license;
         state.setup.edition = "pro";
@@ -288,13 +312,17 @@ export function createServer(options = {}) {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
         const { json: body } = await readJson(req);
         const inspected = inspectPrompt(body.text || "");
-        const target = body.target === "cloud" ? "cloud" : "local";
+        const target = body.target === undefined ? "local" : body.target;
+        if (target !== "cloud" && target !== "local") return json(res, 400, { ok: false, error: "target", code: "V-AI" }, origin);
         if (!inspected.ok && target === "cloud") return json(res, 400, { ok: false, error: "flagged", flags: inspected.flags, code: "V-AI" }, origin);
         if (target === "cloud" && !cloudAllowed(state)) return json(res, 403, { ok: false, error: "license", code: "V-LIC" }, origin);
         if (body.demo === true) {
           return json(res, 200, { ok: true, mode: "echo", text: `Local echo. Not a model response. ${inspected.text}` }, origin);
         }
-        const route = modelRoute(state.setup.providers, { role: body.role || body.capability || "chat" });
+        const route = modelRoute(state.setup.providers, {
+          role: body.role || body.capability || "chat",
+          target,
+        }, { cloudAllowed: target === "cloud" && cloudAllowed(state) });
         if (!route.available) {
           return json(res, 503, { ok: false, error: route.reason, ...route, code: "V-AI" }, origin);
         }
@@ -389,7 +417,7 @@ export function createServer(options = {}) {
       if (req.method === "GET" && url.pathname === "/api/odin") {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
         const role = url.searchParams.get("role") || "chat";
-        const route = modelRoute(state.setup.providers, { role });
+        const route = modelRoute(state.setup.providers, { role }, { cloudAllowed: cloudAllowed(state) });
         return json(res, 200, { ok: true, name: "Odin", model: false, ...route }, origin);
       }
       if (req.method === "GET" && url.pathname === "/api/desk/openapi") {
@@ -421,7 +449,7 @@ export function createServer(options = {}) {
         if (!authed) return json(res, 401, { ok: false, code: "V-AUTH" }, origin);
         return json(res, 200, {
           ok: true,
-          mvp: state.apps.map((app) => ({ id: app.id, network: app.networkScopes.length === 0, liveTrading: false })),
+          mvp: state.apps.map((app) => ({ id: app.id, network: app.networkScopes.length > 0, liveTrading: false })),
           notConfigured: NOT_CONFIGURED_APPS,
         }, origin);
       }

@@ -4,9 +4,14 @@ import { generateEd25519, signBytes, toPem } from "../ed25519.js";
 import { signLicense } from "../license.js";
 import { createServer } from "../valhallaMasterEngineV35.js";
 
+const DEFAULT_BOOTSTRAP_CODE = "ab".repeat(32);
+
 async function boot(env = {}, options = {}) {
+  const bootstrapCode = Object.prototype.hasOwnProperty.call(env, "VALHALLA_BOOTSTRAP_CODE")
+    ? env.VALHALLA_BOOTSTRAP_CODE
+    : DEFAULT_BOOTSTRAP_CODE;
   const server = createServer({
-    env: { SESSION_SECRET: "test-secret", ...env },
+    env: { SESSION_SECRET: "test-secret", VALHALLA_BOOTSTRAP_CODE: DEFAULT_BOOTSTRAP_CODE, ...env },
     ...options,
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -14,7 +19,7 @@ async function boot(env = {}, options = {}) {
   return {
     server,
     base: `http://127.0.0.1:${port}`,
-    code: server.state.bootstrapCode,
+    code: bootstrapCode,
     async stop() {
       await new Promise((resolve) => server.close(resolve));
     },
@@ -45,6 +50,8 @@ test("customer bootstrap uses the configured admin and ignores a client plan", a
     body: { email: "owner@factory.test", code: app.code, deviceId: "d1", role: "admin", plan: "pro" },
   });
   assert.equal(denied.status, 403);
+  const health = await api(app.base, "/health");
+  assert.equal(JSON.stringify(health.json).includes(app.code), false);
   const ok = await api(app.base, "/api/bootstrap", {
     method: "POST",
     body: { email: "Root@Customer.test", code: app.code, deviceId: "d1", role: "admin", plan: "pro" },
@@ -57,6 +64,23 @@ test("customer bootstrap uses the configured admin and ignores a client plan", a
   assert.equal(me.json.root, true);
   const forged = await api(app.base, "/api/admin/metrics", { token: ok.json.token });
   assert.equal(forged.status, 200);
+  const replay = await api(app.base, "/api/bootstrap", {
+    method: "POST",
+    body: { email: "root@customer.test", code: app.code, deviceId: "d1" },
+  });
+  assert.equal(replay.status, 403);
+  assert.equal(app.server.state.env.VALHALLA_BOOTSTRAP_CODE, undefined);
+  await app.stop();
+});
+
+test("bootstrap fails closed without an operator-provided setup code", async () => {
+  const app = await boot({ VALHALLA_BOOTSTRAP_CODE: "" });
+  const denied = await api(app.base, "/api/bootstrap", {
+    method: "POST",
+    body: { email: "root@customer.test", code: app.code, deviceId: "d1" },
+  });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.json.token, undefined);
   await app.stop();
 });
 
@@ -169,6 +193,60 @@ test("pro license is rejected when tampered or expired", async () => {
   });
   assert.equal(old.status, 403);
   await app.stop();
+});
+
+test("production license key comes from the environment and rejects invalid signatures", async () => {
+  const pair = generateEd25519();
+  const otherPair = generateEd25519();
+  const app = await boot({ VALHALLA_LICENSE_PUBLIC_KEY: toPem(pair.publicKey, "spki") });
+  const admin = await api(app.base, "/api/bootstrap", {
+    method: "POST",
+    body: { email: "root@customer.test", code: app.code, deviceId: "d1" },
+  });
+  const license = signLicense(pair.privateKey, {
+    customerId: "cust",
+    edition: "pro",
+    workspaceId: "ws",
+    exp: Date.now() + 60_000,
+    deviceLimit: 2,
+    workspaceLimit: 1,
+    addons: [],
+  });
+  const activated = await api(app.base, "/api/setup/edition", {
+    method: "POST",
+    token: admin.json.token,
+    body: { edition: "pro", license },
+  });
+  assert.equal(activated.status, 200);
+  await app.stop();
+
+  const invalidSignatureApp = await boot({ VALHALLA_LICENSE_PUBLIC_KEY: toPem(pair.publicKey, "spki") });
+  const invalidAdmin = await api(invalidSignatureApp.base, "/api/bootstrap", {
+    method: "POST",
+    body: { email: "root@customer.test", code: invalidSignatureApp.code, deviceId: "d1" },
+  });
+  const invalidSignature = signLicense(otherPair.privateKey, license);
+  const rejected = await api(invalidSignatureApp.base, "/api/setup/edition", {
+    method: "POST",
+    token: invalidAdmin.json.token,
+    body: { edition: "pro", license: invalidSignature },
+  });
+  assert.equal(rejected.status, 403);
+  assert.equal(rejected.json.error, "tamper");
+  await invalidSignatureApp.stop();
+
+  const invalidKeyApp = await boot({ VALHALLA_LICENSE_PUBLIC_KEY: "not a public key" });
+  const invalidKeyAdmin = await api(invalidKeyApp.base, "/api/bootstrap", {
+    method: "POST",
+    body: { email: "root@customer.test", code: invalidKeyApp.code, deviceId: "d1" },
+  });
+  const failClosed = await api(invalidKeyApp.base, "/api/setup/edition", {
+    method: "POST",
+    token: invalidKeyAdmin.json.token,
+    body: { edition: "pro", license },
+  });
+  assert.equal(failClosed.status, 403);
+  await invalidKeyApp.stop();
 });
 
 test("workspace config round-trips without secrets", async () => {
@@ -321,6 +399,64 @@ test("cloud chat is refused when the sanitizer flags the prompt", async () => {
     body: { text: "my key is sk-SUPERSECRET987654" },
   });
   assert.equal(flagged.status, 400);
+  await app.stop();
+});
+
+test("chat routing requires selected-provider enablement and server-side license authorization", async () => {
+  let outboundCalls = 0;
+  const app = await boot({}, {
+    fetchImpl: async () => {
+      outboundCalls += 1;
+      return new Response("unexpected outbound call");
+    },
+  });
+  const admin = await api(app.base, "/api/bootstrap", {
+    method: "POST",
+    body: { email: "root@customer.test", code: app.code, deviceId: "d1" },
+  });
+  const token = admin.json.token;
+  const cloudProvider = app.server.state.setup.providers.deepseek;
+  Object.assign(cloudProvider, { enabled: true, tested: true, health: "up", secretStored: true });
+
+  const unlicensed = await api(app.base, "/api/ai/chat", {
+    method: "POST",
+    token,
+    body: { text: "hello", target: "cloud" },
+  });
+  assert.equal(unlicensed.status, 403);
+
+  app.server.state.setup.license = { edition: "pro", exp: Date.now() + 60_000 };
+  cloudProvider.enabled = false;
+  const disabled = await api(app.base, "/api/ai/chat", {
+    method: "POST",
+    token,
+    body: { text: "hello", target: "cloud" },
+  });
+  assert.equal(disabled.status, 503);
+
+  app.server.state.setup.license.exp = Date.now() - 1;
+  const expired = await api(app.base, "/api/ai/chat", {
+    method: "POST",
+    token,
+    body: { text: "hello", target: "cloud" },
+  });
+  assert.equal(expired.status, 403);
+
+  app.server.state.setup.license.exp = Date.now() + 60_000;
+  cloudProvider.enabled = true;
+  for (const body of [{ text: "hello" }, { text: "hello", target: "local" }]) {
+    const localOnly = await api(app.base, "/api/ai/chat", { method: "POST", token, body });
+    assert.equal(localOnly.status, 503);
+    assert.equal(localOnly.json.provider, null);
+  }
+  const cloud = await api(app.base, "/api/ai/chat", {
+    method: "POST",
+    token,
+    body: { text: "hello", target: "cloud" },
+  });
+  assert.equal(cloud.status, 200);
+  assert.equal(cloud.json.provider, "deepseek");
+  assert.equal(outboundCalls, 0);
   await app.stop();
 });
 

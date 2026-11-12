@@ -16,10 +16,16 @@ test("model routes stay single-provider and do not spend a background call", () 
   assert.equal(voice.background, false);
   assert.equal(voice.quota, "Your provider, your quota");
   const local = modelRoute({
-    ollama: { tested: true, health: "up", baseUrl: "https://ollama.example", secretStored: false, capabilities: ["chat"] },
+    ollama: { enabled: true, tested: true, health: "up", baseUrl: "https://ollama.example", secretStored: false, capabilities: ["chat"] },
   }, { role: "local" });
   assert.equal(local.provider, "ollama");
   assert.equal(local.fallback, false);
+  assert.equal(modelRoute({
+    ollama: { tested: true, health: "up", baseUrl: "https://ollama.example", capabilities: ["chat"] },
+  }, { role: "local" }).available, false);
+  const cloud = { enabled: true, tested: true, health: "up", secretStored: true, capabilities: ["chat"] };
+  assert.equal(modelRoute({ deepseek: cloud }, { role: "chat" }).available, false);
+  assert.equal(modelRoute({ deepseek: cloud }, { role: "chat" }, { cloudAllowed: true }).available, true);
 });
 
 test("an A2A envelope binds recipient, session, expiry, and replay", async () => {
@@ -57,13 +63,14 @@ test("the desk document is paper only and a client plan does not grant a pro app
 });
 
 test("compute, catalog, and paper apps do not call a network", async () => {
-  const server = createServer({ env: { SESSION_SECRET: "test-secret" } });
+  const code = "ab".repeat(32);
+  const server = createServer({ env: { SESSION_SECRET: "test-secret", VALHALLA_BOOTSTRAP_CODE: code } });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   const boot = await fetch(base + "/api/bootstrap", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "root@customer.test", code: server.state.bootstrapCode, deviceId: "d1", plan: "pro", seats: 100 }),
+    body: JSON.stringify({ email: "root@customer.test", code, deviceId: "d1", plan: "pro", seats: 100 }),
   });
   const token = (await boot.json()).token;
   const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
@@ -73,6 +80,13 @@ test("compute, catalog, and paper apps do not call a network", async () => {
   assert.equal(compute.payouts, "unavailable");
   const catalog = await fetch(base + "/api/apps/catalog", { headers }).then((res) => res.json());
   assert.equal(catalog.notConfigured.some((item) => item.id === "code-assistant" && item.network === false), true);
+  const network = Object.fromEntries(catalog.mvp.map((item) => [item.id, item.network]));
+  assert.deepEqual(network, {
+    trading: false,
+    "ai-workspace": true,
+    thalos: false,
+    "data-explorer": false,
+  });
   const thalos = await fetch(base + "/api/apps/thalos/analysis", {
     method: "POST",
     headers,

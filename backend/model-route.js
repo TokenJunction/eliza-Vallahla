@@ -23,21 +23,22 @@ function contract(fields) {
   };
 }
 
-function readyCloud(item) {
-  return Boolean(item && item.tested && item.secretStored && item.health !== "down");
+function readyCloud(item, cloudAllowed) {
+  return Boolean(cloudAllowed && item && item.enabled && item.tested && item.secretStored && item.health === "up");
 }
 
-export function modelRoute(providers, request) {
+export function modelRoute(providers, request, authorization = {}) {
   const source = providers && typeof providers === "object" ? providers : {};
   const role = ["voice", "reasoning", "local", "chat"].includes(request && request.role)
     ? request.role
     : "chat";
-  if (role === "local") {
+  const target = request && ["local", "cloud"].includes(request.target) ? request.target : "auto";
+  if (role === "local" || target === "local") {
     const ollama = source.ollama;
-    const available = Boolean(ollama && ollama.tested && ollama.health === "up" && isAllowedOllamaUrl(ollama.baseUrl));
+    const available = Boolean(role !== "voice" && role !== "reasoning" && ollama && ollama.enabled && ollama.tested && ollama.health === "up" && isAllowedOllamaUrl(ollama.baseUrl));
     return contract({
       role,
-      capability: "chat",
+      capability: role === "voice" || role === "reasoning" ? role : "chat",
       provider: available ? "ollama" : null,
       health: ollama ? ollama.health : "unconfigured",
       byok: false,
@@ -50,7 +51,7 @@ export function modelRoute(providers, request) {
   if (role === "voice" || role === "reasoning") {
     const id = role === "voice" ? "gemini" : "deepseek";
     const item = source[id];
-    const available = readyCloud(item);
+    const available = readyCloud(item, authorization.cloudAllowed === true) && target !== "local";
     return contract({
       role,
       capability: role,
@@ -63,7 +64,11 @@ export function modelRoute(providers, request) {
       reason: available ? "ok" : item && !item.secretStored ? "byok-required" : "unavailable",
     });
   }
-  const decision = planRoute(source, { capability: "chat" });
+  const decision = planRoute(source, {
+    capability: "chat",
+    target,
+    cloudAllowed: authorization.cloudAllowed === true,
+  });
   const item = decision.target ? source[decision.target] : null;
   return contract({
     role: "chat",

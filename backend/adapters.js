@@ -46,11 +46,14 @@ export function isAllowedOllamaUrl(value) {
 
 export function planRoute(providers, request) {
   const capability = request.capability || "chat";
+  const target = request.target === "cloud" || request.target === "local" ? request.target : "auto";
   const ollama = providers.ollama;
-  const ollamaReady = Boolean(ollama && ollama.tested && ollama.health === "up" && isAllowedOllamaUrl(ollama.baseUrl) && capability !== "voice" && capability !== "reasoning");
-  if (ollamaReady) return { running: true, target: "ollama", missing: [], fallback: false };
+  const ollamaReady = Boolean(ollama && ollama.enabled && ollama.tested && ollama.health === "up" && isAllowedOllamaUrl(ollama.baseUrl) && capability !== "voice" && capability !== "reasoning");
+  if (target !== "cloud" && ollamaReady) return { running: true, target: "ollama", missing: [], fallback: false };
   const order = capability === "voice" ? ["gemini"] : capability === "reasoning" ? ["deepseek"] : ["deepseek", "gemini", "xai", "openai"];
-  const cloud = order.map((id) => providers[id]).find((item) => item && item.tested && item.secretStored && item.health !== "down" && item.capabilities.includes(capability === "chat" ? "chat" : capability));
+  const cloud = target !== "local" && request.cloudAllowed === true
+    ? order.map((id) => providers[id]).find((item) => item && item.enabled && item.tested && item.secretStored && item.health === "up" && item.capabilities.includes(capability === "chat" ? "chat" : capability))
+    : null;
   if (cloud) return { running: true, target: cloud.id, missing: [], fallback: true };
   return { running: false, target: null, missing: ollamaReady ? [] : ["ollama", ...order], fallback: false };
 }

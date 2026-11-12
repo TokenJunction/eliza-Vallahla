@@ -121,11 +121,14 @@ test("keeps free accounts locked and requires Google plus a verified code for ow
 test("a verified master admin alias is a leader only with Google and a code", async () => {
   var alias = "alias@example.test";
   var emailHash = await hash(alias);
-  var settings = env({});
+  var rows = {};
+  var settings = env(rows);
   settings.MASTER_ADMIN_EMAIL = alias;
-  var withoutGoogle = await worker.fetch(await request({ eh: emailHash, code: true }), settings);
-  assert.equal((await withoutGoogle.json()).leader, false);
-  var response = await worker.fetch(await request({ eh: emailHash, code: true, google: true }), settings);
+  var withoutGoogle = await request({ eh: emailHash, code: true }, rows);
+  var denied = await worker.fetch(withoutGoogle.request, settings);
+  assert.equal((await denied.json()).leader, false);
+  var verified = await request({ eh: emailHash, code: true, google: true }, rows);
+  var response = await worker.fetch(verified.request, settings);
   assert.equal((await response.json()).leader, true);
 });
 
