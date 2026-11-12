@@ -2,12 +2,13 @@
 // Copyright (c) 2026 TokenJunction LLC
 // SPDX-License-Identifier: MIT
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { URL, fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
+const expectedLicense = "MIT";
 const failures = [];
 
 function read(relativePath) {
@@ -55,8 +56,21 @@ try {
   failures.push("package.json: invalid JSON");
 }
 if (pkg) {
-  if (pkg.license !== "MIT") failures.push('package.json: license must be "MIT"');
+  if (pkg.license !== expectedLicense) {
+    failures.push(`package.json: license must be "${expectedLicense}"`);
+  }
   if (pkg.private !== true) failures.push("package.json: package must remain private");
+}
+
+const docs = ["README.md", "CONTRIBUTING.md"].filter((doc) =>
+  existsSync(join(root, doc)),
+);
+if (docs.length === 0) {
+  failures.push("project docs: README.md or CONTRIBUTING.md is required");
+}
+for (const doc of docs) {
+  const text = read(doc);
+  requireText(doc, text, "](LICENSE)", "](NOTICE)", expectedLicense);
 }
 
 if (failures.length > 0) {
@@ -65,6 +79,6 @@ if (failures.length > 0) {
   process.exitCode = 1;
 } else {
   process.stdout.write(
-    "Licence and notice check passed: MIT licence and upstream elizaOS NOTICE are intact.\n",
+    "Licence check passed: MIT and upstream notice exist, package terms agree, and every project doc links LICENSE and NOTICE.\n",
   );
 }
