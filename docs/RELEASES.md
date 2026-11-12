@@ -1,6 +1,6 @@
 # Releases
 
-A release archive includes `LICENSE`, once TJ adds it, and `SECURITY.md`. See `LICENSE_PENDING.md` until a license is chosen.
+A release archive includes `SECURITY.md`. The project is licensed under the MIT license.
 
 The archive is built only by CI. Do not assemble a release on a laptop and commit the output. The deployment workflow is `.github/workflows/deploy-valhalla.yml`, started with a workflow dispatch for a reviewed commit.
 

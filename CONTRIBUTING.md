@@ -18,4 +18,4 @@ Add a `Signed-off-by` line to each commit:
 git commit -s
 ```
 
-That line certifies you can submit the change under the project's license, once a license is chosen. See `LICENSE_PENDING.md`.
+That line certifies you can submit the change under the project's MIT license.
