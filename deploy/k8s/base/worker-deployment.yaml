@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: valhalla-worker
+  namespace: valhalla
+  labels:
+    app.kubernetes.io/name: valhalla-worker
+    app.kubernetes.io/component: queue-consumer
+    app.kubernetes.io/part-of: valhallaos
+spec:
+  replicas: 0
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 180
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: valhalla-worker}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: valhalla-worker
+        app.kubernetes.io/component: queue-consumer
+        app.kubernetes.io/part-of: valhallaos
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      nodeSelector: {kubernetes.io/os: linux}
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: worker
+          # Image must contain root worker files and dependencies at /app.
+          image: registry.invalid/valhalla/queue-worker:replace-before-activation
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: [node]
+          args: [valhallaWorker.js]
+          envFrom:
+            - configMapRef: {name: valhalla-config}
+          env:
+            - {name: NODE_ENV, value: "production"}
+            - {name: VALHALLA_QUEUE_ROLE, value: "consumer"}
+            - {name: VALHALLA_EXECUTION_MODE, value: "paper"}
+            - {name: VALHALLA_TRADING_ENABLED, value: "false"}
+            - {name: VALHALLA_SOCIAL_ENABLED, value: "false"}
+            - {name: VALHALLA_KEY_STORAGE_ENABLED, value: "false"}
+            - {name: ZEUS_IDLE_ENABLED, value: "false"}
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef: {name: valhalla-worker-redis, key: REDIS_URL, optional: false}
+          resources:
+            requests: {cpu: "100m", memory: "128Mi"}
+            limits: {cpu: "500m", memory: "256Mi"}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          # No inbound listener or application health endpoint exists yet.
+          volumeMounts:
+            - {name: temporary-files, mountPath: /tmp}
+          terminationMessagePolicy: FallbackToLogsOnError
+      volumes:
+        - name: temporary-files
+          emptyDir: {sizeLimit: "64Mi"}

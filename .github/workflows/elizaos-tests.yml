@@ -1,0 +1,100 @@
+name: ElizaOS tests
+
+on:
+  push:
+    branches: [docs/site]
+  pull_request:
+    branches: [docs/site]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: elizaos-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  elizaos-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: valhalla-elizaos
+    env:
+      NODE_ENV: test
+      CI: 'true'
+      PORT: '3000'
+      SERVER_PORT: '3000'
+      CYPRESS_BASE_URL: http://localhost:3000
+      READINESS_URL: http://127.0.0.1:3000/health
+      READINESS_TIMEOUT: '120'
+      VALHALLA_EXECUTION_MODE: paper
+      VALHALLA_TRADING_ENABLED: 'false'
+      VALHALLA_SOCIAL_ENABLED: 'false'
+      VALHALLA_KEY_STORAGE_ENABLED: 'false'
+      ZEUS_IDLE_ENABLED: 'false'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - name: Install browser and native dependencies
+        working-directory: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 ffmpeg curl git unzip xvfb libgtk2.0-0 libgtk-3-0t64 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth
+      - name: Validate shell syntax
+        run: bash -n scripts/test-all.sh
+      - name: Install locked project dependencies
+        run: bun install --frozen-lockfile
+      - name: Install and verify test dependencies
+        run: |
+          mkdir -p test-results
+          set -o pipefail
+          bun run test:install 2>&1 | tee test-results/dependency-install.log
+          bunx --no-install cypress verify 2>&1 | tee test-results/cypress-verify.log
+      - name: Run environment validation tests
+        id: environment_tests
+        continue-on-error: true
+        run: |
+          mkdir -p test-results
+          set -o pipefail
+          bun run test:env 2>&1 | tee test-results/environment-tests.log
+      - name: Run complete shell test suite
+        id: full_suite
+        continue-on-error: true
+        run: |
+          mkdir -p test-results
+          set -o pipefail
+          xvfb-run -a bash scripts/test-all.sh 2>&1 | tee test-results/full-suite.log
+      - name: Upload test logs and browser artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: elizaos-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            valhalla-elizaos/test-results/
+            valhalla-elizaos/cypress/screenshots/
+            valhalla-elizaos/cypress/videos/
+      - name: Enforce test results
+        if: always()
+        env:
+          ENVIRONMENT_OUTCOME: ${{ steps.environment_tests.outcome }}
+          SUITE_OUTCOME: ${{ steps.full_suite.outcome }}
+        run: |
+          if [[ "$ENVIRONMENT_OUTCOME" != success || "$SUITE_OUTCOME" != success ]]; then
+            echo 'Tests failed or did not execute; inspect the preceding steps and artifacts.' >&2
+            exit 1
+          fi

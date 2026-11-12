@@ -41,7 +41,7 @@
     }
     var google = document.getElementById("setGoogle");
     google.textContent = who.kind === "google"
-      ? "Google: " + (who.email || who.name || "connected")
+      ? "Google: " + (who.hint || "connected")
       : "Google: not connected. Use Continue with Google on the sign-in step.";
   }
 
@@ -76,11 +76,24 @@
   });
   var wipe = document.getElementById("deleteData");
   if (wipe) wipe.addEventListener("click", function () {
-    localStorage.clear();
-    sessionStorage.clear();
-    document.cookie = "valhalla_consent=; Path=/; Max-Age=0";
-    var note = document.getElementById("deleteNote");
-    if (note) note.textContent = "Local data on this browser was cleared. To ask TokenJunction LLC to delete data held on a server, email hello@valhalla-app.xyz. This site does not keep a private key.";
+    var token = sessionStorage.getItem("valhalla-auth-token") || "";
+    var base = String((window.VALHALLA_SITE || {}).AUTH_URL || "").replace(/\/$/, "");
+    function finish() {
+      localStorage.clear();
+      sessionStorage.clear();
+      document.cookie = "valhalla_consent=; Path=/; Max-Age=0";
+      var note = document.getElementById("deleteNote");
+      if (note) note.textContent = "Local data on this browser was cleared. To ask TokenJunction LLC to delete data held on a server, email hello@valhalla-app.xyz. This site does not keep a private key.";
+    }
+    if (!token || base.indexOf("https://") !== 0) {
+      finish();
+      return;
+    }
+    fetch(base + "/auth/logout", {
+      method: "POST",
+      credentials: "include",
+      headers: { authorization: "Bearer " + token }
+    }).then(finish, finish);
   });
   document.getElementById("deleteKeys").addEventListener("click", function () {
     localStorage.removeItem(KEYS);

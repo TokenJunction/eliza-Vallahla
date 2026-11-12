@@ -23,13 +23,16 @@ jobs:
           node-version: '22'
       - name: Build and verify login and wallet repairs
         run: |
+          python3 scripts/test_login_build.py -v
           python3 scripts/build-site.py
+          node --check site-build/site-config.js
+          node --check site-build/os/bridge.js
+          node --check site-build/home-motion.js
           node --check site-build/app/gate.js
           node --check site-build/errors.js
           node --check site-build/connect-core.js
           node --check site-build/site-wallet.js
           node --check site-build/app/performance.js
-          node --check site-build/app/gate.js
           node --check site-build/app/leadership.js
           node scripts/test-wallet.cjs
           node --test workers/*.test.mjs app/performance.test.cjs

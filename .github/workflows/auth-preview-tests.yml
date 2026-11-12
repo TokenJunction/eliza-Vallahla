@@ -1,0 +1,55 @@
+name: Auth preview regression tests
+on:
+  push:
+    branches: [cursor/auth-session-hardening-18db]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  auth-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked test dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - name: Run every auth check and record diagnostic evidence
+        run: node scripts/run-auth-ci.mjs
+      - name: Publish per-check diagnostic statuses
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            if (!fs.existsSync('auth-ci-results.json')) {
+              core.warning('No test results: dependency installation, runner setup or execution failed.');
+              return;
+            }
+            const rows = JSON.parse(fs.readFileSync('auth-ci-results.json', 'utf8'));
+            for (const row of rows) {
+              const description = String(row.diagnostic || 'No diagnostic')
+                .replace(/[\r\n]/g, ' ')
+                .replace(/(?:pplx-|sk-)[A-Za-z0-9_-]+/g, '[redacted]')
+                .slice(0, 140);
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.sha,
+                state: row.passed ? 'success' : 'failure',
+                context: 'auth-debug/' + row.name,
+                description,
+                target_url: context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId
+              });
+            }
+      - name: Preserve complete test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-ci-results-${{ github.sha }}
+          path: auth-ci-results.json
+          if-no-files-found: warn
+          retention-days: 7

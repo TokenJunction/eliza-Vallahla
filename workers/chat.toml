@@ -1,21 +1,19 @@
-# Separate deployment; does not replace the Turnstile Worker.
-# DeepSeek is the default Thales chat provider. API usage may incur provider
-# charges; no free or unlimited usage is guaranteed. Set its key with:
-#   npx wrangler secret put DEEPSEEK_API_KEY --config workers/chat.toml
-# When OpenAI is selected, this Worker reads the model from the sign-in Worker.
-# Store only the matching provider key as a Wrangler secret; never put keys in
-# this file or site-config.js.
-# Keep provider choices explicit; automatic routing is disabled.
-# Deploy with:
-#   npx wrangler deploy --config workers/chat.toml
+# Separate chat Worker deployment. Keys remain server-side secrets.
+# Deploy only after tests pass and real provider credentials are configured.
+# Gemini fallback may incur provider charges; existing rate limits apply.
+# Live voice stays disabled until authenticated token provisioning and
+# browser microphone/audio integration have been verified on real devices.
 name = "valhalla-chat"
-main = "chat.js"
+main = "chat-entry.js"
 compatibility_date = "2026-11-03"
 workers_dev = true
 
 [vars]
 CHAT_PROVIDER = "deepseek"
 CHAT_MODEL = "deepseek-chat"
+CHAT_FALLBACK_PROVIDERS = "gemini"
+GEMINI_MODEL = "gemini-3.8-flash"
+ENABLE_GEMINI_LIVE = "false"
 AUTH_CONFIG_URL = "https://valhalla-auth.valhalla-app.workers.dev"
 
 [[ratelimits]]

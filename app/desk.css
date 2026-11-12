@@ -13,7 +13,7 @@ button, .btn { font: inherit; min-height: 44px; cursor: pointer; }
 .card h1 { margin: 0 0 8px; color: var(--amber2); letter-spacing: .16em; font-size: 22px; }
 .note { color: var(--muted); }
 .login-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-#emailCode { letter-spacing: .4em; font-size: 22px; width: 100%; background: #100e0a; color: #f2ead8; border: 1px solid #ffb347; padding: 8px; }
+#emailCodeInput { letter-spacing: .4em; font-size: 22px; width: 100%; background: #100e0a; color: #f2ead8; border: 1px solid #ffb347; padding: 8px; }
 .device-row { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #1c1a16; padding: 6px 0; }
 .login-stack button, #googleBtn { display: flex; align-items: center; gap: 10px; width: 100%; background: rgba(15, 21, 24, .9); color: var(--amber2); border: 1px solid rgba(255,154,31,.45); padding: 8px 12px; text-align: left; }
 .hud { display: grid; grid-template-rows: 64px 1fr 28px; height: 100vh; padding: 12px 14px 8px; gap: 8px; background: var(--bg); }
