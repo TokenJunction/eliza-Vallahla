@@ -1,0 +1,54 @@
+# Copyright (c) 2026 TokenJunction LLC
+# SPDX-License-Identifier: MIT
+
+name: dco
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+permissions:
+  contents: read
+
+jobs:
+  sign-off:
+    name: check signed-off-by
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Load the DCO checker from the base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$BASE_SHA"
+          fi
+          if git cat-file -e "${BASE_SHA}:scripts/check-dco.sh" 2>/dev/null; then
+            git show "${BASE_SHA}:scripts/check-dco.sh" > "$RUNNER_TEMP/check-dco.sh"
+            echo "Using the DCO checker from base ${BASE_SHA}."
+          else
+            echo "Base has no scripts/check-dco.sh; using the head checker for this bootstrap pull request." >&2
+            git show "${HEAD_SHA}:scripts/check-dco.sh" > "$RUNNER_TEMP/check-dco.sh"
+          fi
+          test -s "$RUNNER_TEMP/check-dco.sh"
+
+      - name: Verify every commit is signed off
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash "$RUNNER_TEMP/check-dco.sh" "$BASE_SHA" "$HEAD_SHA"
