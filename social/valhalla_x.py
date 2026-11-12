@@ -343,13 +343,13 @@ def read_log(handle) -> dict:
     handle.seek(0)
     raw = handle.read()
     if not raw.strip():
-        return {"days": {}}
+        raise SystemExit("Post counter is empty; refusing live posts")
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return {"days": {}}
+        raise SystemExit("Post counter is invalid; refusing live posts") from None
     if not isinstance(data, dict) or not isinstance(data.get("days"), dict):
-        return {"days": {}}
+        raise SystemExit("Post counter is invalid; refusing live posts")
     return data
 
 
@@ -363,16 +363,21 @@ def write_log(handle, data: dict) -> None:
 def guarded_post(item: dict[str, object], creds: dict[str, str], opener=None) -> tuple[int, str]:
     path = log_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    new_log = not path.exists()
     with path.open("a+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
             os.chmod(path, 0o600)
+            if new_log and os.fstat(handle.fileno()).st_size == 0:
+                write_log(handle, {"days": {}})
             data = read_log(handle)
             day = today_key()
-            entry = data["days"].get(day)
+            entry = data["days"].get(day, {"count": 0, "posts": []})
             if not isinstance(entry, dict):
-                entry = {"count": 0, "posts": []}
-            count = int(entry.get("count") or 0)
+                raise SystemExit("Post counter is invalid; refusing live posts")
+            count = entry.get("count", 0)
+            if type(count) is not int or count < 0:
+                raise SystemExit("Post counter is invalid; refusing live posts")
             if count >= DAILY_POST_CAP:
                 raise SystemExit(f"Daily cap is {DAILY_POST_CAP} posts for {day} (America/New_York).")
             media_id = ""

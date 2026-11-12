@@ -275,6 +275,19 @@ class ValhallaXTests(unittest.TestCase):
         self.assertIn("Daily cap", out)
         self.assertEqual(len(capture.requests), 2)
 
+    def test_corrupt_daily_log_fails_closed(self) -> None:
+        self.write_queue([{"id": 2, "text": "Cap note.", "approved": True}])
+        self.env_creds()
+        Path(os.environ["VALHALLA_X_LOG"]).write_text(
+            '{"days":{"2026-11-12":{"count":2}}}corrupt', encoding="utf-8"
+        )
+        capture = Capture()
+        valhalla_x.OPENER = capture
+        code, out = self.run_cli(["post", "--id", "2", "--live"])
+        self.assertEqual(code, 1)
+        self.assertIn("Post counter is invalid", out)
+        self.assertEqual(capture.requests, [])
+
     def test_media_upload_is_not_in_the_signature(self) -> None:
         image = Path(self.tmp.name) / "dot.png"
         image.write_bytes(__import__("base64").b64decode(PNG))
