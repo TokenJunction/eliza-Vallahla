@@ -44,7 +44,8 @@
         show('Sign-in required.', 'NOT CONNECTED');
         return;
       }
-      var response = await fetch('/api/ai', {
+      var apiBase = (window.VALHALLA_SITE && window.VALHALLA_SITE.API_URL) || '';
+      var response = await fetch(apiBase + '/api/ai', {
         method: 'POST',
         headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
         body: JSON.stringify({ message: text }),

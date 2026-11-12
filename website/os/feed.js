@@ -35,7 +35,8 @@
         return;
       }
       var wallet = document.body.dataset.wallet || '';
-      var response = await fetch('/api/feed' + (wallet ? '?wallet=' + encodeURIComponent(wallet) : ''), {
+      var apiBase = (window.VALHALLA_SITE && window.VALHALLA_SITE.API_URL) || '';
+      var response = await fetch(apiBase + '/api/feed' + (wallet ? '?wallet=' + encodeURIComponent(wallet) : ''), {
         headers: { authorization: 'Bearer ' + token },
         cache: 'no-store'
       });

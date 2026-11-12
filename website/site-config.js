@@ -45,6 +45,9 @@ window.VALHALLA_SITE = {
   LIVE_TRADING: false,
   SUPABASE_URL: "https://girltjnrrwlyeufrcors.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_PKNzsuQZMMs4Sb81gnoFaw_PCgSbclp",
+  /* The desk's assistant and feed run on the private valos-core deployment.
+     Empty means same origin, which is what the private repo wants. */
+  API_URL: "https://valhalla-app.xyz",
   /* Public chat uses the deployed Cloudflare Workers AI service. Brain integration is separate. */
   CHAT_URL: "https://valhalla-chat.valhalla-app.workers.dev",
   TICKER_URL: ""

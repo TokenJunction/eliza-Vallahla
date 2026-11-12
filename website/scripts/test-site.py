@@ -89,10 +89,10 @@ class SiteTests(unittest.TestCase):
             "python3 scripts/test_private_pack_export.py",
             "node website/scripts/test-wallet.cjs",
             "node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs "
-            "website/scripts/desk.test.cjs website/scripts/host-route.test.cjs "
-            "website/scripts/journey.test.cjs website/scripts/desktop.test.cjs "
-            "website/scripts/minify.test.cjs website/scripts/supabase-auth.test.cjs "
-            "website/scripts/volos-ads.test.cjs",
+            "website/scripts/desk-api.test.cjs website/scripts/desk.test.cjs "
+            "website/scripts/host-route.test.cjs website/scripts/journey.test.cjs "
+            "website/scripts/desktop.test.cjs website/scripts/minify.test.cjs "
+            "website/scripts/supabase-auth.test.cjs website/scripts/volos-ads.test.cjs",
             "node website/scripts/minify-site.mjs",
         )
         position = -1
