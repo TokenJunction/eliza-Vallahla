@@ -30,7 +30,7 @@ function run(file, config, fetchImpl) {
   const document = {
     body: { dataset: { session: 'in', wallet: '' } },
     getElementById(id) { return nodes[id] ||= element(id); },
-    createElement(tag) { return { tag: tag, textContent: '' }; }
+    createElement(tag) { const node = element(tag); node.tag = tag; return node; }
   };
   const window = {
     VALHALLA_SITE: config,
@@ -45,7 +45,8 @@ function run(file, config, fetchImpl) {
     fetch: fetchImpl,
     JSON: JSON,
     Date: Date,
-    encodeURIComponent: encodeURIComponent
+    encodeURIComponent: encodeURIComponent,
+    setInterval: function () { return 0; }
   });
   return { nodes: nodes, windowHandlers: windowHandlers, get: document.getElementById };
 }
@@ -71,6 +72,38 @@ test('the desk asks the configured deployment for the feed', async () => {
   await harness.windowHandlers['valhalla-signed-in'][0]();
   assert.deepEqual(calls, [API + '/api/feed']);
   assert.equal(harness.nodes['feed-status'].textContent, 'Live feed');
+});
+
+test('the health page asks the configured deployment for its status', async () => {
+  const calls = [];
+  const harness = run('website/health/health.js', { API_URL: API }, async (url) => {
+    calls.push(String(url));
+    return {
+      status: 200,
+      ok: true,
+      json: async () => ({
+        status: 'up',
+        mode: 'live',
+        checkedAt: '2026-11-12T21:00:00.000Z',
+        checks: [{ name: 'supabase', status: 'up', latencyMs: 12 }],
+        safety: { trading: 'disabled', social: 'disabled', keyStorage: 'disabled', adminConfigured: true }
+      })
+    };
+  });
+  await new Promise(function (resolve) { setImmediate(resolve); });
+  assert.deepEqual(calls, [API + '/api/health']);
+  assert.equal(harness.nodes['overall'].textContent, 'Up');
+  assert.equal(harness.nodes['systems'].children.length, 1);
+});
+
+test('an empty API_URL keeps the health check on the same origin', async () => {
+  const calls = [];
+  run('website/health/health.js', {}, async (url) => {
+    calls.push(String(url));
+    return { status: 200, ok: true, json: async () => ({ checks: [], safety: {} }) };
+  });
+  await new Promise(function (resolve) { setImmediate(resolve); });
+  assert.deepEqual(calls, ['/api/health']);
 });
 
 test('an empty API_URL keeps both calls on the same origin', async () => {

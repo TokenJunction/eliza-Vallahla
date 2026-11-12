@@ -55,8 +55,13 @@
     document.getElementById('meta').textContent = msg;
   }
 
+  function apiBase() {
+    var config = window.VALHALLA_SITE || {};
+    return typeof config.API_URL === 'string' ? config.API_URL.replace(/\/+$/, '') : '';
+  }
+
   function load() {
-    fetch('/api/health', { cache: 'no-store' })
+    fetch(apiBase() + '/api/health', { cache: 'no-store' })
       .then(function (r) {
         // 503 still carries a valid degraded snapshot
         return r.json().then(function (body) { return { ok: r.ok, status: r.status, body: body }; });
