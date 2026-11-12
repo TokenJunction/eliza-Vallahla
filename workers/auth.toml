@@ -3,6 +3,7 @@
 #   DEVICE_COOKIE_SECRET      long random string for the device cookie and the session token
 #   RESEND_API_KEY            only if Cloudflare Email Sending is not onboarded yet
 #   LEADER_EMAIL              Google-authenticated account authorized for manager access
+#   MASTER_ADMIN_EMAIL        optional second Google-authenticated owner alias
 #   AUTH_KV                   KV namespace id
 #   TURNSTILE_SECRET          optional. Same secret as valhalla-turnstile-verify.
 #                             When set, /auth/human checks the token and the

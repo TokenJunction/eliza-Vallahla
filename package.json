@@ -7,7 +7,7 @@
     "preflight:worker": "node scripts/workerPreflight.js",
     "build": "node scripts/workerPreflight.js --structure && python scripts/build-site.py",
     "validate:env": "node scripts/validateEnv.js",
-    "test": "node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs valhallaQueueEngine.test.cjs valhallaWorker.test.cjs valhallaRedis.integration.test.cjs scripts/validateEnv.test.cjs"
+    "test": "node --test workers/*.test.mjs app/performance.test.cjs lib/*.test.cjs valhallaQueueEngine.test.cjs valhallaWorker.test.cjs valhallaRedis.integration.test.cjs scripts/validateEnv.test.cjs backend/test/engine.test.js backend/test/contracts.test.js"
   },
   "engines": {
     "node": ">=22"

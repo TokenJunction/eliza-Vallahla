@@ -2,16 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { browserName, codeDecision, maskEmail, needSecondFactor, opaqueId, sensitiveSignIn, sessionMatches, turnstileEnforced, validEmail } from "./auth-logic.js";
 
-test("extra code is required for always-ask, unknown, revoked, or missing base proof", () => {
-  var known = { knownDevice: true, alwaysAsk: false, leader: false, revoked: false, baseVerified: true, codeThisLogin: false };
-  assert.equal(needSecondFactor(known), false);
-  assert.equal(needSecondFactor(Object.assign({}, known, { alwaysAsk: true })), true);
-  assert.equal(needSecondFactor(Object.assign({}, known, { knownDevice: false })), true);
-  assert.equal(needSecondFactor({ alwaysAsk: false, knownDevice: false, baseVerified: true }), true);
-  assert.equal(needSecondFactor(Object.assign({}, known, { revoked: true })), true);
-  assert.equal(needSecondFactor(Object.assign({}, known, { leader: true })), true);
-  assert.equal(needSecondFactor(Object.assign({}, known, { baseVerified: false })), true);
-  assert.equal(needSecondFactor({ codeThisLogin: true, knownDevice: false, baseVerified: false }), false);
+test("the optional code preference never skips mandatory sign-in step-up", () => {
+  var known = { knownDevice: true, knownIp: true, alwaysAsk: false, leader: false, revoked: false, baseVerified: true, codeThisLogin: false };
+  assert.equal(needSecondFactor(Object.assign({}, known, { secondFactor: false })), false);
+  assert.equal(needSecondFactor(Object.assign({}, known, { secondFactor: true })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { alwaysAsk: true, secondFactor: false })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { knownDevice: false, secondFactor: false })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { knownIp: false, secondFactor: false })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { revoked: true, secondFactor: false })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { leader: true, secondFactor: false })), true);
+  assert.equal(needSecondFactor(Object.assign({}, known, { baseVerified: false, secondFactor: false })), true);
+  assert.equal(needSecondFactor({ codeThisLogin: true, knownDevice: false, knownIp: false, baseVerified: false }), false);
 });
 
 test("a code allows five tries and then locks", () => {

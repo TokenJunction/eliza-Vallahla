@@ -45,13 +45,15 @@ function harness(extra) {
   };
 }
 
-function call(path, method, body, env, session, cookie) {
+function call(path, method, body, env, session, cookie, extraHeaders) {
   var headers = {
     origin: "https://valhalla-app.xyz",
-    "content-type": "application/json"
+    "content-type": "application/json",
+    "CF-Connecting-IP": "198.51.100.10"
   };
   if (session) headers.authorization = "Bearer " + session;
   if (cookie) headers.cookie = "vh_device=" + cookie;
+  Object.keys(extraHeaders || {}).forEach(function (name) { headers[name] = extraHeaders[name]; });
   return worker.fetch(new Request("https://auth.test" + path, {
     method: method || "GET",
     headers: headers,
@@ -346,10 +348,15 @@ function googleToken(email) {
   };
 }
 
-test("a recognized device skips the extra code and no device or always-ask does not", async (t) => {
+test("the code opt-out skips only a known device and network", async (t) => {
   var h = harness();
   t.mock.method(globalThis, "fetch", googleToken("ada@example.test"));
   var first = await emailLogin(h, "ada@example.test");
+  var defaults = await call("/auth/devices", "GET", undefined, h.env, first.body.session);
+  assert.equal((await defaults.json()).secondFactor, true);
+  var preference = await call("/auth/security", "POST", { secondFactor: false }, h.env, first.body.session);
+  assert.equal(preference.status, 200);
+  assert.equal((await preference.json()).secondFactor, false);
   var known = await call("/auth/google", "POST", {
     credential: "google-known",
     nonce: await nonce(h.env),
@@ -367,6 +374,15 @@ test("a recognized device skips the extra code and no device or always-ask does 
   assert.equal(accessBody.google, true);
   assert.equal(accessBody.code, false);
   assert.equal(accessBody.leader, false);
+
+  var newNetwork = await call("/auth/google", "POST", {
+    credential: "google-new-network",
+    nonce: await nonce(h.env),
+    alwaysAsk: false
+  }, h.env, "", first.cookie, { "CF-Connecting-IP": "198.51.100.27" });
+  var newNetworkBody = await newNetwork.json();
+  assert.equal(newNetworkBody.needCode, true);
+  assert.equal(newNetworkBody.session, undefined);
 
   var unknown = await call("/auth/google", "POST", {
     credential: "google-unknown",
@@ -388,12 +404,16 @@ test("a leader still needs Google plus the email code on a recognized device", a
   var h = harness();
   t.mock.method(globalThis, "fetch", googleToken(leaderEmail));
   var first = await emailLogin(h, leaderEmail);
+  var preference = await call("/auth/security", "POST", { secondFactor: false }, h.env, first.body.session);
+  assert.equal(preference.status, 200);
   var again = await call("/auth/google", "POST", {
     credential: "google-leader-known",
     nonce: await nonce(h.env),
     alwaysAsk: false
   }, h.env, "", first.cookie);
-  assert.equal((await again.json()).needCode, true);
+  var body = await again.json();
+  assert.equal(body.needCode, true);
+  assert.equal(body.session, undefined);
   t.mock.restoreAll();
 });
 

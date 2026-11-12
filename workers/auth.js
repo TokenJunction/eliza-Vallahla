@@ -141,7 +141,7 @@ function deviceCookie(token) {
 }
 
 async function accountOf(env, emailHash) {
-  return JSON.parse((await env.AUTH_KV.get("acct:" + emailHash)) || "null") || { devices: [], ips: [], signins: [], alwaysAsk: false };
+  return JSON.parse((await env.AUTH_KV.get("acct:" + emailHash)) || "null") || { devices: [], ips: [], signins: [], alwaysAsk: false, secondFactor: true };
 }
 
 async function saveAccount(env, emailHash, account) {
@@ -275,18 +275,20 @@ async function checkCode(env, pending, code) {
 
 async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified) {
   var account = await accountOf(env, emailHash);
-  var ipHash = await sha256(request.headers.get("CF-Connecting-IP") || "none");
+  var clientIp = request.headers.get("CF-Connecting-IP") || "";
+  var ipHash = await sha256(clientIp || "none");
   var existing = await readToken(env.DEVICE_COOKIE_SECRET, cookieHeader(request), env);
   if (existing && existing.use !== "device") existing = null;
   var deviceRevoked = Boolean(existing && await env.AUTH_KV.get("revoked:" + existing.did));
   var knownDevice = Boolean(existing && !deviceRevoked && existing.eh === emailHash && (account.devices || []).some(function (row) { return row.id === existing.did && row.revoked !== true; }));
-  var knownIp = (account.ips || []).indexOf(ipHash) >= 0;
+  var knownIp = Boolean(clientIp) && (account.ips || []).indexOf(ipHash) >= 0;
   var configuredLeader = leaderEmail(env);
   var leader = Boolean(configuredLeader) && safeEqual(emailHash, await sha256(configuredLeader));
   var need = needSecondFactor({
     knownDevice: knownDevice,
     knownIp: knownIp,
     alwaysAsk: account.alwaysAsk === true,
+    secondFactor: account.secondFactor !== false,
     leader: leader,
     revoked: deviceRevoked,
     baseVerified: googleVerified === true || codeThisLogin === true,
@@ -358,7 +360,7 @@ async function sessionFor(env, emailHash, request, codeThisLogin, googleVerified
 }
 
 function leaderEmail(env) {
-  return String(env && env.LEADER_EMAIL ? env.LEADER_EMAIL : "").trim().toLowerCase();
+  return String(env && (env.MASTER_ADMIN_EMAIL || env.LEADER_EMAIL) || "").trim().toLowerCase();
 }
 
 async function isLeader(env, session) {
@@ -627,6 +629,7 @@ export default {
       return json({
         ok: true,
         alwaysAsk: account.alwaysAsk === true,
+        secondFactor: account.secondFactor !== false,
         devices: (account.devices || []).filter(function (row) { return row.revoked !== true; }).map(function (row) {
           return { id: row.id, city: row.city, browser: row.browser, created: row.created, last: row.last, current: row.id === session.did };
         }),
@@ -651,9 +654,14 @@ export default {
     }
     if (url.pathname === "/auth/security" && request.method === "POST") {
       var account = await accountOf(env, session.eh);
-      account.alwaysAsk = body.alwaysAsk === true;
+      if (typeof body.alwaysAsk === "boolean") account.alwaysAsk = body.alwaysAsk;
+      if (typeof body.secondFactor === "boolean") account.secondFactor = body.secondFactor;
       await saveAccount(env, session.eh, account);
-      return json({ ok: true, alwaysAsk: account.alwaysAsk }, 200, request);
+      return json({
+        ok: true,
+        alwaysAsk: account.alwaysAsk === true,
+        secondFactor: account.secondFactor !== false
+      }, 200, request);
     }
     return json({ ok: false, error: "not-found" }, 404, request);
   }

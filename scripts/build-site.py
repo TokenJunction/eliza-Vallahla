@@ -14,7 +14,7 @@ shutil.copytree(
         'bun.lockb', 'render.yaml', 'valhalla-elizaos', 'supabase', 'lib',
         'valhallaQueueEngine.js', 'valhallaQueueEngine.test.cjs',
         'valhallaWorker.js', 'valhallaWorker.test.cjs', 'valhallaRedis.integration.test.cjs',
-        'setup.ps1', 'setup.sh'
+        'setup.ps1', 'setup.sh', 'backend', 'experiments', 'docs'
     )
 )
 
