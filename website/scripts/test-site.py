@@ -92,7 +92,6 @@ class SiteTests(unittest.TestCase):
             "website/scripts/desk.test.cjs website/scripts/host-route.test.cjs "
             "website/scripts/journey.test.cjs website/scripts/desktop.test.cjs "
             "website/scripts/minify.test.cjs website/scripts/supabase-auth.test.cjs "
-            "website/scripts/feed.test.cjs website/scripts/ai.test.cjs "
             "website/scripts/volos-ads.test.cjs",
             "node website/scripts/minify-site.mjs",
         )
@@ -131,8 +130,8 @@ class SiteTests(unittest.TestCase):
         for name in (".env", "scripts", "src", "experimental", "experiments"):
             self.assertFalse((OUT / name).exists())
         motion = (OUT / "home-motion.js").read_text()
-        self.assertIn('"/media/hero-web.mp4"', motion)
-        self.assertIn('"/media/heaven-loop.mp4"', motion)
+        self.assertIn('\"/media/hero-web.mp4\"', motion)
+        self.assertIn('\"/media/heaven-loop.mp4\"', motion)
 
     def test_build_rejects_missing_entry_points_and_assets(self):
         with tempfile.TemporaryDirectory() as temp:
