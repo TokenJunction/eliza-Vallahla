@@ -130,8 +130,8 @@ class SiteTests(unittest.TestCase):
         for name in (".env", "scripts", "src", "experimental", "experiments"):
             self.assertFalse((OUT / name).exists())
         motion = (OUT / "home-motion.js").read_text()
-        self.assertIn('\"/media/hero-web.mp4\"', motion)
-        self.assertIn('\"/media/heaven-loop.mp4\"', motion)
+        self.assertIn('"/media/hero-web.mp4"', motion)
+        self.assertIn('"/media/heaven-loop.mp4"', motion)
 
     def test_build_rejects_missing_entry_points_and_assets(self):
         with tempfile.TemporaryDirectory() as temp:
