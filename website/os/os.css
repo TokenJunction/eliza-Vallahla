@@ -399,7 +399,14 @@ button:focus-visible, select:focus-visible, a:focus-visible, iframe:focus-visibl
 .taskbar-clock { border: 1px solid #423623; color: #d3c7b5; }
 .desktop-heading { pointer-events: auto; }
 .menu-signin { margin-left: 8px; }
-.feed-panel, .ai-panel, .market-panel, .telemetry-panel, .cyber-desk { grid-column: 1 / -1; }
+.feed-panel, .ai-panel, .connections-panel, .market-panel, .telemetry-panel, .cyber-desk { grid-column: 1 / -1; }
+.connections-panel form, .connections-panel fieldset, .connections-panel p, .connections-panel ul { margin: 12px 16px; }
+.desktop-icon[hidden], .start-menu button[hidden], .connections-panel label[hidden] { display: none; }
+.connections-panel form label { display: grid; gap: 4px; margin-top: 8px; }
+.connections-panel fieldset label { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.connections-panel input:not([type="checkbox"]), .connections-panel select { min-width: 0; width: 100%; min-height: 44px; }
+.connections-panel input[type="checkbox"] { width: 18px; height: 18px; }
+.connections-panel pre { margin: 0 16px 16px; overflow-wrap: anywhere; white-space: pre-wrap; }
 #ai-status { margin: 16px 16px 0; color: var(--ink, #f4efe6); font-size: 15px; line-height: 1.5; }
 #ai-reply { margin: 8px 16px 0; color: var(--muted, #b7b0a4); font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 #ai-reply:empty { display: none; }
