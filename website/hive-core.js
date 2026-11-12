@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function (root) {
   function simulate(job) {
     var series = Array.isArray(job && job.series) ? job.series : [];

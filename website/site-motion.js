@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 

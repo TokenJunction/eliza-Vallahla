@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 const { handleFeed } = require('../website/scripts/feed-core.cjs');
 
 module.exports = async function handler(req, res) {

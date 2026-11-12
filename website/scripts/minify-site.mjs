@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 import esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';

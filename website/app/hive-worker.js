@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 onmessage = function (event) {
   var job = event.data && event.data.job;
   var cap = Math.min(50, Math.max(25, Number(event.data && event.data.cap) || 25));

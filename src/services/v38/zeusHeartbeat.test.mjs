@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign,randomUUID} from 'node:crypto';
 import net from 'node:net';

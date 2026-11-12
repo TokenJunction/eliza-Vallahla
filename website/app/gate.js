@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var HUMAN_KEY = "valhalla-human";
   var SESSION_KEY = "valhalla-session";

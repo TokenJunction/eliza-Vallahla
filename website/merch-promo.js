@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var KEY = "valhalla-merch-until";
   var DAYS = 14 * 24 * 60 * 60 * 1000;

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var slot = document.getElementById('valos-ad');
   if (!slot) return;

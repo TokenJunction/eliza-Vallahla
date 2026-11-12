@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var status = document.getElementById('auth-status');
   var google = document.getElementById('google-sign-in');

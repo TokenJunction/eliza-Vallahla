@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 import { createHash, randomUUID, verify } from 'node:crypto';
 export class RoutingError extends Error { constructor(code) { super(code); this.code = code; } }
 const ORDERS = {CHAT:['ollama','workers-ai','groq','deepseek'],TRIAGE:['ollama','workers-ai','groq','deepseek'],EXTRACTION:['ollama','workers-ai','groq','deepseek'],REASONING:['ollama','deepseek','workers-ai','groq'],SEARCH:['sonar']};

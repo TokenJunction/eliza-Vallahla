@@ -1,3 +1,5 @@
+/* Copyright (c) 2026 TokenJunction LLC */
+/* SPDX-License-Identifier: MIT */
 :root { --bg:#0d0c0a; --card:#16140f; --line:#2a261d; --text:#efe9dc; --muted:#a39b88; --amber:#ffb347; --ok:#5fd38d; --bad:#ff6b6b; --warn:#ffd166; }
 * { box-sizing: border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }

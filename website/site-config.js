@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 /* Public site settings. These are not secrets.
    The live Pro checkout is the $9.99/mo launch price.
    Yearly and Lifetime stay hidden until their URLs are pasted here. */

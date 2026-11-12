@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function (root) {
   var SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/+esm';
 

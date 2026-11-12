@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var scene = document.getElementById("hero-scene");
   var video = document.getElementById("hero-video");

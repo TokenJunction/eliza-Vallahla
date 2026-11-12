@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var cfg = window.VALHALLA_SITE || {};
   var price = cfg.PRO_PRICE || "$9.99/mo launch price";

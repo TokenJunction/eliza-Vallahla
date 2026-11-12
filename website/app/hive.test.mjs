@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";

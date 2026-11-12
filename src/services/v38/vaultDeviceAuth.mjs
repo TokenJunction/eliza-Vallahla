@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 // Server-side device-key proof verification. Not WebAuthn and not a session issuer.
 import {randomBytes,createHash,createPublicKey,verify as verifySignature} from 'node:crypto';
 const DOMAIN='ValhallaOS/Web3Vault/device-proof/v1';

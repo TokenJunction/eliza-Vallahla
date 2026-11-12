@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const performance = require("./performance.js");

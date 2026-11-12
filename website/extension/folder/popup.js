@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 const desk = document.getElementById("desk");
 const code = document.getElementById("code");
 const status = document.getElementById("status");

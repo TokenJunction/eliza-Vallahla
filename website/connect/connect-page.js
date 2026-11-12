@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   const params = new URLSearchParams(location.search);
   const which = params.get("wallet") === "solflare" ? "solflare" : "phantom";

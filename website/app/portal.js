@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 fetch("/version.json", { cache: "no-store" }).then(function (res) { return res.ok ? res.json() : null; }).then(function (doc) {
   if (!doc || !doc.version) return;
   var key = "valhalla-portal-version";

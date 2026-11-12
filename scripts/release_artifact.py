@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 TokenJunction LLC
+# SPDX-License-Identifier: MIT
 """Download and assemble a release only from an explicitly reviewed manifest."""
 
 import argparse

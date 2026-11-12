@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 'use strict';
 
 const VOLOS_HOSTS = new Set(['valos.live', 'www.valos.live']);

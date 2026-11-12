@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 TokenJunction LLC
+# SPDX-License-Identifier: MIT
 import importlib.util
 import os
 from pathlib import Path

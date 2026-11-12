@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import test from "node:test";
 import logic from "./yolo-logic.js";

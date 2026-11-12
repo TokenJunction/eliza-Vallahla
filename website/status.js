@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function (root) {
   var NAMES = ["VALHALLA CORE", "MECHA BRAIN", "ASK VALHALLA", "ODIN FEED", "FORGE LAB", "HEIMDALL GATE", "SENTINEL WATCH"];
 

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var desk = document.getElementById('desktop');
   var hold = document.getElementById('session-hold');

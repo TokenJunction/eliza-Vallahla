@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function (root) {
   var LOG = "valhalla-debug-log";
   var restartGoogle = false;

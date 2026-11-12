@@ -1,3 +1,5 @@
+/* Copyright (c) 2026 TokenJunction LLC */
+/* SPDX-License-Identifier: MIT */
 :root {
   --bg: #02070b; --bg-strong: #040b12; --panel: rgba(10, 14, 18, .92); --panel-2: #0b1218; --line: rgba(146, 162, 168, .22);
   --amber: #ffb250; --amber2: #ffc66d; --green: #2ff3b3; --green-strong: #0fe7a1; --red: #ff5d6c; --muted: #7b8c95; --text: #e7f0f3;

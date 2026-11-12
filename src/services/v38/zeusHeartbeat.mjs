@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 import { randomUUID, sign, verify } from "node:crypto";
 import { ZeusOrchestrator } from "./foundation.mjs";
 

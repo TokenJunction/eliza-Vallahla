@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 import test from 'node:test';import assert from 'node:assert/strict';import {generateKeyPairSync,sign,randomBytes} from 'node:crypto';
 import {generatePolyglotSignature} from './polyglotExperiment.mjs';import {createVaultDeviceAuth,createRedisChallengeStore} from './vaultDeviceAuth.mjs';
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json'}});

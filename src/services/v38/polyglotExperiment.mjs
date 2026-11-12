@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 // Experimental linguistic transform only. NOT a KDF, credential, or signature.
 export const POLYGLOT_SECURITY_NOTICE='Non-secret inputs only; never grants authentication or vault access.';
 const MODEL='qwen3.8:27b',ENDPOINT='http://127.0.0.1:11434/api/chat';

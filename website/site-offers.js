@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 /* Renders offers.json. A row with an empty url stays a label, not a link. */
 (function () {
   var LABEL = "Affiliate link · we may earn a commission";

@@ -1,3 +1,5 @@
+# Copyright (c) 2026 TokenJunction LLC
+# SPDX-License-Identifier: MIT
 from html.parser import HTMLParser
 from pathlib import Path
 import functools

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 const { next, rewrite } = require('@vercel/functions');
 const { routeForHost } = require('./host-route.cjs');
 

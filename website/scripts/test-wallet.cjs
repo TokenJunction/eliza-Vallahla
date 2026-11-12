@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 const assert = require('node:assert/strict');
 const core = require('../../site-build/connect-core.js');
 (async () => {

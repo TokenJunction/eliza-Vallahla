@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 TokenJunction LLC
+# SPDX-License-Identifier: MIT
 """Boot the actual ISO and require serial evidence plus QEMU's debug-exit status."""
 import argparse
 from pathlib import Path

@@ -1,3 +1,5 @@
+/* Copyright (c) 2026 TokenJunction LLC */
+/* SPDX-License-Identifier: MIT */
 :root { color-scheme: dark; font-family: var(--font, "Segoe UI", Tahoma, sans-serif); color: var(--ink, #f4efe6); background: var(--bg, #090a0c); }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg, #090a0c); }

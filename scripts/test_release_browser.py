@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 TokenJunction LLC
+# SPDX-License-Identifier: MIT
 """Optional local Chromium smoke test using only synthetic release fixtures."""
 
 import functools

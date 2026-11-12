@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var MAX_TOKENS = 10;
   var SOL_ADDRESS = "So11111111111111111111111111111111111111112";

@@ -1,3 +1,5 @@
+# Copyright (c) 2026 TokenJunction LLC
+# SPDX-License-Identifier: MIT
 import json
 import os
 from pathlib import Path

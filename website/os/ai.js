@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function () {
   var form = document.getElementById('ai-form');
   var status = document.getElementById('ai-status');

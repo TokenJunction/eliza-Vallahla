@@ -1,3 +1,5 @@
+// Copyright (c) 2026 TokenJunction LLC
+// SPDX-License-Identifier: MIT
 (function (root, factory) {
   var logic = factory();
   if (typeof module !== "undefined" && module.exports) module.exports = logic;

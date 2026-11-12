@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 TokenJunction LLC
+# SPDX-License-Identifier: MIT
 """Boot the actual ISO; fail on panic, hang, missing milestones, or bad exit."""
 import argparse
 from pathlib import Path
