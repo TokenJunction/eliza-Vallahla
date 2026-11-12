@@ -1,0 +1,73 @@
+name: PR checks
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  pr-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Fetch the base tip
+        env:
+          GIT_TOKEN: ${{ github.token }}
+        run: |
+          auth=$(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 -w 0)
+          git -c "http.extraheader=AUTHORIZATION: basic ${auth}" fetch --no-tags --filter=blob:none --depth=50 "https://github.com/${GITHUB_REPOSITORY}.git" "${{ github.event.pull_request.base.sha }}:refs/remotes/origin/pr-base"
+          unset auth
+          if git config --get-regexp 'http\..*\.extraheader' >/dev/null 2>&1; then
+            echo "Git credentials were left in config." >&2
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install and run tests
+        run: |
+          npm ci
+          bash website/scripts/vercel-build.sh
+      - name: Reject secret patterns in public files
+        run: bash scripts/pr-public-secret-scan.sh
+      - name: Install gitleaks
+        run: |
+          curl -sSfL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          install gitleaks /usr/local/bin/gitleaks
+      - name: Fail on a secret in the pull request diff
+        run: |
+          if ! MB=$(git merge-base HEAD refs/remotes/origin/pr-base); then
+            echo "### Gitleaks" >> "$GITHUB_STEP_SUMMARY"
+            echo "Stopped. The pull request head and the base tip were not connected in the shallow fetch, so the diff was not scanned. The full history was not fetched." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "merge-base $MB"
+          set +e
+          gitleaks detect --source . --config .gitleaks.toml --redact --no-banner --exit-code 1 --log-opts="${MB}..HEAD" > /tmp/gitleaks.txt 2>&1
+          code=$?
+          set -e
+          {
+            echo "### Gitleaks"
+            echo
+            echo "Range: \`${MB}..HEAD\` (pull request commits only)"
+            echo
+            echo '```'
+            cat /tmp/gitleaks.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$code"
