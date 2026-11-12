@@ -71,7 +71,9 @@
         return;
       }
       if (reply) reply.textContent = body.reply;
-      show('Reply received. Not financial advice.', 'CONNECTED');
+      var names = { byok: 'your key', huggingface: 'Hugging Face', openrouter: 'OpenRouter', overseer: 'the overseer node', gpu: 'the GPU node' };
+      var who = names[body.provider] || 'the assistant';
+      show('Reply received from ' + who + '. Not financial advice.', 'CONNECTED');
     } catch (error) {
       show('Assistant not connected', 'NOT CONNECTED');
     } finally {

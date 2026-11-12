@@ -5,6 +5,7 @@ module.exports = async function handler(req, res) {
   const result = await handleAi({
     method: req.method,
     headers: req.headers || {},
+    url: req.url || '',
     body: raw
   }, process.env, fetch);
   res.statusCode = result.status;

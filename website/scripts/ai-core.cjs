@@ -1,6 +1,7 @@
 'use strict';
 
 const { publicSupabase } = require('./feed-core.cjs');
+const { routeChat, providerHealth, capUsd } = require('./einherjar-core.cjs');
 
 const DEFAULT_MODEL = 'nvidia/nemotron-3.5-lightning:free';
 const FALLBACK_MODEL = 'google/gemma-4-31b-it:free';
@@ -83,35 +84,28 @@ function messageFrom(raw) {
   return { message: message, model: payload.model || DEFAULT_MODEL };
 }
 
-async function complete(key, model, message, fetchImpl) {
-  if (!allowedModel(model)) return { rejected: true };
-  const response = await fetchImpl('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer ' + key,
-      'content-type': 'application/json',
-      'HTTP-Referer': 'https://valhalla-app.xyz',
-      'X-Title': 'ValhallaOS'
-    },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: MAX_TOKENS,
-      messages: [
-        { role: 'system', content: SYSTEM },
-        { role: 'user', content: message }
-      ]
-    })
-  });
-  if (!response) return { reply: '' };
-  if (response.status === 429) return { limited: true, reply: '' };
-  if (!response.ok) return { reply: '' };
-  const body = await response.json();
-  const text = body && body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;
-  return { reply: typeof text === 'string' ? text.trim() : '' };
+function providerReady(env) {
+  const source = env || {};
+  const openrouter = String(env && env.OPENROUTER_API_KEY || '');
+  return Boolean(
+    openrouter ||
+    source.HF_TOKEN ||
+    source.AI_BYOK_ENC_KEY ||
+    (source.OVERSEER_NODE_URL && source.RELAY_SIGN_PRIVATE && source.OVERSEER_AGREE_PUBLIC) ||
+    (source.GPU_NODE_URL && source.GPU_NODE_KEY && capUsd(source) > 0)
+  );
+}
+
+function leaks(text, env) {
+  const source = env || {};
+  return [source.OPENROUTER_API_KEY, source.HF_TOKEN, source.GPU_NODE_KEY, source.AI_BYOK_ENC_KEY, source.RELAY_SIGN_PRIVATE, source.OVERSEER_AGREE_PUBLIC]
+    .filter(Boolean)
+    .some(function (secret) { return String(text).includes(secret); });
 }
 
 async function handleAi(req, env, fetchImpl, now) {
-  if (!req || req.method !== 'POST') return { status: 405, body: { error: 'Method not allowed.' } };
+  const health = Boolean(req && req.method === 'GET' && /\/health|view=health/.test(String(req.url || '')));
+  if (!req || (req.method !== 'POST' && !health)) return { status: 405, body: { error: 'Method not allowed.' } };
   const token = bearer(req.headers);
   if (!token) return { status: 401, body: { error: 'Sign-in required.' } };
   let user;
@@ -121,24 +115,32 @@ async function handleAi(req, env, fetchImpl, now) {
     return { status: 401, body: { error: 'Sign-in required.' } };
   }
   if (!user) return { status: 401, body: { error: 'Sign-in required.' } };
-  const parsed = messageFrom(req.body);
-  if (parsed.error) return parsed.error;
-  const key = String(env && env.OPENROUTER_API_KEY || '');
-  if (!key) return { status: 503, body: { error: 'AI not configured' } };
+  let parsed = null;
+  if (!health) {
+    parsed = messageFrom(req.body);
+    if (parsed.error) return parsed.error;
+    if (!providerReady(env)) return { status: 503, body: { error: 'AI not configured' } };
+  }
   if (!allow(user.id, now || Date.now())) return { status: 429, body: { error: 'Too many assistant requests.' } };
   try {
-    let used = parsed.model;
-    let result = await complete(key, used, parsed.message, fetchImpl);
-    if (result.rejected) return { status: 400, body: { error: 'Model not allowed.' } };
-    const next = used === DEFAULT_MODEL ? FALLBACK_MODEL : (used === FALLBACK_MODEL ? DEFAULT_MODEL : '');
-    if ((!result.reply || result.limited) && next) {
-      used = next;
-      result = await complete(key, used, parsed.message, fetchImpl);
+    if (health) {
+      const report = await providerHealth(env || {}, user, fetchImpl);
+      if (leaks(JSON.stringify(report), env)) return { status: 502, body: { error: 'Assistant not connected' } };
+      return { status: 200, body: report };
     }
-    if (result && result.limited && !result.reply) return { status: 429, body: { error: 'The free model is busy. Try again shortly.' } };
-    if (!result || result.rejected || !result.reply) return { status: 502, body: { error: 'Assistant not connected' } };
-    if (result.reply.includes(key)) return { status: 502, body: { error: 'Assistant not connected' } };
-    return { status: 200, body: { reply: result.reply, model: used } };
+    const routed = await routeChat({
+      env: env || {},
+      user: user,
+      fetchImpl: fetchImpl,
+      message: parsed.message,
+      model: parsed.model,
+      fallbackModel: parsed.model === DEFAULT_MODEL ? FALLBACK_MODEL : DEFAULT_MODEL,
+      system: SYSTEM,
+      maxTokens: MAX_TOKENS
+    });
+    if (routed.busy && !routed.reply) return { status: 429, body: { error: 'The free model is busy. Try again shortly.' } };
+    if (!routed.reply || leaks(routed.reply, env)) return { status: 502, body: { error: 'Assistant not connected' } };
+    return { status: 200, body: { reply: routed.reply, model: routed.model, provider: routed.provider } };
   } catch (error) {
     return { status: 502, body: { error: 'Assistant not connected' } };
   }
