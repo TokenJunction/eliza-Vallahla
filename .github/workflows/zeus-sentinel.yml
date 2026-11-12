@@ -1,0 +1,66 @@
+name: Zeus Sentinel
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
+
+jobs:
+  sentinel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Restore the rollback clock
+        id: clock
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: .zeus-state
+          key: zeus-state-${{ github.run_id }}
+          restore-keys: |
+            zeus-state-
+      - name: Read the restored clock
+        run: |
+          mkdir -p .zeus-state
+          if [ "${{ steps.clock.outcome }}" != "success" ]; then
+            echo "ZEUS_STATE_READ=error" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ -f .zeus-state/state.json ]; then
+            echo "ZEUS_STATE_READ=hit" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "ZEUS_STATE_READ=miss" >> "$GITHUB_ENV"
+      - name: Check the site and reserve a rollback
+        id: plan
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ZEUS_LAST_VERIFIED_DEPLOYMENT: ${{ vars.ZEUS_LAST_VERIFIED_DEPLOYMENT }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ZEUS_STATE_PATH: .zeus-state/state.json
+        run: node scripts/zeus-sentinel.mjs plan
+      - name: Save the rollback clock
+        id: save-clock
+        if: steps.plan.outputs.promote == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .zeus-state
+          key: zeus-state-${{ github.run_id }}
+      - name: Promote the verified deployment
+        if: steps.plan.outputs.promote == 'true' && steps.save-clock.outcome == 'success'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ZEUS_LAST_VERIFIED_DEPLOYMENT: ${{ vars.ZEUS_LAST_VERIFIED_DEPLOYMENT }}
+          ZEUS_STATE_PATH: .zeus-state/state.json
+        run: node scripts/zeus-sentinel.mjs promote
