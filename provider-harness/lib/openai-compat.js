@@ -8,6 +8,11 @@ const {
   readEnvKey,
 } = require('./contracts');
 const { parseOpenAIChatBody, parseGeminiNativeBody, parseModelsListing } = require('./parse');
+const {
+  MAX_MODEL_LIST_RESPONSE_BYTES,
+  MAX_PROVIDER_RESPONSE_BYTES,
+  readBoundedText,
+} = require('./response-body');
 
 function missingCredential(providerId) {
   return {
@@ -104,7 +109,19 @@ async function chatOpenAICompat(providerId, opts = {}) {
     };
   }
 
-  const text = await response.text();
+  let text;
+  try {
+    text = await readBoundedText(response, MAX_PROVIDER_RESPONSE_BYTES);
+  } catch (err) {
+    return {
+      ok: false,
+      status: 'unavailable',
+      reason: err && err.code === 'response_too_large' ? 'response_too_large' : 'provider_unavailable',
+      content: null,
+      request,
+      provider: providerId,
+    };
+  }
   const parsed = parseOpenAIChatBody(text, { maxTokens });
   return {
     ...parsed,
@@ -165,7 +182,19 @@ async function chatGeminiNative(opts = {}) {
   if (!response || !response.ok) {
     return { ok: false, status: 'unavailable', reason: 'http_error', content: null, request, httpStatus: response && response.status };
   }
-  const text = await response.text();
+  let text;
+  try {
+    text = await readBoundedText(response, MAX_PROVIDER_RESPONSE_BYTES);
+  } catch (err) {
+    return {
+      ok: false,
+      status: 'unavailable',
+      reason: err && err.code === 'response_too_large' ? 'response_too_large' : 'provider_unavailable',
+      content: null,
+      request,
+      provider: 'gemini_native',
+    };
+  }
   const parsed = parseGeminiNativeBody(text);
   return { ...parsed, request, provider: 'gemini_native', calledUrl: url, intendedBody: body };
 }
@@ -194,7 +223,17 @@ async function listOpenAIModels(providerId, opts = {}) {
   if (!response || !response.ok) {
     return { ok: false, reason: 'http_error', models: [], generationAuthorized: false };
   }
-  const text = await response.text();
+  let text;
+  try {
+    text = await readBoundedText(response, MAX_MODEL_LIST_RESPONSE_BYTES);
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err && err.code === 'response_too_large' ? 'response_too_large' : 'unreachable',
+      models: [],
+      generationAuthorized: false,
+    };
+  }
   const listing = parseModelsListing(text, 'openai');
   return { ...listing, generationAuthorized: false, url: spec.modelsUrl };
 }

@@ -81,6 +81,17 @@ test('deepseek env model is used; missing model/key unavailable; no invented def
   assert.equal(ok.content, 'ZED99');
 });
 
+test('oversized OpenAI-compatible provider bodies stay unavailable', async () => {
+  const result = await chatDeepSeek({
+    fetchImpl: async () => new Response('x'.repeat(1024 * 1024 + 1)),
+    env: envDeepseek,
+    prompt: PROMPT,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'response_too_large');
+  assert.equal(result.content, null);
+});
+
 test('mistral env route validation and chat success', async () => {
   const { fetchImpl, calls } = createFetchMock((entry, jsonResponse) => {
     assert.equal(entry.url, 'https://api.mistral.ai/v1/chat/completions');

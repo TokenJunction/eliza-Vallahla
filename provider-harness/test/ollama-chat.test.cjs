@@ -39,6 +39,17 @@ test('ollama /api/chat success parses message.content and matches request body',
   assert.equal(JSON.stringify(result.intendedBody), calls[0].body);
 });
 
+test('oversized local Ollama chat bodies stay unavailable', async () => {
+  const result = await chat({
+    fetchImpl: async () => new Response('x'.repeat(1024 * 1024 + 1)),
+    prompt: PROMPT,
+    env: {},
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'response_too_large');
+  assert.equal(result.content, null);
+});
+
 test('ollama whitespace-only and empty content are unavailable', () => {
   assert.equal(parseOllamaChatBody(JSON.stringify({
     message: { role: 'assistant', content: '   ' },

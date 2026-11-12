@@ -11,6 +11,11 @@ const {
   PROVIDERS,
 } = require('./contracts');
 const { parseOllamaChatBody, parseModelsListing } = require('./parse');
+const {
+  MAX_MODEL_LIST_RESPONSE_BYTES,
+  MAX_PROVIDER_RESPONSE_BYTES,
+  readBoundedText,
+} = require('./response-body');
 
 /**
  * Customer-PC / relay-side Ollama adapter.
@@ -105,7 +110,19 @@ async function chat(opts = {}) {
     };
   }
 
-  const text = await response.text();
+  let text;
+  try {
+    text = await readBoundedText(response, MAX_PROVIDER_RESPONSE_BYTES);
+  } catch (err) {
+    return {
+      ok: false,
+      status: 'unavailable',
+      reason: err && err.code === 'response_too_large' ? 'response_too_large' : 'provider_unavailable',
+      content: null,
+      request,
+      httpStatus: response.status,
+    };
+  }
   const parsed = parseOllamaChatBody(text, { maxTokens });
   return {
     ...parsed,
@@ -138,7 +155,18 @@ async function listModels(opts = {}) {
   if (!response || !response.ok) {
     return { ok: false, reason: 'http_error', models: [], generationAuthorized: false, url };
   }
-  const text = await response.text();
+  let text;
+  try {
+    text = await readBoundedText(response, MAX_MODEL_LIST_RESPONSE_BYTES);
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err && err.code === 'response_too_large' ? 'response_too_large' : 'unreachable',
+      models: [],
+      generationAuthorized: false,
+      url,
+    };
+  }
   const listing = parseModelsListing(text, 'ollama_tags');
   return { ...listing, url, generationAuthorized: false };
 }
