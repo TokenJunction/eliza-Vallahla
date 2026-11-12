@@ -47,7 +47,7 @@ function run(file, config, fetchImpl) {
     Date: Date,
     encodeURIComponent: encodeURIComponent
   });
-  return { nodes: nodes, windowHandlers: windowHandlers };
+  return { nodes: nodes, windowHandlers: windowHandlers, get: document.getElementById };
 }
 
 test('the desk asks the configured deployment for an assistant reply', async () => {
@@ -56,7 +56,7 @@ test('the desk asks the configured deployment for an assistant reply', async () 
     calls.push(String(url));
     return { status: 200, ok: true, json: async () => ({ reply: 'answer' }) };
   });
-  harness.nodes['ai-input'].value = 'What is the desk?';
+  harness.get('ai-input').value = 'What is the desk?';
   await harness.nodes['ai-form'].handlers.submit[0]({ preventDefault() {} });
   assert.deepEqual(calls, [API + '/api/ai']);
   assert.equal(harness.nodes['ai-reply'].textContent, 'answer');
@@ -79,7 +79,7 @@ test('an empty API_URL keeps both calls on the same origin', async () => {
     calls.push(String(url));
     return { status: 200, ok: true, json: async () => ({ reply: 'answer' }) };
   });
-  harness.nodes['ai-input'].value = 'Hello';
+  harness.get('ai-input').value = 'Hello';
   await harness.nodes['ai-form'].handlers.submit[0]({ preventDefault() {} });
   assert.deepEqual(calls, ['/api/ai']);
 });
