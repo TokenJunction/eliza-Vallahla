@@ -1,0 +1,7 @@
+{
+  "updater": "not-connected",
+  "live": false,
+  "reason": "No updater process reported a successful health probe. This static file is not a running hive.",
+  "channels": ["akershus", "zeus"],
+  "check": "GET /updates/health.json"
+}
