@@ -19,13 +19,23 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "site-build"
 
 
+BUILD_SITE_STEP = "python3 website/scripts/build-site.py"
+
+
 def build_command_steps(script):
-    chain = next(
+    matches = [
         line.strip()
         for line in script.splitlines()
-        if line.strip().startswith("python3 website/scripts/build-site.py")
-    )
-    return [step.strip() for step in chain.split("&&") if step.strip()]
+        if line.strip().startswith(BUILD_SITE_STEP)
+    ]
+    if not matches:
+        raise ValueError(f"build script is missing the {BUILD_SITE_STEP!r} step")
+    if len(matches) > 1:
+        raise ValueError(f"build script has more than one {BUILD_SITE_STEP!r} step")
+    steps = [step.strip() for step in matches[0].split("&&")]
+    if any(not step for step in steps):
+        raise ValueError(f"build script has an empty command step: {matches[0]!r}")
+    return steps
 
 
 def assert_minified_pages_keep_doctype(directory):
@@ -143,6 +153,37 @@ class SiteTests(unittest.TestCase):
         self.assertNotIn("will pump", volos.lower())
         self.assertNotIn("github.com", volos.lower())
         self.assertNotRegex(volos, r"0x[0-9a-fA-F]{40}")
+
+    def test_build_step_parser_returns_chained_steps(self):
+        script = (
+            "#!/usr/bin/env bash\n"
+            "set -e\n"
+            "python3 website/scripts/build-site.py && node a.js && python3 b.py\n"
+        )
+        self.assertEqual(
+            build_command_steps(script),
+            ["python3 website/scripts/build-site.py", "node a.js", "python3 b.py"],
+        )
+
+    def test_build_step_parser_rejects_malformed_scripts(self):
+        with self.subTest("missing build step"):
+            with self.assertRaisesRegex(
+                ValueError, r"missing the 'python3 website/scripts/build-site\.py' step"
+            ):
+                build_command_steps("node website/scripts/minify-site.mjs\n")
+        with self.subTest("empty command step"):
+            with self.assertRaisesRegex(ValueError, "empty command step"):
+                build_command_steps(
+                    "python3 website/scripts/build-site.py && && node a.js\n"
+                )
+        with self.subTest("duplicate build step"):
+            with self.assertRaisesRegex(
+                ValueError, r"more than one 'python3 website/scripts/build-site\.py' step"
+            ):
+                build_command_steps(
+                    "python3 website/scripts/build-site.py && node a.js\n"
+                    "python3 website/scripts/build-site.py && node b.js\n"
+                )
 
     def test_minified_pages_keep_doctype(self):
         with tempfile.TemporaryDirectory() as temp:
