@@ -3,102 +3,123 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#07110e">
-  <meta name="description" content="volOS is a planned token that has not been released. No contract address is published. This page is not an offer and does not promise a price increase.">
+  <meta name="theme-color" content="#090a0c">
+  <meta name="description" content="Official valOS token page. Name ValhallaOS. Live trading on this page is off. Not financial advice.">
   <link rel="canonical" href="https://valos.live/">
   <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
-  <title>volOS — pre-launch</title>
+  <link rel="stylesheet" href="/visual.css">
+  <title>valOS — ValhallaOS</title>
   <style>
-    :root { color-scheme: dark; }
     * { box-sizing: border-box; }
     html, body { margin: 0; }
-    body {
-      min-height: 100vh;
-      background:
-        radial-gradient(ellipse 60% 40% at 0% 0%, rgba(80, 220, 160, .12), transparent 28rem),
-        radial-gradient(ellipse 40% 30% at 100% 10%, rgba(226, 176, 85, .12), transparent 24rem),
-        #07110e;
-      color: #f4f7f2;
-      font-family: "Segoe UI", Tahoma, sans-serif;
-    }
-    a { color: #e2b055; }
-    a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #f3e0b0; outline-offset: 3px; }
-    .wrap { width: min(1100px, calc(100% - 28px)); margin: 0 auto; padding: 22px 0 56px; }
-    header, .station { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .mark { display: inline-flex; align-items: center; gap: 10px; color: inherit; font-weight: 750; letter-spacing: .06em; text-decoration: none; }
-    .mark b { color: #8ef0c2; }
-    .mark span { color: #e2b055; }
-    .pill, .signin { min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 999px; }
-    .pill { border: 1px solid rgba(142, 240, 194, .45); color: #c9ffe6; letter-spacing: .12em; text-transform: uppercase; font-size: 12px; }
-    .signin { background: #e2b055; color: #1a1408; font-weight: 750; text-decoration: none; }
-    h1 { margin: 22px 0 8px; font-size: clamp(48px, 10vw, 84px); line-height: .9; letter-spacing: -.04em; }
-    h1 b { color: #8ef0c2; font-weight: 650; }
-    h1 span { color: #e2b055; }
-    .lede { max-width: 40rem; margin: 0 0 18px; color: #d5e4da; font-size: 18px; line-height: 1.5; }
-    .grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, .8fr); gap: 12px; }
-    article { padding: 16px; border: 1px solid rgba(142, 240, 194, .22); border-radius: 16px; background: rgba(8, 20, 16, .9); }
-    h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #b7f5d4; }
-    p { margin: 0; line-height: 1.5; }
-    .chart { width: 100%; height: 180px; margin-top: 8px; border: 1px solid rgba(142, 240, 194, .2); border-radius: 12px; background: #06110d; }
-    .slot, label { display: block; }
-    .slot, input, button { min-height: 44px; }
-    input, button { width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(142, 240, 194, .3); background: #06110d; color: #f4f7f2; font: inherit; }
-    button { background: #143028; color: #9eb0a6; cursor: not-allowed; }
-    .stack { display: grid; gap: 12px; margin-top: 12px; }
-    .risk { border-color: rgba(226, 176, 85, .4); }
-    footer { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-top: 18px; color: #d5e4da; }
-    footer a { min-height: 44px; display: inline-flex; align-items: center; }
+    body { min-height: 100vh; }
+    a { color: var(--ink); }
+    a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .wrap { width: min(640px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 56px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .mark { color: var(--ink); font-size: 13px; font-weight: 650; letter-spacing: .14em; text-decoration: none; }
+    .mark span { color: var(--gold); }
+    .pill { min-height: 32px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--gold); letter-spacing: .06em; text-transform: uppercase; font-size: 11px; }
+    h1 { margin: 28px 0 8px; font-size: var(--title); font-weight: 650; line-height: 1.1; letter-spacing: 0; }
+    h1 span { color: var(--gold); }
+    .lede, p { margin: 0; line-height: 1.5; }
+    .lede { max-width: 38rem; margin-bottom: 8px; color: var(--muted); font-size: var(--small); }
+    article { margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    h2 { margin: 0 0 12px; font-size: 13px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    dl { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 10px 12px; margin: 0; }
+    dt { color: var(--muted); font-size: var(--small); }
+    dd { margin: 0; overflow-wrap: anywhere; }
+    .contract { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-family: ui-monospace, "Cascadia Mono", monospace; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+    .copy { min-height: 44px; margin-top: 12px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--gold); color: var(--gold-ink); font: inherit; font-size: var(--small); font-weight: 650; cursor: pointer; }
+    .links { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .links a { min-height: 44px; display: flex; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); text-decoration: none; }
+    .links a:hover { border-color: var(--gold); }
+    .risk p + p { margin-top: 8px; }
+    button.swap { width: 100%; min-height: 44px; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--muted); font: inherit; cursor: not-allowed; }
+    .ad-slot { margin-top: 20px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .ad-slot[hidden] { display: none; }
+    .ad-label { margin: 0 0 8px; color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .ad-slot .adsbygoogle { display: block; width: 100%; max-width: 100%; min-height: 90px; overflow: hidden; }
+    footer { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; margin-top: 20px; color: var(--muted); font-size: var(--small); }
+    footer a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 10px; background: var(--gold); color: var(--gold-ink); font-weight: 650; text-decoration: none; }
     @media (max-width: 800px) {
-      header, .station { align-items: flex-start; flex-wrap: wrap; }
-      .grid { grid-template-columns: 1fr; }
-      .lede { font-size: 16px; }
+      .wrap { width: min(640px, calc(100% - 24px)); }
+      header { align-items: flex-start; }
+      dl { grid-template-columns: 1fr; gap: 2px 0; }
+      dl div, dl dt, dl dd { min-width: 0; }
+      dd { margin-bottom: 8px; }
+      .copy { width: 100%; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <a class="mark" href="#station">vol<span>OS</span></a>
-      <p class="pill">Pre-launch</p>
+      <a class="mark" href="#station">val<span>OS</span></a>
+      <p class="pill">Live trading off</p>
     </header>
     <main id="station">
-      <h1><b>vol</b><span>OS</span></h1>
-      <p class="lede">A token the owner plans to release later. It is not released, nothing on this page is for sale, and no pool is linked.</p>
-      <div class="grid">
-        <article aria-labelledby="chart-title">
-          <h2 id="chart-title">Chart</h2>
-          <p>Illustration only. No price, volume, or supply figure is connected.</p>
-          <svg class="chart" viewBox="0 0 640 180" role="img" aria-label="Decorative curve. No market data is shown.">
-            <path d="M16 140 C 120 140, 180 120, 240 100 S 360 40, 470 70 600 36 624 48" fill="none" stroke="#8ef0c2" stroke-width="3"/>
-          </svg>
-        </article>
-        <article aria-labelledby="swap-title">
-          <h2 id="swap-title">Swap</h2>
-          <p>Unavailable. volOS is not released, and this page cannot trade.</p>
-          <label>You pay <input value="Not available" disabled></label>
-          <label>You receive <input value="Not available" disabled></label>
-          <button type="button" disabled>Swap unavailable</button>
-        </article>
-      </div>
-      <div class="stack">
-        <article aria-labelledby="contract-title">
-          <h2 id="contract-title">Official contract</h2>
-          <p id="official-contract" class="slot">Not published. The contract address will be added on this page when the owner releases it.</p>
-        </article>
-        <article aria-labelledby="link-title">
-          <h2 id="link-title">Official link</h2>
-          <p id="official-link" class="slot">Not published. An official link will be added here later. This page does not link to a trading venue.</p>
-        </article>
-        <article class="risk" aria-labelledby="risk-title">
-          <h2 id="risk-title">Risk</h2>
-          <p>Crypto assets can fall to zero. This page is not financial advice, not an offer to sell, and it does not promise that volOS will rise in price or that a launch will happen on any date.</p>
-        </article>
-      </div>
+      <h1>val<span>OS</span></h1>
+      <p class="lede">Official token record for ValhallaOS. This page does not trade.</p>
+      <article aria-labelledby="facts-title">
+        <h2 id="facts-title">Record</h2>
+        <dl>
+          <dt>Name</dt><dd>ValhallaOS</dd>
+          <dt>Ticker</dt><dd>valOS</dd>
+          <dt>Supply</dt><dd>1,000,000,000</dd>
+          <dt>Standard</dt><dd>Token-2022 on Solana</dd>
+          <dt>Mint authority</dt><dd>Revoked</dd>
+          <dt>Freeze authority</dt><dd>Revoked</dd>
+          <dt>Dev tokens</dt><dd>1,564,344.31 valOS locked with Jupiter Lock</dd>
+        </dl>
+      </article>
+      <article aria-labelledby="contract-title">
+        <h2 id="contract-title">Official contract</h2>
+        <p id="official-contract" class="contract">AwRR84BRbzPKSvWnw4BBNYmFYmRdRTBkLxCiKzTvpump</p>
+        <button class="copy" id="copy-contract" type="button">Copy contract</button>
+      </article>
+      <article aria-labelledby="link-title">
+        <h2 id="link-title">Links</h2>
+        <ul class="links" id="official-link">
+          <li><a href="https://pump.fun/coin/AwRR84BRbzPKSvWnw4BBNYmFYmRdRTBkLxCiKzTvpump">Pump.fun</a></li>
+          <li><a href="https://solscan.io/token/AwRR84BRbzPKSvWnw4BBNYmFYmRdRTBkLxCiKzTvpump">Solscan</a></li>
+          <li><a href="https://dexscreener.com/solana/fwrzklr118ppxyoj4lsh317rrfjaduhatmnayezbgr5j">DexScreener</a></li>
+          <li><a href="https://solscan.io/tx/jFgUp1TvrvAf6BvJxUVQ3PNiuXYDSekedWyLqgGvHnLVUxNjFuYsBjMX3xXWfbmwGbWjVpa2Gg6cDngDVjaBTa1">Jupiter Lock proof</a></li>
+        </ul>
+      </article>
+      <article aria-labelledby="swap-title">
+        <h2 id="swap-title">Swap</h2>
+        <p>Live trading on this page is off.</p>
+        <button class="swap" type="button" disabled>Swap unavailable</button>
+      </article>
+      <article class="risk" aria-labelledby="risk-title">
+        <h2 id="risk-title">Risk</h2>
+        <p>Crypto assets can fall to zero.</p>
+        <p>Not financial advice. Holding the coin is not a promise of profit, yield, or a payout.</p>
+      </article>
     </main>
+    <aside id="valos-ad" class="ad-slot" hidden>
+      <p class="ad-label">Advertisement</p>
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-6504655762357230" data-ad-format="auto" data-full-width-responsive="true"></ins>
+    </aside>
     <footer>
-      <a class="signin" href="https://valhalla-app.xyz/">ValhallaOS workspace</a>
+      <a href="https://valhalla-app.xyz/">ValhallaOS workspace</a>
       <p>A separate product. Live trading there is off.</p>
     </footer>
   </div>
+  <script src="/site-config.js" defer></script>
+  <script src="/volos/ads.js" defer></script>
+  <script>
+    document.getElementById('copy-contract').addEventListener('click', function () {
+      var text = document.getElementById('official-contract').textContent.trim();
+      var button = this;
+      function done(message) { button.textContent = message; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done('Copied'); }, function () { done('Copy failed'); });
+      } else {
+        done('Copy failed');
+      }
+    });
+  </script>
 </body>
 </html>
