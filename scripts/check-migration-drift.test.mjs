@@ -364,6 +364,13 @@ test('checkMigrationDrift follows a recorded table moved to another schema', asy
   });
 });
 
+test('checkMigrationDrift fails when the migrations directory is missing', async () => {
+  await assert.rejects(
+    () => runCheck(path.join(tmpdir(), 'migration-drift-directory-does-not-exist')),
+    /Migrations directory not found/,
+  );
+});
+
 test('checkMigrationDrift fails pending migrations before checking schema', async () => {
   let queried = false;
   await withMigrations({

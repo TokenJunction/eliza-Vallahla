@@ -466,7 +466,9 @@ async function readLocalMigrations(directory) {
   try {
     entries = await readdir(directory, { withFileTypes: true });
   } catch (error) {
-    if (error.code === 'ENOENT') return [];
+    if (error.code === 'ENOENT') {
+      throw new Error(`Migrations directory not found: ${directory}`);
+    }
     throw error;
   }
 
