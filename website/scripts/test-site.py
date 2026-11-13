@@ -28,6 +28,21 @@ def build_command_steps(script):
     return [step.strip() for step in chain.split("&&") if step.strip()]
 
 
+def assert_minified_pages_keep_doctype(directory):
+    """Fail if any minified HTML page does not begin with an HTML5 doctype."""
+    pages = sorted(Path(directory).rglob("*.html"))
+    if not pages:
+        raise AssertionError("no HTML pages found after minification")
+    for page in pages:
+        relative = page.relative_to(directory)
+        text = page.read_text(encoding="utf-8")
+        if text.startswith("google-site-verification:"):
+            continue
+        content = text.lstrip("\ufeff")
+        if not re.match(r"(?i)^<!doctype\s+html\s*>", content):
+            raise AssertionError(f"{relative} lost its doctype after minification")
+
+
 class Assets(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -147,18 +162,26 @@ class SiteTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            pages = sorted(build.rglob("*.html"))
-            self.assertTrue(pages, "no HTML pages found after minification")
-            for page in pages:
-                relative = page.relative_to(build)
-                text = page.read_text(encoding="utf-8")
-                if text.startswith("google-site-verification:"):
-                    continue
-                content = text.lstrip("\ufeff")
-                self.assertTrue(
-                    re.match(r"(?i)^<!doctype\s+html\s*>", content),
-                    f"{relative} lost its doctype after minification",
-                )
+            assert_minified_pages_keep_doctype(build)
+
+    def test_doctype_check_fails_when_a_minified_page_loses_it(self):
+        with tempfile.TemporaryDirectory() as temp:
+            build = Path(temp)
+            (build / "index.html").write_text(
+                "<!doctype html><html><body>ok</body></html>",
+                encoding="utf-8",
+            )
+            assert_minified_pages_keep_doctype(build)
+
+            (build / "broken.html").write_text(
+                "<html><body>doctype stripped</body></html>",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                AssertionError,
+                r"broken\.html lost its doctype after minification",
+            ):
+                assert_minified_pages_keep_doctype(build)
 
     def test_auth_is_not_rewritten_or_covered(self):
         self.assertEqual((OUT / "app/gate.js").read_bytes(), (ROOT / "website/app/gate.js").read_bytes())
@@ -167,8 +190,8 @@ class SiteTests(unittest.TestCase):
         for name in (".env", "scripts", "src", "experimental", "experiments"):
             self.assertFalse((OUT / name).exists())
         motion = (OUT / "home-motion.js").read_text()
-        self.assertIn('"/media/hero-web.mp4"', motion)
-        self.assertIn('"/media/heaven-loop.mp4"', motion)
+        self.assertIn('\"/media/hero-web.mp4\"', motion)
+        self.assertIn('\"/media/heaven-loop.mp4\"', motion)
 
     def test_build_rejects_missing_entry_points_and_assets(self):
         with tempfile.TemporaryDirectory() as temp:
