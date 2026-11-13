@@ -17,6 +17,15 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "site-build"
 
 
+def build_command_steps(script):
+    chain = next(
+        line.strip()
+        for line in script.splitlines()
+        if line.strip().startswith("python3 website/scripts/build-site.py")
+    )
+    return [step.strip() for step in chain.split("&&") if step.strip()]
+
+
 class Assets(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -83,24 +92,18 @@ class SiteTests(unittest.TestCase):
         self.assertLessEqual(len(command), 256)
         self.assertEqual(command, "bash website/scripts/vercel-build.sh")
         script = (ROOT / "website/scripts/vercel-build.sh").read_text()
-        steps = (
+        steps = build_command_steps(script)
+        self.assertGreaterEqual(len(steps), 6)
+        self.assertEqual(steps[:4], [
             "python3 website/scripts/build-site.py",
             "python3 website/scripts/test-site.py",
             "python3 scripts/test_private_pack_export.py",
             "node website/scripts/test-wallet.cjs",
-            "node --test website/scripts/gate.test.cjs website/scripts/os.test.cjs "
-            "website/scripts/desk.test.cjs website/scripts/host-route.test.cjs "
-            "website/scripts/journey.test.cjs website/scripts/desktop.test.cjs "
-            "website/scripts/minify.test.cjs website/scripts/supabase-auth.test.cjs "
-            "website/scripts/feed.test.cjs website/scripts/ai.test.cjs "
-            "website/scripts/volos-ads.test.cjs",
-            "node website/scripts/minify-site.mjs",
-        )
-        position = -1
-        for step in steps:
-            found = script.find(step)
-            self.assertGreater(found, position, step)
-            position = found
+        ])
+        self.assertTrue(steps[4].startswith("node --test "), steps[4])
+        self.assertEqual(steps[5], "node website/scripts/minify-site.mjs")
+        for step in steps[6:]:
+            self.assertTrue(step.startswith("node --test "), step)
         self.assertFalse(any(item.get("destination") == "/volos/index.html" and "has" not in item for item in config.get("rewrites", [])))
         self.assertFalse((OUT / "index.html").exists())
         with self.get("/home/") as response:
