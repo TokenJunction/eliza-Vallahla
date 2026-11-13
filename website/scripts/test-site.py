@@ -3,6 +3,8 @@ from pathlib import Path
 import functools
 import http.server
 import json
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -126,6 +128,37 @@ class SiteTests(unittest.TestCase):
         self.assertNotIn("will pump", volos.lower())
         self.assertNotIn("github.com", volos.lower())
         self.assertNotRegex(volos, r"0x[0-9a-fA-F]{40}")
+
+    def test_minified_pages_keep_doctype(self):
+        with tempfile.TemporaryDirectory() as temp:
+            build = Path(temp) / "site-build"
+            shutil.copytree(OUT, build)
+            subprocess.run(
+                [
+                    "node",
+                    "--input-type=module",
+                    "-e",
+                    "import { minifySite } from './website/scripts/minify-site.mjs'; "
+                    "await minifySite(process.env.MINIFY_DIR);",
+                ],
+                cwd=ROOT,
+                env={**os.environ, "MINIFY_DIR": str(build)},
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            pages = sorted(build.rglob("*.html"))
+            self.assertTrue(pages, "no HTML pages found after minification")
+            for page in pages:
+                relative = page.relative_to(build)
+                text = page.read_text(encoding="utf-8")
+                if text.startswith("google-site-verification:"):
+                    continue
+                content = text.lstrip("\ufeff")
+                self.assertTrue(
+                    re.match(r"(?i)^<!doctype\s+html\s*>", content),
+                    f"{relative} lost its doctype after minification",
+                )
 
     def test_auth_is_not_rewritten_or_covered(self):
         self.assertEqual((OUT / "app/gate.js").read_bytes(), (ROOT / "website/app/gate.js").read_bytes())
