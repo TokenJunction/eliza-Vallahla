@@ -425,7 +425,7 @@ export function resolveCharacterId(text: string): ValhallaRoleId {
     ['odin', /\b(odin|branch lock|pull request|pr lock|hive)\b/],
     ['sigrun', /\b(sigrun|sigrún|patch author|write code|propose a (patch|diff))\b/],
     ['skuld', /\b(skuld|browser check|playwright|console errors?|renderer crash|page title)\b/],
-    ['hlokk', /\b(hlokk|hlökk|repository movement|open issues?|open prs?|blockers?)\b/],
+    ['hlokk', /\b(hlokk|hlökk|repository movement|open issues?|open prs?)\b/],
     ['valkyrie', /\b(valkyrie|scribe|ast|diff audit|evidence hash)\b/],
     ['cerberus', /\b(cerberus|withdraw|transfer|sign|vault|rate limit|firewall)\b/],
     ['ahti', /\b(ahti|janitor|cleanup|sweep|storage|cache)\b/],
