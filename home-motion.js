@@ -17,9 +17,13 @@
     var stored = false;
     try {
       queryOff = new URLSearchParams(window.location.search).get("motion") === "0";
-      stored = sessionStorage.getItem("valhalla-hero-paused") === "1";
     } catch (error) {
       queryOff = false;
+    }
+    try {
+      stored = sessionStorage.getItem("valhalla-hero-paused") === "1";
+    } catch (error) {
+      stored = false;
     }
     return reduceQuery.matches || saveDataOn() || queryOff || stored;
   }
@@ -39,6 +43,7 @@
     var mp4 = document.createElement("source");
     mp4.src = "/assets/hero-ascent.mp4";
     mp4.type = "video/mp4";
+    mp4.addEventListener("error", showFallback);
     video.appendChild(mp4);
     video.preload = "metadata";
     video.load();
