@@ -13,6 +13,9 @@ const REQUIRED_ROLES = [
   'odin',
   'wren',
   'valkyrie',
+  'sigrun',
+  'skuld',
+  'hlokk',
   'sentinel',
   'forge',
   'gorgo',
@@ -31,7 +34,7 @@ describe('Valhalla role roster', () => {
     expect(new Set(characterRoster.map((entry) => entry.id)).size).toBe(REQUIRED_ROLES.length);
   });
 
-  it('registers all fourteen characters as project agents', () => {
+  it('registers all seventeen characters as project agents', () => {
     expect(project.agents).toHaveLength(REQUIRED_ROLES.length);
     expect(project.agents.map((agent) => agent.character.username)).toEqual(REQUIRED_ROLES);
   });
@@ -77,5 +80,8 @@ describe('Valhalla role roster', () => {
     expect(resolveCharacterId('Help me with onboarding and my API key')).toBe('merlin');
     expect(resolveCharacterId('Summarize the standup')).toBe('gwen');
     expect(resolveCharacterId('Hello, what can you do?')).toBe('conductor');
+    expect(resolveCharacterId('Sigrún, propose a patch for the wallet list bug')).toBe('sigrun');
+    expect(resolveCharacterId('Skuld, check /os/ in the browser for console errors')).toBe('skuld');
+    expect(resolveCharacterId('Hlökk, what moved in the repo and what is blocked?')).toBe('hlokk');
   });
 });
