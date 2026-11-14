@@ -42,7 +42,7 @@ window.VALHALLA_SITE = {
   COINBASE_COMMERCE_URL: "",
   NOWPAYMENTS_URL: "",
   LIVE_TRADING: false,
-  /* Public chat uses the deployed Cloudflare Workers AI service. Brain integration is separate. */
-  CHAT_URL: "https://valhalla-chat.valhalla-app.workers.dev",
+  /* Public chat uses the deployed ElizaOS role bridge. Brain integration is separate. */
+  CHAT_URL: "https://valhalla-elizaos.onrender.com/api/valhalla",
   TICKER_URL: ""
 };

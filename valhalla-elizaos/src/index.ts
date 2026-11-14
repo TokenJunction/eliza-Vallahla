@@ -1,35 +1,50 @@
 import { logger, type IAgentRuntime, type Project, type ProjectAgent } from '@elizaos/core';
-import { character, gorgoCharacter, cerberusCharacter } from './character.ts';
+import { character, characters, VALHALLA_ROLE_IDS, type ValhallaRoleId } from './character.ts';
 import { cerberusPlugin } from './cerberus.ts';
 import { valhallaStatusPlugin } from './plugin.ts';
+import { registerRuntime } from './runtime-registry.ts';
 import { ProjectStarterTestSuite } from './__tests__/e2e/project-starter.e2e.ts';
 
-const initializeAgent = (name: string) => async (runtime: IAgentRuntime) => {
-  logger.info({ agent: name, agentId: runtime.agentId }, 'Valhalla read-only agent initialized');
-};
+const initializeAgent =
+  (role: ValhallaRoleId, name: string) => async (runtime: IAgentRuntime) => {
+    registerRuntime(role, runtime);
+    logger.info({ role, agent: name, agentId: runtime.agentId }, 'Valhalla read-only agent initialized');
+  };
 
-const zeusAgent: ProjectAgent = {
-  character,
-  init: initializeAgent(character.name),
-  plugins: [valhallaStatusPlugin],
-  tests: [ProjectStarterTestSuite],
-};
-
-const gorgoAgent: ProjectAgent = {
-  character: gorgoCharacter,
-  init: initializeAgent(gorgoCharacter.name),
-};
-
-const cerberusAgent: ProjectAgent = {
-  character: cerberusCharacter,
-  init: initializeAgent(cerberusCharacter.name),
-  plugins: [cerberusPlugin],
-};
+function createProjectAgent(role: ValhallaRoleId): ProjectAgent {
+  const roleCharacter = characters[role];
+  return {
+    character: roleCharacter,
+    init: initializeAgent(role, roleCharacter.name),
+    ...(role === 'zeus' ? { plugins: [valhallaStatusPlugin], tests: [ProjectStarterTestSuite] } : {}),
+    ...(role === 'cerberus' ? { plugins: [cerberusPlugin] } : {}),
+  };
+}
 
 const project: Project = {
-  agents: [zeusAgent, gorgoAgent, cerberusAgent],
+  agents: VALHALLA_ROLE_IDS.map(createProjectAgent),
 };
 
-export { character, gorgoCharacter, cerberusCharacter } from './character.ts';
+export {
+  character,
+  characters,
+  conductorCharacter,
+  odinCharacter,
+  wrenCharacter,
+  valkyrieCharacter,
+  sentinelCharacter,
+  forgeCharacter,
+  gorgoCharacter,
+  cerberusCharacter,
+  ahtiCharacter,
+  hermodCharacter,
+  nornsCharacter,
+  gwenCharacter,
+  merlinCharacter,
+  characterRoster,
+  resolveCharacterId,
+  VALHALLA_ROLE_IDS,
+  type ValhallaRoleId,
+} from './character.ts';
 
 export default project;
