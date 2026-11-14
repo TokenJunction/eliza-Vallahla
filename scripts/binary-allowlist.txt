@@ -1,0 +1,2 @@
+# Paths of committed executables that are allowed. One path per line.
+# Image, video, and font files are not executables and do not belong here.

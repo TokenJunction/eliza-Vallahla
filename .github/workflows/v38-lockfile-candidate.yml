@@ -5,17 +5,19 @@ on:
     paths: ['.github/workflows/v38-lockfile-candidate.yml']
 permissions:
   contents: read
-  pull-requests: write
 concurrency:
   group: v38-lockfile-candidate
   cancel-in-progress: false
 jobs:
   candidate:
+    permissions:
+      contents: read
+      pull-requests: write
     if: github.repository == 'TokenJunction/eliza-valhalla' && github.ref == 'refs/heads/copilot/fix-350450408-1440217645-36eef3f4-91a2-4723-b0b7-872e5b817e41'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
