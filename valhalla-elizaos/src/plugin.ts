@@ -6,7 +6,7 @@ import {
   type Plugin,
   type RouteResponse,
 } from '@elizaos/core';
-import { resolveCharacterId, type ValhallaRoleId } from './character.ts';
+import { VALHALLA_ROLE_IDS, resolveCharacterId, type ValhallaRoleId } from './character.ts';
 import { getRuntime } from './runtime-registry.ts';
 
 type ChatBody = {
@@ -58,7 +58,7 @@ async function handleChat(body: ChatBody, response: RouteResponse) {
   const requested =
     typeof body.agent === 'string' ? body.agent.trim().toLowerCase() : '';
   const role: ValhallaRoleId =
-    requested in { conductor: 1, zeus: 1, odin: 1, wren: 1, valkyrie: 1, sentinel: 1, forge: 1, gorgo: 1, cerberus: 1, ahti: 1, hermod: 1, norns: 1, gwen: 1, merlin: 1 }
+    (VALHALLA_ROLE_IDS as readonly string[]).includes(requested)
       ? (requested as ValhallaRoleId)
       : resolveCharacterId(text);
   const runtime = getRuntime(role);
