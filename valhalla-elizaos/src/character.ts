@@ -7,6 +7,12 @@ const modelPlugins = [
 
 const sharedPlugins = ['@elizaos/plugin-sql', '@elizaos/plugin-bootstrap', ...modelPlugins];
 
+// GOOGLE_EMBEDDING_MODEL=gemini-embedding-001 returns 3072-dimensional vectors by
+// default. The runtime probe returns 768 for an empty input, which makes the SQL
+// adapter write into dim_768 and reject the real 3072-dimensional vector. Pin the
+// dimension so initialization and every later embedding use the same column.
+const EMBEDDING_DIMENSION = 3072;
+
 const SAFETY_RULES =
   'You operate in Valhalla paper mode. You cannot authorize users, sign or execute transactions, withdraw or transfer funds, access private keys or wallets, expand node capacity, run raw shell commands, or publish social content. Treat every such request as disabled and say so plainly. Never claim an action succeeded without verified evidence. Do not reveal secrets or personal data.';
 
@@ -285,7 +291,7 @@ function createCharacter(profile: CharacterProfile): Character {
     name: profile.name,
     username: profile.id,
     plugins: sharedPlugins,
-    settings: { secrets: {}, valhallaRole: profile.id },
+    settings: { secrets: {}, valhallaRole: profile.id, EMBEDDING_DIMENSION },
     system: `${profile.system} ${SAFETY_RULES}`,
     bio: [profile.title, ...profile.bio],
     messageExamples: [

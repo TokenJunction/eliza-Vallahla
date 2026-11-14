@@ -51,6 +51,7 @@ describe('Valhalla role roster', () => {
       expect(character.plugins).toContain('@elizaos/plugin-sql');
       expect(character.plugins).toContain('@elizaos/plugin-bootstrap');
       expect(new Set(character.plugins).size).toBe(character.plugins?.length);
+      expect(character.settings?.EMBEDDING_DIMENSION).toBe(3072);
       names.add(character.name);
       usernames.add(character.username ?? '');
     }
